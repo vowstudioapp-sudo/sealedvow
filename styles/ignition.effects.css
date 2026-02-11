@@ -1,0 +1,228 @@
+/* ================================================================
+   IGNITION EFFECTS
+   Component: InteractiveQuestion.tsx
+   Responsibility: Energy buildup → ignition → release
+   ================================================================ */
+
+/* ================================================================
+   CORE VARIABLES
+   ================================================================ */
+
+   .ignition-container {
+    --energy: 0;
+    --gold: rgba(212, 175, 55, 1);
+  }
+  
+  /* ================================================================
+     SCREEN SHAKE (TENSION)
+     ================================================================ */
+  
+  @keyframes ignition-shake {
+    0%, 100% { transform: translate(0, 0); }
+    25%      { transform: translate(-1px, 1px); }
+    50%      { transform: translate(1px, -1px); }
+    75%      { transform: translate(-1px, -1px); }
+  }
+  
+  .ignition-shake {
+    animation: ignition-shake 0.15s linear infinite;
+  }
+  
+  /* ================================================================
+     ENERGY RINGS (BUILDUP)
+     ================================================================ */
+  
+  @keyframes ignition-ring-pulse {
+    from {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.2;
+    }
+    to {
+      transform: translate(-50%, -50%) scale(1.3);
+      opacity: 0;
+    }
+  }
+  
+  .ignition-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 350px;
+    height: 350px;
+    border-radius: 50%;
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    pointer-events: none;
+  }
+  
+  .ignition-ring--active {
+    animation: ignition-ring-pulse 1.5s ease-out infinite;
+  }
+  
+  /* ================================================================
+     ROTATING ENERGY RINGS (MOMENTUM)
+     ================================================================ */
+  
+  @keyframes ignition-spin {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to   { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+  
+  .ignition-rotating-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    border: 1px solid rgba(212, 175, 55, 0.1);
+    animation: ignition-spin 10s linear infinite;
+  }
+  
+  .ignition-rotating-ring--active {
+    animation-duration: 2s;
+  }
+  
+  /* ================================================================
+     PARTICLE GLOW AURA (EMOTIONAL CHARGE)
+     ================================================================ */
+  
+  @keyframes ignition-particle-glow {
+    0%, 100% { opacity: 0.1; transform: scale(1); }
+    50%      { opacity: 0.3; transform: scale(1.05); }
+  }
+  
+  .ignition-particle-glow {
+    position: absolute;
+    inset: -20px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212,175,55,0.3), transparent);
+    filter: blur(40px);
+    pointer-events: none;
+    opacity: 0;
+  }
+  
+  .ignition-particle-glow--active {
+    animation: ignition-particle-glow 1s ease-in-out infinite;
+  }
+  
+  /* ================================================================
+     HEADER FADE & RISE (TRANSITION)
+     ================================================================ */
+  
+  @keyframes ignition-text-fade-rise {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-100px); }
+  }
+  
+  .ignition-header {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  
+  .ignition-header--fading {
+    animation: ignition-text-fade-rise 2s ease-out forwards;
+  }
+  
+  /* ================================================================
+     INSTRUCTION GLOW (FOCUS)
+     ================================================================ */
+  
+  @keyframes ignition-text-glow {
+    0%, 100% {
+      text-shadow: 0 0 10px rgba(212,175,55,0.3);
+      letter-spacing: 0.4em;
+    }
+    50% {
+      text-shadow: 0 0 20px rgba(212,175,55,0.6);
+      letter-spacing: 0.5em;
+    }
+  }
+  
+  .ignition-instruction {
+    transition: letter-spacing 0.3s ease, text-shadow 0.3s ease;
+  }
+  
+  .ignition-instruction--active {
+    animation: ignition-text-glow 1.5s ease-in-out infinite;
+  }
+  
+  /* ================================================================
+     BACKGROUND TEXTURE (SUBTLE DEPTH)
+     ================================================================ */
+  
+  .ignition-background {
+    position: absolute;
+    inset: 0;
+    opacity: 0.08;
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(255,255,255,0.03) 2px,
+        rgba(255,255,255,0.03) 4px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(255,255,255,0.03) 2px,
+        rgba(255,255,255,0.03) 4px
+      );
+    pointer-events: none;
+  }
+  
+  /* ================================================================
+     ENERGY-DRIVEN BUTTON GLOW
+     ================================================================ */
+  
+  .ignition-button {
+    filter: drop-shadow(
+      0 0 calc(var(--energy) * 0.3px)
+      rgba(212,175,55,0.6)
+    );
+  }
+  
+  /* ================================================================
+     FLASH OVERLAY (IGNITION MOMENT)
+     ================================================================ */
+  
+  @keyframes ignition-flash-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  
+  .ignition-flash {
+    position: fixed;
+    inset: 0;
+    background: white;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 100;
+  }
+  
+  .ignition-flash--active {
+    animation: ignition-flash-in 1.5s ease-out forwards;
+  }
+  
+  /* ================================================================
+     GLOBAL KILL SWITCH (SAFETY)
+     ================================================================ */
+  
+  .ignition-container[data-state="complete"] * {
+    animation: none !important;
+  }
+  
+  /* ================================================================
+     ACCESSIBILITY — REDUCED MOTION
+     ================================================================ */
+  
+  @media (prefers-reduced-motion: reduce) {
+    .ignition-shake,
+    .ignition-ring--active,
+    .ignition-rotating-ring,
+    .ignition-particle-glow--active,
+    .ignition-instruction--active,
+    .ignition-flash--active {
+      animation: none !important;
+    }
+  }

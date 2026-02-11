@@ -1,0 +1,316 @@
+/* ================================================================
+   MASTER CONTROL EFFECTS
+   Component: MasterControl.tsx
+   Responsibility: Reveal / Sync control interface
+   ================================================================ */
+
+
+/* ================================================================
+   DESIGN TOKENS
+   Scoped to MasterControl only
+   ================================================================ */
+
+   .master-control {
+    --mc-wine: 88, 47, 47;
+    --mc-gold: 212, 175, 55;
+    --mc-stone: 68, 68, 68;
+  }
+  
+  
+  /* ================================================================
+     ROOT CONTAINER
+     ================================================================ */
+  
+  .master-control {
+    min-height: 100vh;
+    background-color: #050505;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1.5rem;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+  }
+  
+  
+  /* ================================================================
+     AMBIENT BACKGROUND
+     ================================================================ */
+  
+  .master-control-ambient-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at center,
+      rgba(var(--mc-wine), 0.2) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+  
+  
+  /* ================================================================
+     HEADER
+     ================================================================ */
+  
+  .master-control-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    position: relative;
+    z-index: 10;
+  }
+  
+  .master-control-eyebrow {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.4em;
+    color: rgba(var(--mc-gold), 1);
+    margin-bottom: 1rem;
+    opacity: 0.6;
+  }
+  
+  .master-control-title {
+    font-size: clamp(1.875rem, 5vw, 3rem);
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    color: #ffffff;
+  }
+  
+  
+  /* ================================================================
+     REMOTE MODE
+     ================================================================ */
+  
+  .master-control-remote {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+  }
+  
+  .master-control-remote-button {
+    width: 12rem;
+    height: 12rem;
+    border-radius: 9999px;
+    border: 2px solid rgba(var(--mc-wine), 1);
+    background: rgba(var(--mc-wine), 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.875rem;
+    color: #ffffff;
+    cursor: pointer;
+  
+    box-shadow: 0 0 50px rgba(var(--mc-wine), 0.4);
+  
+    transition:
+      transform 700ms,
+      background-color 700ms,
+      border-color 700ms,
+      box-shadow 700ms,
+      color 700ms;
+  }
+  
+  .master-control-remote-button:hover:not(:disabled) {
+    transform: scale(1.05);
+  }
+  
+  .master-control-remote-button:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+  
+  .master-control-remote-button.is-triggered {
+    background: rgba(var(--mc-gold), 1);
+    border-color: rgba(var(--mc-gold), 1);
+    color: #000000;
+    transform: scale(0.9);
+    box-shadow: 0 0 50px rgba(var(--mc-gold), 0.5);
+  }
+  
+  .master-control-hint {
+    margin-top: 2rem;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #666666;
+  }
+  
+  
+  /* ================================================================
+     SYNC MODE
+     ================================================================ */
+  
+  .master-control-sync {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+  }
+  
+  .master-control-sync-button-wrapper {
+    position: relative;
+    margin-bottom: 2rem;
+  }
+  
+  
+  /* --- Glow --- */
+  
+  .master-control-sync-glow {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: rgba(var(--mc-gold), 0.3);
+    filter: blur(2rem);
+    opacity: 0;
+    transform: scale(1);
+    transition: opacity 300ms, transform 300ms;
+    pointer-events: none;
+  }
+  
+  .master-control-sync-glow.is-active {
+    opacity: 0.8;
+    transform: scale(var(--glow-scale, 1));
+  }
+  
+  
+  /* --- Sync Button --- */
+  
+  .master-control-sync-button {
+    position: relative;
+    width: 10rem;
+    height: 10rem;
+    border-radius: 9999px;
+    background: rgba(var(--mc-wine), 0.05);
+    backdrop-filter: blur(0.5rem);
+    border: 1px solid rgba(var(--mc-gold), 0.4);
+  
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  
+    font-size: 3rem;
+    color: rgba(var(--mc-stone), 0.4);
+    filter: grayscale(1);
+  
+    cursor: pointer;
+    overflow: hidden;
+  
+    transition:
+      transform 300ms,
+      border-color 300ms,
+      box-shadow 300ms,
+      color 300ms,
+      filter 300ms;
+  }
+  
+  .master-control-sync-button:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+  
+  .master-control-sync-button.is-pressing {
+    border-color: rgba(var(--mc-gold), 1);
+    box-shadow: 0 0 30px rgba(var(--mc-gold), 0.3);
+    color: rgba(var(--mc-wine), 0.8);
+    filter: grayscale(0);
+    transform: scale(1.1);
+  }
+  
+  
+  /* --- Progress Ring --- */
+  
+  .master-control-sync-ring {
+    position: absolute;
+    inset: 0;
+    transform: rotate(-90deg) scale(1.05);
+    pointer-events: none;
+  }
+  
+  .master-control-sync-ring circle {
+    fill: none;
+    stroke: rgba(var(--mc-gold), 1);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 75ms linear;
+  }
+  
+  
+  /* ================================================================
+     SYNC STATUS TEXT
+     ================================================================ */
+  
+  .master-control-sync-status {
+    text-align: center;
+    min-height: 3rem;
+  }
+  
+  .status-unlocked {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.4em;
+    color: #4ade80;
+    font-weight: bold;
+  }
+  
+  .status-partner-active {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: rgba(var(--mc-gold), 1);
+    animation: pulse 2s infinite;
+  }
+  
+  .status-waiting {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #555555;
+  }
+  
+  .status-warning {
+    font-size: 8px;
+    color: #f87171;
+    margin-top: 0.5rem;
+  }
+  
+  
+  /* ================================================================
+     VIGIL MODE
+     ================================================================ */
+  
+  .master-control-vigil {
+    color: rgba(255, 255, 255, 0.6);
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1.125rem;
+    position: relative;
+    z-index: 10;
+  }
+  
+  
+  /* ================================================================
+     ANIMATIONS
+     ================================================================ */
+  
+  @keyframes pulse {
+    0%   { opacity: 0.6; }
+    50%  { opacity: 1; }
+    100% { opacity: 0.6; }
+  }
+  
+  
+  /* ================================================================
+     ACCESSIBILITY
+     ================================================================ */
+  
+  @media (prefers-reduced-motion: reduce) {
+    .master-control *,
+    .master-control *::before,
+    .master-control *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }

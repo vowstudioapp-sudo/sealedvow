@@ -1,0 +1,8 @@
+{
+  "name": "Valentine's Eternal Love",
+  "description": "A deeply personalized and romantic digital surprise package featuring AI-generated letters, virtual gift boxes, and interactive memories.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

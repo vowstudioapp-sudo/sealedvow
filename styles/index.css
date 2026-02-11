@@ -1,0 +1,135 @@
+/* ================================================================
+   GLOBAL FOUNDATION
+   ================================================================ */
+
+   body {
+    font-family: 'Quicksand', sans-serif;
+    background-color: #050505;
+    color: #2D2424;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 2.5s ease-out;
+  }
+  
+  /* Font utilities (used across multiple components) */
+  .font-romantic {
+    font-family: 'Dancing Script', cursive;
+  }
+  
+  .font-serif-elegant {
+    font-family: 'Playfair Display', serif;
+  }
+  
+  /* Scrollbar normalization */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* ================================================================
+     GLOBAL DESIGN PRIMITIVES
+     (Reusable, non-branded building blocks)
+     ================================================================ */
+  
+  .silk-glass {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+  }
+  
+  .narrative-container {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  
+  .polaroid {
+    background: #ffffff;
+    padding: 1rem;
+    padding-bottom: 3.5rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+  
+  /* ================================================================
+     GLOBAL REVEAL ANIMATIONS
+     (Generic, non-thematic animations only)
+     ================================================================ */
+  
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .reveal-section {
+    opacity: 0;
+    animation: fade-in-up 1.8s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+  }
+  
+  /* ================================================================
+     BOOT / LOADING SCREEN (App-level only)
+     ================================================================ */
+  
+  .boot-screen-container {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: linear-gradient(180deg, #1A0B2E 0%, #0F0622 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 1s ease-out;
+  }
+  
+  .boot-screen-container.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  /* ================================================================
+     GLOBAL OVERLAYS
+     (Applied across the entire application)
+     ================================================================ */
+  
+  /*
+    Film grain overlay
+    NOTE:
+    - Kept global by design
+    - Replace with pure CSS grain later if external assets are banned
+  */
+  .film-grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.04;
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.03),
+        rgba(255, 255, 255, 0.03) 1px,
+        transparent 1px,
+        transparent 2px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.02),
+        rgba(255, 255, 255, 0.02) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+  }
+  
+  /* ================================================================
+     ACCESSIBILITY (Always Last)
+     ================================================================ */
+  
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }

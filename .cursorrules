@@ -1,0 +1,106 @@
+# On Mac/Linux
+touch .cursorrules
+
+# On Windows
+type nul > .cursorrules
+```
+
+### **Step 3: Paste ChatGPT's Immutability Rule**
+Open `.cursorrules` and paste this **EXACTLY**:
+```
+🚫 CURSOR AI — ABSOLUTE IMMUTABILITY RULE
+
+APPLIES TO THIS FILE AND ALL FUTURE EDITS
+
+You are editing a React + TypeScript codebase that enforces STRICT IMMUTABILITY.
+
+❌ ABSOLUTE BAN (NON-NEGOTIABLE)
+
+You MUST NOT, under ANY circumstance:
+
+* Mutate arrays using:
+   * array[index] = ...
+   * .splice()
+   * .push()
+   * .pop()
+   * .shift()
+   * .unshift()
+
+* Mutate objects using:
+   * obj.key = ...
+   * delete obj.key
+
+* Mutate derived copies after spread:
+   * const x = [...arr]; x[i] = ... ❌
+   * const x = { ...obj }; x.a = ... ❌
+
+If ANY of the above appear, the task is FAILED.
+
+✅ ONLY ALLOWED STATE UPDATE PATTERNS
+
+When updating arrays, you MUST use pure functional transforms:
+- .map()
+- .filter()
+- .reduce()
+
+Example (MANDATORY pattern):
+```
+updateData(prev => ({
+  memoryBoard: prev.memoryBoard?.map((item, i) =>
+    i === index ? { ...item, caption } : item
+  ) ?? []
+}));
+```
+
+When updating objects, you MUST use direct object replacement:
+```
+updateData(prev => ({
+  audio: prev.audio ? { ...prev.audio, url: null } : null
+}));
+```
+
+🔒 FUNCTIONAL UPDATES ARE REQUIRED
+
+* All state updates MUST use functional updaters:
+   * updateData(prev => ({ ... }))
+
+* Captured state (data, step, etc.) MUST NOT be used inside updates.
+
+🧪 VERIFICATION CHECK (MANDATORY)
+
+Before responding, you MUST internally verify:
+* No array index assignments exist
+* No .splice() calls exist
+* No object property assignments exist
+* All updates are referentially pure
+* ESLint immutable/no-mutation would pass
+
+If verification fails, you MUST fix the code before returning.
+
+🧠 DESIGN INTENT (DO NOT IGNORE)
+
+This codebase:
+* Uses React concurrent rendering
+* Relies on referential equality
+* Assumes updates are replay-safe
+* Must never contain hidden mutation risk
+
+Readability and future safety > brevity.
+
+✅ FINAL OUTPUT REQUIREMENT
+
+* Code must be 100% immutable
+* No comments explaining immutability
+* No justification text
+* Just the corrected code
+
+🏁 FAILURE CONDITION
+
+If even ONE of the following appears, the output is invalid:
+* array[index] =
+* .splice(
+* .push(
+* .pop(
+* object.key =
+* obj[key] =
+* delete

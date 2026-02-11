@@ -1,0 +1,197 @@
+/* ================================================================
+   LANDING PAGE EFFECTS
+   Component: LandingPage.tsx
+   Responsibility: Visual atmosphere only
+   ================================================================ */
+
+/* ================================================================
+   DESIGN TOKENS (Local Scope)
+   ================================================================ */
+
+   .landing {
+    --landing-gold: 212, 175, 55;
+    --landing-wine: 88, 47, 47;
+    --landing-glow-opacity: 0.35;
+    --landing-texture-opacity: 0.08;
+  }
+  
+  /* ================================================================
+     BACKGROUND LAYERS
+     ================================================================ */
+  
+  .landing-background {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  
+  .landing-glow {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    opacity: var(--landing-glow-opacity);
+    pointer-events: none;
+  }
+  
+  .landing-glow--wine {
+    background: radial-gradient(
+      circle at center,
+      rgba(var(--landing-wine), 0.9),
+      transparent 60%
+    );
+  }
+  
+  .landing-glow--gold {
+    background: radial-gradient(
+      circle at center,
+      rgba(var(--landing-gold), 0.9),
+      transparent 60%
+    );
+  }
+  
+  .landing-texture {
+    position: absolute;
+    inset: 0;
+    opacity: var(--landing-texture-opacity);
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle at 0 0, rgba(255,255,255,0.07), transparent 55%),
+      radial-gradient(circle at 100% 0, rgba(var(--landing-gold),0.08), transparent 55%),
+      radial-gradient(circle at 0 100%, rgba(0,0,0,0.4), transparent 65%);
+  }
+  
+  /* ================================================================
+     MONOGRAM
+     ================================================================ */
+  
+  .monogram-ring {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .monogram-ring--outer,
+  .monogram-ring--inner {
+    position: absolute;
+    border-radius: 9999px;
+    border: 0.5px solid rgba(var(--landing-gold), 0.5);
+  }
+  
+  .monogram-ring--outer {
+    inset: 0;
+    box-shadow: 0 0 40px rgba(var(--landing-gold), 0.35);
+  }
+  
+  .monogram-ring--inner {
+    inset: 6px;
+    border-color: rgba(var(--landing-gold), 0.3);
+  }
+  
+  .monogram-glow {
+    position: absolute;
+    inset: 18%;
+    border-radius: 9999px;
+    background: radial-gradient(
+      circle at center,
+      rgba(var(--landing-gold), 0.4),
+      transparent 70%
+    );
+    opacity: 0.9;
+  }
+  
+  /* ================================================================
+     ENTER BUTTON
+     ================================================================ */
+  
+  .landing-enter-button {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .landing-enter-fill {
+    position: absolute;
+    inset: 0;
+    transform: translateY(100%);
+    background: linear-gradient(
+      to top,
+      rgba(var(--landing-gold), 0.18),
+      rgba(var(--landing-gold), 0.5)
+    );
+    transition: transform 450ms cubic-bezier(0.19, 1, 0.22, 1);
+  }
+  
+  .landing-enter-button:hover .landing-enter-fill {
+    transform: translateY(0%);
+  }
+  
+  /* ================================================================
+     PROGRESS BAR
+     ================================================================ */
+  
+  .landing-progress-track {
+    position: relative;
+    width: 100%;
+    height: 1px;
+    border-radius: 9999px;
+    overflow: hidden;
+    background: linear-gradient(
+      to right,
+      rgba(var(--landing-gold), 0.08),
+      rgba(var(--landing-gold), 0.35)
+    );
+  }
+  
+  .landing-progress-bar {
+    position: absolute;
+    inset: 0;
+    width: 0%;
+    background: linear-gradient(
+      to right,
+      rgba(var(--landing-gold), 0.25),
+      rgba(var(--landing-gold), 0.9)
+    );
+    box-shadow: 0 0 12px rgba(var(--landing-gold), 0.8);
+  }
+  
+  /* ================================================================
+     ANIMATIONS
+     ================================================================ */
+  
+  @keyframes landing-pulse {
+    0%   { opacity: 0.5; }
+    40%  { opacity: 1; }
+    70%  { opacity: 0.9; }
+    100% { opacity: 0.4; }
+  }
+  
+  /* ================================================================
+     STATE CONTROL (Kill Switch)
+     ================================================================ */
+  
+  .landing[data-state="complete"] * {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  /* ================================================================
+     ACCESSIBILITY
+     ================================================================ */
+  
+  @media (prefers-reduced-motion: reduce) {
+    .landing * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+  
+  /* ================================================================
+     PROGRESSIVE ENHANCEMENT
+     ================================================================ */
+  
+  @supports (mix-blend-mode: screen) {
+    .landing-glow {
+      mix-blend-mode: screen;
+    }
+  }
