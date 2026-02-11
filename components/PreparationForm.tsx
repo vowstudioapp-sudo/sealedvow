@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { usePreparationState } from '../hooks/usePreparationState';
 import { useMediaUploads } from '../hooks/useMediaUploads';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
@@ -55,6 +56,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   
   const media = useMediaUploads({
     sessionId: data.sessionId,
+    currentMemoryCount: () => data.memoryBoard?.length || 0,
     updateData,
     onError: setError,
   });
@@ -79,6 +81,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   const [showAllOccasions, setShowAllOccasions] = useState(false);
   // UI State for Location Fields (Fix #2)
   const [showLocationFields, setShowLocationFields] = useState(false);
+  const [activePhoto, setActivePhoto] = useState<number | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +99,16 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
       }
     };
   }, []);
+
+  // Scroll lock when photo is zoomed
+  useEffect(() => {
+    if (activePhoto !== null) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [activePhoto]);
 
   const handleOccasionChange = (occ: Occasion) => {
       const occasionConfig = OCCASIONS.find(o => o.id === occ);
@@ -120,11 +133,8 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
   // --- MEMORY BOARD UPLOAD LOGIC ---
   const handleMemoryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[DEBUG] handleMemoryUpload fired');
     const files = Array.from(e.target.files || []);
-    console.log(`[DEBUG] Files selected: ${files.length}`);
-    files.forEach((f, i) => console.log(`[DEBUG]   File ${i + 1}: ${f.name} | ${f.type} | ${(f.size / 1024).toFixed(1)}KB`));
-    console.log('[DEBUG] Calling media.uploadMemoryBoard...');
+    e.target.value = '';
     media.uploadMemoryBoard(files);
   };
 
@@ -182,15 +192,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation for Memory Board
-    if (step === 2) {
-      const memoryCount = data.memoryBoard?.length || 0;
-      if (memoryCount > 0 && memoryCount < 5) {
-        alert("Please upload at least 5 photos for the Memory Board, or remove them all to skip this feature.");
-        return;
-      }
-    }
 
     if (step < 3) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -237,6 +238,14 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
       </div>
 
       <form onSubmit={handleSubmit} className="relative space-y-12">
+
+        {error && (
+          <div className="mx-auto max-w-md p-4 bg-[#2B0A0A]/80 border border-red-400/30 text-red-200 text-[11px] tracking-wide rounded-lg text-center backdrop-blur-sm"
+               onClick={() => setError(null)}>
+            {error}
+            <span className="block text-[9px] text-red-300/50 mt-1 uppercase tracking-widest">Tap to dismiss</span>
+          </div>
+        )}
         
         {/* PHASE 1: THE FOUNDATION */}
         {step === 1 && (
@@ -371,7 +380,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                        The Memory Board (Optional)
                      </label>
                      <p className="text-[10px] uppercase tracking-widest text-luxury-ink/70 mb-6 font-bold max-w-sm mx-auto">
-                       Upload 5 to 10 photos to create a scattered, handwritten polaroid collage. This is a separate <strong>interactive gallery</strong>.
+                       Upload up to 10 photos to create a scattered, handwritten polaroid collage. This is a separate <strong>interactive gallery</strong>. Best with 5–10 photos.
                      </p>
                   </div>
                   
@@ -393,34 +402,97 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                        className="hidden" 
                      />
                      <p className="text-[10px] mt-4 text-luxury-stone/80 uppercase tracking-widest font-bold">
-                       {(data.memoryBoard?.length || 0)} / 10 Uploaded (Min 5)
+                       {(data.memoryBoard?.length || 0)} / 10 Uploaded
                      </p>
                   </div>
 
                   {data.memoryBoard && data.memoryBoard.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-8">
-                       {data.memoryBoard.map((photo, idx) => (
-                          <div key={idx} className="bg-white p-2 pb-6 shadow-md border border-black/10 relative group transition-transform hover:-translate-y-1">
-                             <button 
-                               type="button" 
-                               onClick={() => removeMemoryPhoto(idx)}
-                               className="absolute -top-2 -right-2 w-6 h-6 bg-luxury-wine text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
-                             >
-                               ✕
-                             </button>
-                             <div className="aspect-square overflow-hidden bg-gray-100 mb-2">
-                                <img src={photo.url} className="w-full h-full object-cover" alt="Memory" />
-                             </div>
-                             <input 
-                               type="text" 
-                               placeholder="1-3 word caption"
-                               value={photo.caption}
-                               onChange={e => updateMemoryCaption(idx, e.target.value)}
-                               className="w-full bg-transparent border-b border-transparent hover:border-luxury-ink/20 text-center text-sm font-romantic text-luxury-ink outline-none focus:border-luxury-gold transition-colors pb-1 placeholder-luxury-ink/40"
-                               maxLength={25}
-                             />
-                          </div>
-                       ))}
+                    <div className="relative w-full mt-8" style={{ minHeight: `${Math.ceil((data.memoryBoard.length) / 2) * 200 + 80}px` }}>
+
+                       {/* Backdrop overlay when a photo is zoomed */}
+                       {activePhoto !== null && (
+                         <motion.div
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: 1 }}
+                           exit={{ opacity: 0 }}
+                           transition={{ duration: 0.2 }}
+                           className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[90]"
+                           onClick={() => setActivePhoto(null)}
+                         />
+                       )}
+
+                       {data.memoryBoard.map((photo, idx) => {
+                          const col = idx % 2;
+                          const row = Math.floor(idx / 2);
+                          const baseX = col * 52;
+                          const baseY = row * 200;
+                          const isActive = activePhoto === idx;
+
+                          return (
+                            <motion.div
+                              key={`${photo.url}-${idx}`}
+                              drag={!isActive}
+                              dragMomentum={false}
+                              dragElastic={0.15}
+                              initial={false}
+                              animate={{
+                                scale: isActive ? 1.6 : 1,
+                                rotate: isActive ? 0 : photo.angle,
+                                zIndex: isActive ? 100 : idx + 1,
+                              }}
+                              transition={{
+                                type: 'spring',
+                                stiffness: 320,
+                                damping: 26,
+                              }}
+                              onTap={() => setActivePhoto(isActive ? null : idx)}
+                              className={`absolute group touch-none ${isActive ? 'cursor-zoom-out' : 'cursor-grab active:cursor-grabbing'}`}
+                              style={{
+                                left: `${baseX + photo.xOffset * 0.15}%`,
+                                top: `${baseY + photo.yOffset}px`,
+                                width: '44%',
+                              }}
+                            >
+                              <div className={`bg-white p-2 pb-6 border border-black/5 relative transition-shadow duration-300 ${isActive ? 'shadow-[0_12px_40px_rgba(0,0,0,0.35)]' : 'shadow-[0_4px_20px_rgba(0,0,0,0.15)]'}`}>
+                                {/* Delete button — only visible when not zoomed */}
+                                {!isActive && (
+                                  <button 
+                                    type="button" 
+                                    onClick={(e) => { e.stopPropagation(); removeMemoryPhoto(idx); }}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className="absolute -top-2 -right-2 w-6 h-6 bg-luxury-wine text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+
+                                {/* Photo */}
+                                <div 
+                                  className="aspect-square overflow-hidden bg-gray-100 mb-2"
+                                  onPointerDown={(e) => { if (isActive) e.stopPropagation(); }}
+                                >
+                                  <img 
+                                    src={photo.url} 
+                                    className="w-full h-full object-cover pointer-events-none select-none" 
+                                    alt="Memory" 
+                                    draggable={false}
+                                  />
+                                </div>
+
+                                {/* Caption */}
+                                <input 
+                                  type="text" 
+                                  placeholder="caption..."
+                                  value={photo.caption}
+                                  onChange={e => updateMemoryCaption(idx, e.target.value)}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  className="w-full bg-transparent border-b border-transparent hover:border-luxury-ink/20 text-center text-[11px] font-romantic text-luxury-ink outline-none focus:border-luxury-gold transition-colors pb-1 placeholder-luxury-ink/30"
+                                  maxLength={25}
+                                />
+                              </div>
+                            </motion.div>
+                          );
+                       })}
                     </div>
                   )}
                 </div>
