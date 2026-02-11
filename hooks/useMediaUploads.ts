@@ -128,12 +128,19 @@ export function useMediaUploads({
    * This is intentional for UX consistency.
    */
   const uploadMemoryBoard = async (files: File[]) => {
+    console.log('[DEBUG] uploadMemoryBoard called');
+    console.log(`[DEBUG] sessionId: ${sessionId}`);
+    console.log(`[DEBUG] files.length: ${files.length}`);
+    console.log(`[DEBUG] MEMORY_MIN: ${LIMITS.MEMORY_MIN} | MEMORY_MAX: ${LIMITS.MEMORY_MAX}`);
+
     if (files.length < LIMITS.MEMORY_MIN) {
+      console.warn(`[DEBUG] REJECTED: ${files.length} files < MEMORY_MIN (${LIMITS.MEMORY_MIN})`);
       onError(`Please upload at least ${LIMITS.MEMORY_MIN} photos`);
       return;
     }
 
     if (files.length > LIMITS.MEMORY_MAX) {
+      console.warn(`[DEBUG] REJECTED: ${files.length} files > MEMORY_MAX (${LIMITS.MEMORY_MAX})`);
       onError(`Maximum ${LIMITS.MEMORY_MAX} photos allowed`);
       return;
     }
@@ -142,12 +149,17 @@ export function useMediaUploads({
 
     try {
       const sid = ensureSession();
+      console.log(`[DEBUG] Session confirmed: ${sid}`);
 
-      files.forEach(file =>
-        validateFileSize(file, LIMITS.IMAGE_MB, 'Photo')
-      );
+      files.forEach((file, i) => {
+        console.log(`[DEBUG] Validating file ${i + 1}: ${file.name} | ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+        validateFileSize(file, LIMITS.IMAGE_MB, 'Photo');
+      });
 
+      console.log('[DEBUG] All files validated. Starting Firebase upload...');
       const urls = await uploadMemoryPhotos(sid, files);
+      console.log(`[DEBUG] Upload complete. ${urls.length} URLs returned.`);
+      urls.forEach((url, i) => console.log(`[DEBUG]   URL ${i + 1}: ${url.substring(0, 60)}...`));
 
       const memoryBoard: MemoryPhoto[] = urls.map(url => ({
         url,
@@ -158,10 +170,14 @@ export function useMediaUploads({
       }));
 
       updateData({ memoryBoard });
+      console.log('[DEBUG] memoryBoard state updated');
     } catch (err: any) {
+      console.error('[DEBUG] uploadMemoryBoard FAILED:', err);
+      console.error('[DEBUG] Error stack:', err.stack);
       onError(err.message || 'Memory board upload failed');
     } finally {
       setIsUploadingMemories(false);
+      console.log('[DEBUG] uploadMemoryBoard finished');
     }
   };
 

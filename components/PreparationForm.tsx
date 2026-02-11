@@ -120,7 +120,11 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
   // --- MEMORY BOARD UPLOAD LOGIC ---
   const handleMemoryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[DEBUG] handleMemoryUpload fired');
     const files = Array.from(e.target.files || []);
+    console.log(`[DEBUG] Files selected: ${files.length}`);
+    files.forEach((f, i) => console.log(`[DEBUG]   File ${i + 1}: ${f.name} | ${f.type} | ${(f.size / 1024).toFixed(1)}KB`));
+    console.log('[DEBUG] Calling media.uploadMemoryBoard...');
     media.uploadMemoryBoard(files);
   };
 
