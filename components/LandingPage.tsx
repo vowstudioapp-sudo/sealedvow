@@ -56,7 +56,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#D4AF37] relative overflow-hidden flex flex-col">
+    <div className="landing min-h-screen bg-[#050505] text-[#D4AF37] relative overflow-hidden flex flex-col">
 
       {/* Modals */}
       <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
@@ -117,7 +117,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 onClick={handleEnter}
                 className="landing-enter-button"
               >
-                <span className="relative z-10 transition-colors duration-500 group-hover:text-[#050505]">
+                <span className="relative z-10">
                   Enter Studio
                 </span>
                 <div className="landing-enter-fill" />

@@ -1,6 +1,6 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CoupleData } from '../types';
+import { saveSession, slugify } from '../services/firebase';
 
 interface Props {
   data: CoupleData;
@@ -11,39 +11,63 @@ interface Props {
 export const SharePackage: React.FC<Props> = ({ data, onPreview, onEdit }) => {
   const [copied, setCopied] = useState(false);
   const [masterCopied, setMasterCopied] = useState(false);
-  
-  // Calculate URL logic
-  const generateShareUrl = () => {
-    try {
-      const currentFullUrl = window.location.href;
-      const baseUrl = currentFullUrl.split('#')[0].split('?')[0];
-      const jsonString = JSON.stringify(data);
-      // Simple base64 encoding (representing the transmission format)
-      const encodedData = btoa(encodeURIComponent(jsonString).replace(/%([0-9A-F]{2})/g, (match, p1) => {
-          return String.fromCharCode(parseInt(p1, 16));
-      }));
-      return `${baseUrl}#p=${encodeURIComponent(encodedData)}`;
-    } catch (e) {
-      return window.location.href;
-    }
-  };
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const [saving, setSaving] = useState(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const shareUrl = generateShareUrl();
-  const masterUrl = `${shareUrl}&role=master`;
+  // Save session to Firebase once on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    const save = async () => {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const key = await saveSession(data);
+        if (!cancelled) {
+          setSessionKey(key);
+          setSaving(false);
+        }
+      } catch (err: any) {
+        console.error('[SharePackage] Failed to save session:', err);
+        if (!cancelled) {
+          setSaveError(err.message || 'Failed to generate link.');
+          setSaving(false);
+        }
+      }
+    };
+
+    save();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Build pretty URL: slug is presentation-only, DB key is opaque
+  const baseUrl = window.location.origin;
+  const buildShareUrl = () => {
+    if (!sessionKey) return '';
+    const sender = slugify(data.senderName) || 'sender';
+    const receiver = slugify(data.recipientName) || 'receiver';
+    return `${baseUrl}/${sender}-${receiver}-${sessionKey}`;
+  };
+  const shareUrl = buildShareUrl();
+  const masterUrl = sessionKey ? `${shareUrl}?role=master` : '';
 
   const handleCopy = () => {
+    if (!shareUrl) return;
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
   
   const handleMasterCopy = () => {
+    if (!masterUrl) return;
     navigator.clipboard.writeText(masterUrl);
     setMasterCopied(true);
     setTimeout(() => setMasterCopied(false), 2000);
   };
 
   const handleNativeShare = async () => {
+    if (!shareUrl) return;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -81,34 +105,59 @@ export const SharePackage: React.FC<Props> = ({ data, onPreview, onEdit }) => {
           "This link is the only key to your message. It exists only for you and {data.recipientName}."
         </p>
 
+        {/* SAVING STATE */}
+        {saving && (
+          <div className="mb-12 flex flex-col items-center space-y-4">
+            <div className="w-48 h-[2px] bg-luxury-gold/30 relative overflow-hidden rounded-full">
+              <div className="absolute inset-0 bg-luxury-gold animate-pulse rounded-full"></div>
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-luxury-stone/70 font-bold">Sealing your message...</p>
+          </div>
+        )}
+
+        {/* SAVE ERROR */}
+        {saveError && (
+          <div className="mb-12 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm font-bold">{saveError}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-3 text-[10px] uppercase tracking-widest text-red-500 font-bold underline"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
         {/* RECIPIENT LINK */}
-        <div className="mb-12">
-           <label className="block text-[10px] font-bold text-luxury-ink/60 uppercase tracking-[0.2em] mb-4">Link for {data.recipientName}</label>
-           <div 
-             className="bg-[#1C1917] rounded-lg p-5 border-2 border-luxury-gold/40 text-left relative group cursor-pointer hover:border-luxury-gold transition-colors shadow-inner" 
-             onClick={handleCopy}
-           >
-             <div className="flex justify-between items-center mb-2">
-               <p className="text-[10px] font-bold text-luxury-gold/80 uppercase tracking-[0.2em]">Key</p>
-               <div className={`text-[10px] uppercase tracking-widest font-bold transition-colors ${copied ? 'text-green-400' : 'text-luxury-gold/60'}`}>
-                 {copied ? 'COPIED' : 'COPY'}
+        {sessionKey && (
+          <div className="mb-12">
+             <label className="block text-[10px] font-bold text-luxury-ink/60 uppercase tracking-[0.2em] mb-4">Link for {data.recipientName}</label>
+             <div 
+               className="bg-[#1C1917] rounded-lg p-5 border-2 border-luxury-gold/40 text-left relative group cursor-pointer hover:border-luxury-gold transition-colors shadow-inner" 
+               onClick={handleCopy}
+             >
+               <div className="flex justify-between items-center mb-2">
+                 <p className="text-[10px] font-bold text-luxury-gold/80 uppercase tracking-[0.2em]">Key</p>
+                 <div className={`text-[10px] uppercase tracking-widest font-bold transition-colors ${copied ? 'text-green-400' : 'text-luxury-gold/60'}`}>
+                   {copied ? 'COPIED' : 'COPY'}
+                 </div>
+               </div>
+               <div className="font-mono text-xs text-luxury-ivory/80 tracking-wider font-bold">
+                 {shareUrl}
                </div>
              </div>
-             <div className="font-mono text-xs text-luxury-ivory/80 truncate tracking-wider font-bold">
-               {shareUrl.substring(0, 40)}...
-             </div>
-           </div>
-           
-           <button 
-            onClick={handleNativeShare}
-            className="w-full mt-6 py-5 bg-luxury-wine text-white font-bold text-[10px] tracking-[0.4em] uppercase rounded-full hover:bg-black shadow-xl transition-all flex items-center justify-center group"
-          >
-            <span>Deliver Key</span>
-          </button>
-        </div>
+             
+             <button 
+              onClick={handleNativeShare}
+              className="w-full mt-6 py-5 bg-luxury-wine text-white font-bold text-[10px] tracking-[0.4em] uppercase rounded-full hover:bg-black shadow-xl transition-all flex items-center justify-center group"
+            >
+              <span>Deliver Key</span>
+            </button>
+          </div>
+        )}
 
         {/* MASTER KEY (For Remote/Sync) */}
-        {showMasterKey && (
+        {showMasterKey && sessionKey && (
           <div className="pt-8 border-t-2 border-luxury-ink/20">
              <label className="block text-[10px] font-bold text-luxury-wine uppercase tracking-[0.2em] mb-4">
                 Your Master Control Link
@@ -124,8 +173,8 @@ export const SharePackage: React.FC<Props> = ({ data, onPreview, onEdit }) => {
                    {masterCopied ? 'COPIED' : 'COPY'}
                  </div>
                </div>
-               <div className="font-mono text-xs text-white/70 truncate tracking-wider font-bold">
-                 {masterUrl.substring(0, 40)}...
+               <div className="font-mono text-xs text-white/70 tracking-wider font-bold">
+                 {masterUrl}
                </div>
              </div>
           </div>

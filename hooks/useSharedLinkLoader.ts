@@ -38,13 +38,18 @@ export interface SharedLinkLoaderResult {
 
 /**
  * THE MAIN HOOK
- * This safely loads shared letter links from the URL
+ * This safely loads shared letter links from the URL hash (#p=...)
+ * 
+ * When enabled=false, immediately returns NO_LINK without any decode logic.
+ * This is used by useLinkLoader to guarantee mutual exclusion with usePathLinkLoader.
  * 
  * How to use:
  * const { state, data, error } = useSharedLinkLoader();
  */
-export function useSharedLinkLoader(): SharedLinkLoaderResult {
-  const [state, setState] = useState<LoaderState>(LoaderState.IDLE);
+export function useSharedLinkLoader(enabled: boolean = true): SharedLinkLoaderResult {
+  const [state, setState] = useState<LoaderState>(
+    enabled ? LoaderState.IDLE : LoaderState.NO_LINK
+  );
   const [data, setData] = useState<CoupleData | null>(null);
   const [error, setError] = useState<LoaderError | null>(null);
   
@@ -53,6 +58,12 @@ export function useSharedLinkLoader(): SharedLinkLoaderResult {
   
   // The function that does the actual loading
   const loadFromURL = () => {
+    // If disabled, immediately return NO_LINK — no decode, no side effects
+    if (!enabled) {
+      setState(LoaderState.NO_LINK);
+      return;
+    }
+
     // Reset everything
     setState(LoaderState.LOADING);
     setError(null);

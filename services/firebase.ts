@@ -1,8 +1,10 @@
 import { initializeApp } from "firebase/app";
+import { CoupleData } from '../types';
 import { 
   getDatabase, 
   ref, 
   set, 
+  get,
   onValue, 
   update 
 } from "firebase/database";
@@ -134,3 +136,93 @@ export const uploadMemoryPhoto = async (
   await uploadBytes(fileRef, file);
   return await getDownloadURL(fileRef);
 };
+
+
+// ===============================
+// SESSION PERSISTENCE (Clean URLs)
+// ===============================
+
+/**
+ * Slugify a name for URL display.
+ * "Ajmal Fahad" → "ajmal-fahad"
+ * Exported for SharePackage to build pretty URLs.
+ */
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 30);
+}
+
+/**
+ * Generate a short random ID (8 chars, alphanumeric).
+ * Uses crypto.getRandomValues for proper randomness.
+ */
+function generateShortId(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const array = new Uint8Array(8);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < 8; i++) {
+    result += chars[array[i] % chars.length];
+  }
+  return result;
+}
+
+/**
+ * Save full CoupleData to Firebase RTDB under an opaque key.
+ * Checks for collision before writing.
+ * Returns the opaque key (not a slug — slug is built in the UI layer).
+ */
+export async function saveSession(data: CoupleData): Promise<string> {
+  if (!db) {
+    throw new Error('Firebase not initialized. Cannot save session.');
+  }
+
+  // Generate key with collision check (max 5 attempts)
+  let key: string = '';
+  for (let attempt = 0; attempt < 5; attempt++) {
+    key = generateShortId();
+    const existing = await get(ref(db, `shared/${key}`));
+    if (!existing.exists()) break;
+    if (attempt === 4) {
+      throw new Error('Failed to generate unique session key after 5 attempts.');
+    }
+  }
+
+  await set(ref(db, `shared/${key}`), {
+    ...data,
+    createdAt: new Date().toISOString(),
+  });
+
+  console.log(`[Session] Saved under key: ${key}`);
+  return key;
+}
+
+/**
+ * Load CoupleData from Firebase RTDB by key.
+ * Accepts either:
+ *   - opaque key directly: "k8f2x9m1"
+ *   - full slug from URL: "ajmal-saniya-k8f2x9m1" (extracts last segment)
+ * Returns null if not found.
+ */
+export async function loadSession(key: string): Promise<CoupleData | null> {
+  if (!db) {
+    throw new Error('Firebase not initialized. Cannot load session.');
+  }
+
+  // Extract opaque key from slug if needed
+  // "ajmal-saniya-k8f2x9m1" → last 8 chars = "k8f2x9m1"
+  const parts = key.split('-');
+  const opaqueKey = parts.length > 1 ? parts[parts.length - 1] : key;
+
+  const snapshot = await get(ref(db, `shared/${opaqueKey}`));
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return snapshot.val() as CoupleData;
+}

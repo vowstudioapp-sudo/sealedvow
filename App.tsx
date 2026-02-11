@@ -11,7 +11,7 @@ import { PaymentStage } from './components/PaymentStage.tsx';
 import { BackgroundAudio } from './components/BackgroundAudio.tsx';
 import { MasterControl } from './components/MasterControl.tsx';
 import { CoupleData, AppStage, Theme } from './types.ts';
-import { useSharedLinkLoader, LoaderState } from './hooks/useSharedLinkLoader';
+import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
 
 const THEME_BG_COLORS: Record<Theme, string> = {
@@ -85,7 +85,7 @@ const writePersistedCoupleData = (value: CoupleData): void => {
 };
 
 const App: React.FC = () => {
-  const { state: linkState, data: sharedData, error: linkError } = useSharedLinkLoader();
+  const { state: linkState, data: sharedData, error: linkError } = useLinkLoader();
   
   const [stage, setStage] = useState<AppStage>(AppStage.LANDING);
   const [data, setData] = useState<CoupleData | null>(null);
@@ -118,9 +118,10 @@ const App: React.FC = () => {
     if (linkState === LoaderState.SUCCESS && sharedData) {
       setData(hydrateCoupleData(sharedData));
       
-      const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
-      const role = params.get('role');
+      // Check for master role in query params (clean URLs) or hash params (legacy)
+      const queryParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const role = queryParams.get('role') || hashParams.get('role');
       
       if (role === 'master') {
         safeSetStage(AppStage.MASTER_CONTROL);
