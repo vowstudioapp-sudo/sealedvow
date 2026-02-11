@@ -26,7 +26,7 @@ const AUDIO_TYPES = ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav'];
 
 const lastUploadAt = new Map<string, number>();
 
-function rateLimit(key: string, ms = 60_000): void {
+function rateLimit(key: string, ms = 3_000): void {
   const now = Date.now();
   const last = lastUploadAt.get(key);
   
@@ -202,29 +202,47 @@ export async function uploadMemoryPhoto(
 
 export async function uploadMemoryPhotos(
   sessionId: string,
-  files: File[]
+  files: File[],
+  startingIndex: number = 0
 ): Promise<string[]> {
-  if (files.length === 0 || files.length > 10) {
-    throw new Error('Please select between 1 and 10 photos.');
+  if (files.length === 0 || startingIndex + files.length > 10) {
+    throw new Error('Maximum 10 photos allowed.');
   }
 
+  // Parallel upload for speed
+  const results = await Promise.allSettled(
+    files.map((file, i) =>
+      uploadMemoryPhoto(sessionId, file, startingIndex + i + 1)
+    )
+  );
+
+  // Check for failures
   const urls: string[] = [];
+  const failed: number[] = [];
 
-  try {
-    for (let i = 0; i < files.length; i++) {
-      const url = await uploadMemoryPhoto(sessionId, files[i], i + 1);
-      urls.push(url);
+  results.forEach((result, i) => {
+    if (result.status === 'fulfilled') {
+      urls.push(result.value);
+    } else {
+      failed.push(startingIndex + i + 1);
     }
-    return urls;
-  } catch (error) {
-    // Best-effort rollback
-    for (let i = 0; i < urls.length; i++) {
-      await deleteByPath(
-        storagePath(sessionId, `memory-board/photo-${i + 1}.jpg`)
-      ).catch(() => {});
+  });
+
+  // If any failed, rollback only successful ones
+  if (failed.length > 0) {
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'fulfilled') {
+        const idx = startingIndex + i + 1;
+        const ext = files[i].name.split('.').pop() || 'jpg';
+        await deleteByPath(
+          storagePath(sessionId, `memory-board/photo-${idx}.${ext}`)
+        ).catch(() => {});
+      }
     }
-    throw error;
+    throw new Error(`${failed.length} photo(s) failed to upload. Please try again.`);
   }
+
+  return urls;
 }
 
 // ============================================================================

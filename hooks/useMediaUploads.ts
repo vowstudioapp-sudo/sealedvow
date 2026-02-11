@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import imageCompression from 'browser-image-compression';
 import { CoupleData, MemoryPhoto } from '../types';
 import {
   uploadUserImage,
@@ -82,7 +83,14 @@ export function useMediaUploads({
       const sid = ensureSession();
       validateFileSize(file, LIMITS.IMAGE_MB, 'Image');
 
-      const url = await uploadUserImage(sid, file);
+      const compressed = await imageCompression(file, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        preserveExif: false,
+      });
+
+      const url = await uploadUserImage(sid, compressed as File);
       updateData({ userImageUrl: url });
     } catch (err: any) {
       onError(err.message || 'Image upload failed');
@@ -149,11 +157,22 @@ export function useMediaUploads({
     try {
       const sid = ensureSession();
 
-      files.forEach(file =>
-        validateFileSize(file, LIMITS.IMAGE_MB, 'Photo')
-      );
+      // Compress images: strip EXIF, resize, reduce size
+      const compressedFiles: File[] = [];
+      for (const file of files) {
+        validateFileSize(file, LIMITS.IMAGE_MB, 'Photo');
 
-      const urls = await uploadMemoryPhotos(sid, files);
+        const compressed = await imageCompression(file, {
+          maxSizeMB: 0.8,
+          maxWidthOrHeight: 1600,
+          useWebWorker: true,
+          preserveExif: false,
+        });
+
+        compressedFiles.push(compressed as File);
+      }
+
+      const urls = await uploadMemoryPhotos(sid, compressedFiles, existingCount);
 
       const newPhotos: MemoryPhoto[] = urls.map(url => ({
         url,
