@@ -24,7 +24,6 @@ import {
 const LIMITS = {
   IMAGE_MB: 5,
   VIDEO_MB: 10,
-  MEMORY_MIN: 5,
   MEMORY_MAX: 10,
 } as const;
 
@@ -32,6 +31,7 @@ const MB = 1024 * 1024;
 
 interface UseMediaUploadsParams {
   sessionId: string | null | undefined;
+  currentMemoryCount: () => number;
   updateData: (
     patch:
       | Partial<CoupleData>
@@ -42,6 +42,7 @@ interface UseMediaUploadsParams {
 
 export function useMediaUploads({
   sessionId,
+  currentMemoryCount,
   updateData,
   onError,
 }: UseMediaUploadsParams) {
@@ -123,25 +124,23 @@ export function useMediaUploads({
   // ---------------------------------------------------------------------------
   /**
    * NOTE:
-   * Memory board uploads are ATOMIC by design.
-   * If any file fails, the entire upload fails.
-   * This is intentional for UX consistency.
+   * Memory board uploads are ATOMIC per batch.
+   * New photos are APPENDED to existing board.
+   * Total cap: MEMORY_MAX (10).
    */
   const uploadMemoryBoard = async (files: File[]) => {
-    console.log('[DEBUG] uploadMemoryBoard called');
-    console.log(`[DEBUG] sessionId: ${sessionId}`);
-    console.log(`[DEBUG] files.length: ${files.length}`);
-    console.log(`[DEBUG] MEMORY_MIN: ${LIMITS.MEMORY_MIN} | MEMORY_MAX: ${LIMITS.MEMORY_MAX}`);
+    if (files.length === 0) return;
 
-    if (files.length < LIMITS.MEMORY_MIN) {
-      console.warn(`[DEBUG] REJECTED: ${files.length} files < MEMORY_MIN (${LIMITS.MEMORY_MIN})`);
-      onError(`Please upload at least ${LIMITS.MEMORY_MIN} photos`);
-      return;
-    }
+    // Check total cap against existing + new
+    const existingCount = currentMemoryCount();
+    const total = existingCount + files.length;
 
-    if (files.length > LIMITS.MEMORY_MAX) {
-      console.warn(`[DEBUG] REJECTED: ${files.length} files > MEMORY_MAX (${LIMITS.MEMORY_MAX})`);
-      onError(`Maximum ${LIMITS.MEMORY_MAX} photos allowed`);
+    if (total > LIMITS.MEMORY_MAX) {
+      const remaining = LIMITS.MEMORY_MAX - existingCount;
+      onError(remaining > 0
+        ? `You can add ${remaining} more photo${remaining === 1 ? '' : 's'}. You selected ${files.length}.`
+        : `Memory board is full (${LIMITS.MEMORY_MAX} photos maximum).`
+      );
       return;
     }
 
@@ -149,35 +148,28 @@ export function useMediaUploads({
 
     try {
       const sid = ensureSession();
-      console.log(`[DEBUG] Session confirmed: ${sid}`);
 
-      files.forEach((file, i) => {
-        console.log(`[DEBUG] Validating file ${i + 1}: ${file.name} | ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-        validateFileSize(file, LIMITS.IMAGE_MB, 'Photo');
-      });
+      files.forEach(file =>
+        validateFileSize(file, LIMITS.IMAGE_MB, 'Photo')
+      );
 
-      console.log('[DEBUG] All files validated. Starting Firebase upload...');
       const urls = await uploadMemoryPhotos(sid, files);
-      console.log(`[DEBUG] Upload complete. ${urls.length} URLs returned.`);
-      urls.forEach((url, i) => console.log(`[DEBUG]   URL ${i + 1}: ${url.substring(0, 60)}...`));
 
-      const memoryBoard: MemoryPhoto[] = urls.map(url => ({
+      const newPhotos: MemoryPhoto[] = urls.map(url => ({
         url,
         caption: '',
-        angle: Math.random() * 60 - 30,
-        xOffset: Math.random() * 200 - 100,
-        yOffset: Math.random() * 200 - 100,
+        angle: Math.random() * 20 - 10,
+        xOffset: Math.random() * 40 - 20,
+        yOffset: Math.random() * 40 - 20,
       }));
 
-      updateData({ memoryBoard });
-      console.log('[DEBUG] memoryBoard state updated');
+      updateData(prev => ({
+        memoryBoard: [...(prev.memoryBoard ?? []), ...newPhotos],
+      }));
     } catch (err: any) {
-      console.error('[DEBUG] uploadMemoryBoard FAILED:', err);
-      console.error('[DEBUG] Error stack:', err.stack);
       onError(err.message || 'Memory board upload failed');
     } finally {
       setIsUploadingMemories(false);
-      console.log('[DEBUG] uploadMemoryBoard finished');
     }
   };
 

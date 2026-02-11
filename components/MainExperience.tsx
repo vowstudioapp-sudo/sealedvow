@@ -148,7 +148,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
   const sectionCount = useMemo(() => {
     let count = 2; // Hero + Letter always present
     if (data.userImageUrl || data.aiImageUrl) count++;
-    if (data.memoryBoard && data.memoryBoard.length >= 5) count++;
+    if (data.memoryBoard?.length) count++;
     if (data.sacredLocation) count++;
     if (data.coupons && data.coupons.length > 0) count++;
     if (data.hasGift) count++;
@@ -498,7 +498,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
       )}
 
       {/* SECTION: Memory Board */}
-      {interactivePhotos && interactivePhotos.length >= 5 && (
+      {interactivePhotos && interactivePhotos.length >= 1 && (
         <section className="snap-section min-h-[100vh] w-full relative flex flex-col items-center justify-center snap-start overflow-hidden bg-[#EAE6DF] py-32">
           <div className="main-experience-board-texture" />
           

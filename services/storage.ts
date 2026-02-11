@@ -204,8 +204,8 @@ export async function uploadMemoryPhotos(
   sessionId: string,
   files: File[]
 ): Promise<string[]> {
-  if (files.length < 5 || files.length > 10) {
-    throw new Error('Upload between 5 and 10 photos.');
+  if (files.length === 0 || files.length > 10) {
+    throw new Error('Please select between 1 and 10 photos.');
   }
 
   const urls: string[] = [];
