@@ -10,6 +10,7 @@ import { LandingPage } from './components/LandingPage.tsx';
 import { PaymentStage } from './components/PaymentStage.tsx';
 import { BackgroundAudio } from './components/BackgroundAudio.tsx';
 import { MasterControl } from './components/MasterControl.tsx';
+import { PersonalIntro } from './components/PersonalIntro.tsx';
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
@@ -45,6 +46,7 @@ const ensureExhaustiveStage = (stage: AppStage): void => {
     case AppStage.PREVIEW:
     case AppStage.PAYMENT:
     case AppStage.SHARE:
+    case AppStage.PERSONAL_INTRO:
     case AppStage.ENVELOPE:
     case AppStage.QUESTION:
     case AppStage.SOULMATE_SYNC:
@@ -126,7 +128,7 @@ const App: React.FC = () => {
       if (role === 'master') {
         safeSetStage(AppStage.MASTER_CONTROL);
       } else {
-        safeSetStage(AppStage.ENVELOPE);
+        safeSetStage(AppStage.PERSONAL_INTRO);
       }
     } else if (linkState === LoaderState.NO_LINK) {
       safeSetStage(AppStage.LANDING);
@@ -178,7 +180,8 @@ const App: React.FC = () => {
 
     switch (stage) {
       case AppStage.LANDING:
-      case AppStage.MASTER_CONTROL: {
+      case AppStage.MASTER_CONTROL:
+      case AppStage.PERSONAL_INTRO: {
         applyColor('#050505');
         break;
       }
@@ -382,6 +385,13 @@ const App: React.FC = () => {
 
         {stage === AppStage.MASTER_CONTROL && data && (
           <MasterControl data={data} />
+        )}
+
+        {stage === AppStage.PERSONAL_INTRO && data && (
+          <PersonalIntro
+            recipientName={data.recipientName}
+            onComplete={() => safeSetStage(AppStage.ENVELOPE)}
+          />
         )}
 
         {stage === AppStage.ENVELOPE && data && (

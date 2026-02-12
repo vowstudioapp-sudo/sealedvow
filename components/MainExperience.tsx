@@ -78,6 +78,15 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
   
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [isVoicePlaying, setIsVoicePlaying] = useState(false);
+  const [showRevisit, setShowRevisit] = useState(false);
+
+  // Show "revisit" link 5s after reaching the final section
+  useEffect(() => {
+    if (activeSection === sections.length - 1 && sections.length > 0 && !isPreview) {
+      const t = setTimeout(() => setShowRevisit(true), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [activeSection, sections.length, isPreview]);
   
   const [interactivePhotos, setInteractivePhotos] = useState<InteractivePhoto[]>(
     data.memoryBoard?.map((p, i) => ({
@@ -779,6 +788,56 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
           <div className="absolute bottom-12 opacity-30 flex flex-col items-center gap-2">
             <div className="w-px h-8 bg-white/50" />
             <p className="text-[8px] uppercase tracking-[0.8em] text-white">Forever Yours</p>
+          </div>
+        </section>
+      )}
+
+      {/* SECTION: Final Closure */}
+      {!isPreview && (
+        <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center snap-start bg-black">
+          <div className="text-center px-8">
+            <p
+              style={{
+                fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+                fontStyle: 'italic',
+                fontSize: 'clamp(1.2rem, 4vw, 2rem)',
+                color: '#E5D0A1',
+                lineHeight: 1.6,
+              }}
+            >
+              Sealed by {data.senderName}
+            </p>
+
+            {(data.sealedAt || data.createdAt) && (
+              <p className="mt-3 text-[10px] uppercase tracking-[0.3em] text-[#D4AF37]/40 font-bold">
+                {(() => {
+                  const d = new Date(data.sealedAt || data.createdAt || '');
+                  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                    + ' · '
+                    + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                })()}
+              </p>
+            )}
+
+            <div className="w-8 h-px bg-[#D4AF37]/20 mx-auto my-8" />
+
+            <p className="text-[9px] uppercase tracking-[0.4em] text-white/25 font-bold">
+              This was written only for you
+            </p>
+
+            <button
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setCurrentParagraph(0);
+              }}
+              className="mt-16 text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/20 hover:text-[#D4AF37]/60 transition-colors border-b border-[#D4AF37]/10 pb-1"
+              style={{
+                opacity: showRevisit ? 1 : 0,
+                transition: 'opacity 1s ease-in',
+              }}
+            >
+              Revisit from the beginning
+            </button>
           </div>
         </section>
       )}

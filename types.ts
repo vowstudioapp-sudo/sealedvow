@@ -15,6 +15,7 @@ export enum AppStage {
   PREVIEW = 'PREVIEW',
   PAYMENT = 'PAYMENT',
   SHARE = 'SHARE',
+  PERSONAL_INTRO = 'PERSONAL_INTRO',
   ENVELOPE = 'ENVELOPE',
   QUESTION = 'QUESTION',
   SOULMATE_SYNC = 'SOULMATE_SYNC',
@@ -134,6 +135,7 @@ export interface CoupleData {
   status?: LetterStatus;
   createdAt?: string;        // ISO timestamp
   updatedAt?: string;        // ISO timestamp
+  sealedAt?: string;         // ISO timestamp — set at payment verification
   previewExpiresAt?: string; // ISO timestamp
 
   // -------------------------------------------------------------------------
