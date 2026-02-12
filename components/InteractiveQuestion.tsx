@@ -1,6 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CoupleData } from '../types';
+import { CoupleData, Theme } from '../types';
 import { listenToSessionStatus } from '../services/firebase';
+
+/* ------------------------------------------------------------------ */
+/* THEME COLORS                                                        */
+/* ------------------------------------------------------------------ */
+
+const IQ_THEME: Record<Theme, { bg: string; text: string; gold: string; seal: string; goldRgb: string; sealRgb: string }> = {
+  obsidian:  { bg: '#0C0A09', text: '#E5D0A1', gold: '#D4AF37', seal: '#722F37', goldRgb: '212,175,55',  sealRgb: '114,47,55' },
+  velvet:    { bg: '#1A0B2E', text: '#E9D5FF', gold: '#C084FC', seal: '#7C3AED', goldRgb: '192,132,252', sealRgb: '124,58,237' },
+  crimson:   { bg: '#2B0A0A', text: '#FECDD3', gold: '#F43F5E', seal: '#9F1239', goldRgb: '244,63,94',   sealRgb: '159,18,57' },
+  midnight:  { bg: '#020617', text: '#E0F2FE', gold: '#7DD3FC', seal: '#1E40AF', goldRgb: '125,211,252', sealRgb: '30,64,175' },
+  evergreen: { bg: '#022C22', text: '#D1FAE5', gold: '#34D399', seal: '#065F46', goldRgb: '52,211,153',  sealRgb: '6,95,70' },
+  pearl:     { bg: '#1C1917', text: '#F5F5F4', gold: '#A8A29E', seal: '#57534E', goldRgb: '168,162,158', sealRgb: '87,83,78' },
+};
 
 /* ------------------------------------------------------------------ */
 /* TYPES                                                               */
@@ -33,6 +46,7 @@ const ACCEPT_DELAY_REMOTE = 2000;
 /* ------------------------------------------------------------------ */
 
 export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
+  const tc = IQ_THEME[data.theme || 'obsidian'];
   /* ------------------------------------------------------------------ */
   /* ONE-SHOT ACCEPT GUARARD                                             */
   /* ------------------------------------------------------------------ */
@@ -212,7 +226,8 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
         </h1>
         <button
           onClick={acceptOnce}
-          className="px-10 py-4 rounded-full bg-[#D4AF37] text-black uppercase tracking-widest text-xs"
+          className="px-10 py-4 rounded-full text-black uppercase tracking-widest text-xs"
+          style={{ backgroundColor: tc.gold }}
         >
           Initiate Link
         </button>
@@ -225,39 +240,110 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
   /* ------------------------------------------------------------------ */
 
   if (phase === 'ignite') {
+    const progress = energy / IGNITION_TARGET;
+    const glowIntensity = progress * 30;
+    const sealScale = 1 + progress * 0.08;
+    const crackOpacity = Math.min(progress * 1.5, 1);
+
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-black select-none">
-        <h1 className="mb-20 text-3xl italic">
+      <div className="fixed inset-0 flex flex-col items-center justify-center select-none" style={{ backgroundColor: tc.bg }}>
+        <p
+          className="mb-4"
+          style={{
+            fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+            fontStyle: 'italic',
+            fontSize: 'clamp(1.6rem, 5vw, 2.4rem)',
+            color: tc.text,
+            opacity: 0.8,
+          }}
+        >
           {data.recipientName}
-        </h1>
+        </p>
+
+        <p 
+          className="mb-16 text-[10px] uppercase tracking-[0.3em]"
+          style={{ color: `rgba(${tc.goldRgb}, 0.4)` }}
+        >
+          Something awaits you
+        </p>
 
         <button
-          aria-label="Hold to connect"
+          aria-label="Hold to break the seal"
           onMouseDown={() => setHolding(true)}
           onMouseUp={() => setHolding(false)}
           onMouseLeave={() => setHolding(false)}
           onTouchStart={() => setHolding(true)}
           onTouchEnd={() => setHolding(false)}
-          className="relative w-48 h-48 rounded-full border border-[#D4AF37] flex items-center justify-center"
+          className="relative w-40 h-40 rounded-full flex items-center justify-center cursor-pointer active:cursor-grabbing"
+          style={{
+            transform: `scale(${sealScale})`,
+            transition: holding ? 'none' : 'transform 0.3s ease-out',
+          }}
         >
-          <svg className="absolute inset-0 w-full h-full -rotate-90">
-            <circle
-              cx="96"
-              cy="96"
-              r="94"
-              fill="none"
-              stroke="#D4AF37"
-              strokeWidth="2"
-              strokeDasharray="590"
-              strokeDashoffset={590 - (590 * energy) / 100}
-            />
+          <div 
+            className="absolute inset-0 rounded-full"
+            style={{
+              boxShadow: `0 0 ${glowIntensity}px ${glowIntensity / 2}px rgba(${tc.goldRgb}, ${progress * 0.3})`,
+              transition: holding ? 'none' : 'box-shadow 0.3s ease-out',
+            }}
+          />
+
+          <div 
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: `radial-gradient(circle, rgba(${tc.sealRgb}, ${0.8 - progress * 0.3}) 0%, rgba(${tc.sealRgb}, ${0.9 - progress * 0.4}) 70%, transparent 100%)`,
+              border: `1.5px solid rgba(${tc.goldRgb}, ${0.3 + progress * 0.4})`,
+            }}
+          />
+
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 160 160" style={{ opacity: crackOpacity }}>
+            <line x1="80" y1="30" x2="75" y2="55" stroke={tc.gold} strokeWidth="0.5" opacity={progress > 0.2 ? 1 : 0} />
+            <line x1="75" y1="55" x2="65" y2="70" stroke={tc.gold} strokeWidth="0.5" opacity={progress > 0.35 ? 1 : 0} />
+            <line x1="130" y1="75" x2="110" y2="80" stroke={tc.gold} strokeWidth="0.5" opacity={progress > 0.3 ? 1 : 0} />
+            <line x1="110" y1="80" x2="100" y2="95" stroke={tc.gold} strokeWidth="0.5" opacity={progress > 0.5 ? 1 : 0} />
+            <line x1="85" y1="130" x2="90" y2="110" stroke={tc.gold} strokeWidth="0.5" opacity={progress > 0.4 ? 1 : 0} />
+            <line x1="35" y1="90" x2="55" y2="85" stroke={tc.gold} strokeWidth="0.5" opacity={progress > 0.45 ? 1 : 0} />
+            <line x1="55" y1="85" x2="60" y2="75" stroke={tc.gold} strokeWidth="0.5" opacity={progress > 0.6 ? 1 : 0} />
           </svg>
-          <span className="text-3xl text-[#D4AF37]">❦</span>
+
+          <span 
+            className="relative z-10 text-3xl"
+            style={{ 
+              color: `rgba(${tc.goldRgb}, ${0.6 + progress * 0.4})`,
+              filter: `drop-shadow(0 0 ${progress * 8}px rgba(${tc.goldRgb}, ${progress * 0.5}))`,
+            }}
+          >
+            ❦
+          </span>
         </button>
 
-        <p className="mt-16 uppercase tracking-widest text-xs opacity-60">
-          {holding ? 'Establishing Link…' : 'Hold to Connect'}
+        <p 
+          className="mt-14"
+          style={{
+            fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+            fontStyle: 'italic',
+            fontSize: '0.85rem',
+            color: holding ? `rgba(${tc.goldRgb}, 0.7)` : 'rgba(255, 255, 255, 0.5)',
+            letterSpacing: '0.05em',
+            transition: 'color 0.3s ease',
+          }}
+        >
+          {holding ? 'Breaking the seal...' : 'Hold to break the seal'}
         </p>
+
+        {energy > 0 && (
+          <div className="mt-6 w-32 h-px bg-white/10 overflow-hidden rounded-full">
+            <div 
+              className="h-full transition-all"
+              style={{ 
+                backgroundColor: tc.gold,
+                opacity: 0.5,
+                width: `${progress * 100}%`,
+                transition: holding ? 'width 0.05s linear' : 'width 0.3s ease-out',
+              }} 
+            />
+          </div>
+        )}
       </div>
     );
   }

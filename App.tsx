@@ -16,7 +16,7 @@ import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
 
 const THEME_BG_COLORS: Record<Theme, string> = {
-  obsidian: '#FAF6F1',
+  obsidian: '#050505',
   velvet: '#1A0B2E',
   crimson: '#2B0A0A',
   midnight: '#0f172a',
@@ -116,9 +116,111 @@ const App: React.FC = () => {
     setData(prev => (prev ? { ...prev, ...patch } : prev));
   };
 
+  // DEV PREVIEW — ?preview=receiver|intro|envelope|letter
   useEffect(() => {
+    if (import.meta.env.DEV) {
+      const params = new URLSearchParams(window.location.search);
+      const preview = params.get('preview');
+      if (!preview) return;
+
+      // Theme override: ?theme=velvet, ?theme=crimson, etc.
+      const themeParam = params.get('theme') as Theme | null;
+      const VALID_THEMES: Theme[] = ['obsidian', 'velvet', 'crimson', 'midnight', 'evergreen', 'pearl'];
+      const selectedTheme: Theme = (themeParam && VALID_THEMES.includes(themeParam)) ? themeParam : 'obsidian';
+
+      // High-quality free stock images (Unsplash — no auth needed)
+      const IMG = {
+        cover: 'https://images.unsplash.com/photo-1529634597503-139d3726fed5?w=800&q=80',
+        memory1: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600&q=80',
+        memory2: 'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=600&q=80',
+        memory3: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&q=80',
+        memory4: 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=600&q=80',
+        memory5: 'https://images.unsplash.com/photo-1545389336-cf090694435e?w=600&q=80',
+      };
+
+      const mockData: CoupleData = {
+        sessionId: 'dev-preview-001',
+        recipientName: 'Saniya',
+        senderName: 'Ajmal',
+        timeShared: '3 beautiful years',
+        relationshipIntent: 'Deeply romantic, grateful, and present.',
+        sharedMoment: 'When we got lost in the old city and found that rooftop café where the stars felt close enough to touch.',
+        occasion: 'valentine',
+        writingMode: 'assisted',
+        theme: selectedTheme,
+        myth: 'Three years. One story. Still unfolding.',
+
+        finalLetter: 'From the moment I first saw you, I knew something had shifted in the universe. Not dramatically — more like a quiet rearrangement of priorities.\n\nYou taught me that love is not a grand gesture. It is the way you remember how I take my coffee. The way you laugh at my worst jokes. The way you hold my hand when I am anxious without me having to ask.\n\nThere are nights I lie awake wondering what I did to deserve this. Wondering how one person can make an entire city feel like home. You are my answer to every question I was afraid to ask.\n\nEvery morning with you feels like a gift I did nothing to deserve. And yet here we are — improbably, stubbornly, beautifully together.\n\nI do not know what the future holds. But I know that whatever it is, I want to face it standing next to you. Always.',
+
+        // Cover image
+        userImageUrl: IMG.cover,
+
+        // Memory board — 5 photos with captions
+        memoryBoard: [
+          { url: IMG.memory1, caption: 'That first evening', angle: -4, xOffset: -15, yOffset: -10 },
+          { url: IMG.memory2, caption: 'Lost in the old city', angle: 3, xOffset: 20, yOffset: 5 },
+          { url: IMG.memory3, caption: 'Our quiet place', angle: -2, xOffset: -8, yOffset: 15 },
+          { url: IMG.memory4, caption: 'You laughed so hard', angle: 5, xOffset: 12, yOffset: -5 },
+          { url: IMG.memory5, caption: 'Unplanned and perfect', angle: -3, xOffset: -20, yOffset: 8 },
+        ],
+
+        // Sacred location
+        sacredLocation: {
+          placeName: 'The Rooftop Café, Old City',
+          description: 'Where we got lost and found something better. The stars felt close enough to touch.',
+          googleMapsUri: 'https://maps.google.com/?q=26.9124,75.7873',
+          latLng: { lat: 26.9124, lng: 75.7873 },
+        },
+
+        // Promises (coupons)
+        coupons: [
+          { id: 'c1', title: 'One Midnight Drive', description: 'No destination. No map. Just us, the road, and whatever playlist you choose.', icon: '🌙', isOpen: true },
+          { id: 'c2', title: 'A Full Day of Yes', description: 'Whatever you want — wherever you want — no questions asked. Your wish is literally my command.', icon: '✨', isOpen: true },
+          { id: 'c3', title: 'Breakfast in Bed', description: 'Handmade by me. Served on the good plates. You don\'t lift a finger until noon.', icon: '🍳', isOpen: true },
+        ],
+
+        // Gift
+        hasGift: true,
+        giftType: 'gastronomy',
+        giftTitle: 'Dinner at That Rooftop Place',
+        giftLink: 'https://example.com/reservation',
+
+        // Music
+        musicType: 'preset',
+        musicUrl: '',
+
+        // Reveal
+        revealMethod: 'direct',
+        replyEnabled: true,
+
+        // Timestamps
+        sealedAt: new Date().toISOString(),
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+      };
+
+      setData(mockData);
+      setIsBooting(false);
+      setIsFadingOut(true);
+      setHasInteracted(true);
+
+      if (preview === 'intro') safeSetStage(AppStage.PERSONAL_INTRO);
+      else if (preview === 'envelope') safeSetStage(AppStage.ENVELOPE);
+      else if (preview === 'letter' || preview === 'main') safeSetStage(AppStage.MAIN_EXPERIENCE);
+      else if (preview === 'receiver') safeSetStage(AppStage.PERSONAL_INTRO);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Skip link loader routing when dev preview is active
+    if (import.meta.env.DEV) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('preview')) return;
+    }
+
     if (linkState === LoaderState.SUCCESS && sharedData) {
       setData(hydrateCoupleData(sharedData));
+      setIsBooting(false);
+      setIsFadingOut(true);
       
       // Check for master role in query params (clean URLs) or hash params (legacy)
       const queryParams = new URLSearchParams(window.location.search);
@@ -182,7 +284,8 @@ const App: React.FC = () => {
       case AppStage.LANDING:
       case AppStage.MASTER_CONTROL:
       case AppStage.PERSONAL_INTRO: {
-        applyColor('#050505');
+        document.body.style.transition = 'background-color 0.5s ease';
+        applyColor('#000000');
         break;
       }
       case AppStage.PREPARE: {
@@ -285,25 +388,42 @@ const App: React.FC = () => {
     <div className={`boot-screen-container ${isFadingOut ? 'fade-out' : ''}`}>
       <div className="relative flex flex-col items-center">
         <div className="mb-12 relative w-32 h-32 flex items-center justify-center animate-boot-logo">
-           <div className="absolute inset-0 border-[0.5px] border-luxury-gold/50 rounded-full"></div>
-           <div className="absolute inset-2 border-[0.5px] border-luxury-gold/30 rounded-full"></div>
-           <span className="text-5xl font-serif-elegant italic text-luxury-gold select-none tracking-tighter">V</span>
+           <div className="absolute inset-0 border-[0.5px] rounded-full" style={{ borderColor: 'rgba(198,168,90,0.35)' }}></div>
+           <div className="absolute inset-2 border-[0.5px] rounded-full" style={{ borderColor: 'rgba(198,168,90,0.2)' }}></div>
+           <span 
+             className="text-5xl font-serif-elegant italic select-none"
+             style={{ 
+               color: '#C6A85A', 
+               letterSpacing: '-0.03em',
+               textShadow: '0 0 12px rgba(198,168,90,0.25)',
+             }}
+           >V</span>
         </div>
         
         <div className="overflow-hidden mb-4 text-center">
-          <h1 className="text-[13px] font-bold text-luxury-gold uppercase tracking-[1em] animate-boot-text">
+          <h1 
+            className="text-[13px] font-bold uppercase animate-boot-text"
+            style={{ 
+              color: '#C6A85A', 
+              letterSpacing: '1em',
+              textShadow: '0 0 12px rgba(198,168,90,0.25)',
+            }}
+          >
             VOW
           </h1>
-          <p className="text-[7px] text-luxury-gold/70 tracking-[0.6em] uppercase mt-2 animate-fade-in" style={{ animationDelay: '1.2s' }}>
-            Private Studio
+          <p 
+            className="text-[7px] uppercase mt-3 animate-fade-in"
+            style={{ 
+              animationDelay: '1.2s',
+              color: 'rgba(198,168,90,0.6)',
+              letterSpacing: '0.7em',
+            }}
+          >
+            Sealed Moment
           </p>
         </div>
         
-        <div className="h-[0.5px] bg-luxury-gold/80 animate-boot-line"></div>
-        
-        <p className="absolute bottom-[-100px] text-[8px] tracking-[0.4em] uppercase text-luxury-gold/60 italic">
-          Private Expression Studio
-        </p>
+        <div className="animate-boot-line" style={{ height: '0.5px', backgroundColor: 'rgba(198,168,90,0.6)' }}></div>
       </div>
     </div>
   );
@@ -390,6 +510,7 @@ const App: React.FC = () => {
         {stage === AppStage.PERSONAL_INTRO && data && (
           <PersonalIntro
             recipientName={data.recipientName}
+            theme={data.theme}
             onComplete={() => safeSetStage(AppStage.ENVELOPE)}
           />
         )}
@@ -449,7 +570,10 @@ const App: React.FC = () => {
           <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
             <PaymentStage 
               data={data} 
-              onPaymentComplete={() => safeSetStage(AppStage.SHARE)}
+              onPaymentComplete={(replyEnabled: boolean) => {
+                updateData({ replyEnabled, sealedAt: new Date().toISOString() });
+                safeSetStage(AppStage.SHARE);
+              }}
               onBack={() => {
                 safeSetStage(AppStage.MAIN_EXPERIENCE); 
                 setIsCreatorPreview(true);
@@ -503,6 +627,44 @@ const App: React.FC = () => {
         }
         .animate-boot-line { animation: boot-line 2.5s ease-in-out forwards; }
       `}</style>
+
+      {/* Dev Theme Switcher — only in preview mode */}
+      {import.meta.env.DEV && new URLSearchParams(window.location.search).get('preview') && data && (
+        <div className="fixed bottom-0 left-0 right-0 z-[500] bg-black/90 border-t border-white/10 px-4 py-3 flex items-center justify-center gap-3 backdrop-blur-sm">
+          <span className="text-[8px] uppercase tracking-widest text-white/30 mr-2">Theme</span>
+          {(['obsidian', 'velvet', 'crimson', 'midnight', 'evergreen', 'pearl'] as Theme[]).map((t) => {
+            const colors: Record<Theme, string> = {
+              obsidian: '#D4AF37',
+              velvet: '#C084FC',
+              crimson: '#FDA4AF',
+              midnight: '#93c5fd',
+              evergreen: '#d97706',
+              pearl: '#a8a29e',
+            };
+            const isActive = data.theme === t;
+            return (
+              <button
+                key={t}
+                onClick={() => {
+                  updateData({ theme: t } as Partial<CoupleData>);
+                  document.body.style.backgroundColor = THEME_BG_COLORS[t];
+                }}
+                className={`flex flex-col items-center gap-1 px-2 py-1 rounded transition-all ${isActive ? 'opacity-100' : 'opacity-40 hover:opacity-70'}`}
+              >
+                <div 
+                  className="w-5 h-5 rounded-full border-2" 
+                  style={{ 
+                    backgroundColor: THEME_BG_COLORS[t], 
+                    borderColor: isActive ? colors[t] : 'transparent',
+                    boxShadow: isActive ? `0 0 8px ${colors[t]}40` : 'none',
+                  }} 
+                />
+                <span className="text-[7px] uppercase tracking-wider text-white/50">{t}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

@@ -30,10 +30,10 @@ const ENVELOPE_STYLES: Record<
   }
 > = {
   obsidian: {
-    paper: '#F5F1E9',
+    paper: '#0A0A0A',
     border: '#D4AF37',
-    text: '#582F2F',
-    subtext: '#D4AF37',
+    text: '#E5D0A1',
+    subtext: 'rgba(212, 175, 55, 0.5)',
     seal: 'radial-gradient(circle at 30% 30%, #a83232, #582F2F)',
     sealText: 'rgba(255,255,255,0.8)',
     particle: '#D4AF37',
@@ -203,14 +203,15 @@ export const Envelope: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Wax Seal */}
+        {/* Wax Seal — sits below center text like a real envelope seal */}
         <div
-          className={`absolute top-1/2 left-1/2 w-16 h-16 rounded-full flex items-center justify-center transition-transform ${
+          className={`absolute left-1/2 w-16 h-16 rounded-full flex items-center justify-center transition-transform ${
             phase === 'breaking' ? 'animate-seal-explode' : ''
           }`}
           style={{
             background: styles.seal,
-            transform: 'translate(-50%, -50%)',
+            transform: 'translateX(-50%)',
+            bottom: '1.5rem',
           }}
         >
           <span
@@ -244,8 +245,11 @@ export const Envelope: React.FC<Props> = ({
 
       {/* CTA */}
       {phase === 'idle' && (
-        <div className="mt-16 text-center opacity-70">
-          <p className="text-xs uppercase tracking-widest">
+        <div className="mt-16 text-center">
+          <p 
+            className="text-xs uppercase tracking-widest"
+            style={{ color: styles.subtext, opacity: 0.9 }}
+          >
             Tap the seal to begin
           </p>
         </div>

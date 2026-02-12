@@ -3,18 +3,38 @@ import { CoupleData } from '../types';
 
 interface Props {
   data: CoupleData;
-  onPaymentComplete: () => void;
+  onPaymentComplete: (replyEnabled: boolean) => void;
   onBack: () => void;
 }
 
-const FEATURES = [
-  "AI-Crafted Personal Letter",
-  "Audio Narration",
-  "Memory Board Gallery",
-  "Interactive Envelope Experience",
-  "Lifetime Hosting",
-  "Private Shareable Link",
-];
+type Tier = 'standard' | 'reply';
+
+const TIERS: Record<Tier, { name: string; price: number; tagline: string; features: string[] }> = {
+  standard: {
+    name: 'Sealed Vow',
+    price: 99,
+    tagline: 'A private letter, sealed in time.',
+    features: [
+      'AI-Crafted Personal Letter',
+      'Interactive Envelope Experience',
+      'Memory Board Gallery',
+      'Audio Narration',
+      'Private Shareable Link',
+      'Lifetime Hosting',
+    ],
+  },
+  reply: {
+    name: 'Sealed Vow · With Reply',
+    price: 149,
+    tagline: 'Let them seal something back.',
+    features: [
+      'Everything in Sealed Vow',
+      'Receiver Can Seal a Reply',
+      'Reply Notification to You',
+      'Two-Way Sealed Moment',
+    ],
+  },
+};
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -29,12 +49,15 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack }) => {
+  const [selectedTier, setSelectedTier] = useState<Tier>('reply');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const paymentInProgressRef = useRef(false);
 
   useEffect(() => { loadRazorpayScript().then(setScriptLoaded); }, []);
+
+  const tier = TIERS[selectedTier];
 
   const handlePay = async () => {
     if (paymentInProgressRef.current || isProcessing) return;
@@ -49,11 +72,10 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         setScriptLoaded(true);
       }
 
-      // Create order — no body needed, server determines amount
       const orderRes = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ tier: selectedTier }),
       });
 
       if (!orderRes.ok) {
@@ -62,7 +84,6 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
       }
 
       const { orderId, amount, currency, keyId } = await orderRes.json();
-
       await openCheckout({ orderId, amount, currency, keyId });
 
     } catch (err: any) {
@@ -82,7 +103,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         amount,
         currency,
         name: 'Sealed Vow',
-        description: 'Private Expression — Standard',
+        description: tier.name,
         order_id: orderId,
         prefill: { name: data.senderName || '' },
         theme: { color: '#722F37' },
@@ -99,8 +120,12 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
               }),
             });
             const result = await verifyRes.json();
-            if (result.verified) { onPaymentComplete(); resolve(); }
-            else { reject(new Error('Payment verification failed. Please contact support.')); }
+            if (result.verified) {
+              onPaymentComplete(selectedTier === 'reply');
+              resolve();
+            } else {
+              reject(new Error('Payment verification failed. Please contact support.'));
+            }
           } catch {
             reject(new Error('Verification failed. Please check your connection.'));
           }
@@ -124,17 +149,49 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
 
         {/* Header */}
         <div className="bg-[#1C1917] p-8 md:p-10 text-center relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-luxury-gold to-transparent opacity-50"></div>
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-luxury-gold to-transparent opacity-50" />
           <div className="w-16 h-16 rounded-full bg-luxury-wine/30 border-2 border-luxury-gold/50 flex items-center justify-center mx-auto mb-6">
             <span className="text-2xl text-luxury-gold">💎</span>
           </div>
           <h2 className="text-[10px] uppercase tracking-[0.5em] text-luxury-gold font-bold mb-2">Finalize Your Gift</h2>
-          <h1 className="text-3xl font-serif-elegant italic text-white">Sealed Vow</h1>
-          <p className="text-4xl font-bold text-luxury-gold mt-4">₹99</p>
-          <p className="text-[9px] uppercase tracking-[0.3em] text-white/40 mt-2">One-time · Lifetime access</p>
+          <h1 className="text-3xl font-serif-elegant italic text-white">Choose Your Seal</h1>
         </div>
 
         <div className="p-6 md:p-10">
+
+          {/* Tier Selection */}
+          <div className="mb-8 space-y-3">
+            {(Object.entries(TIERS) as [Tier, typeof TIERS['standard']][]).map(([key, t]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedTier(key)}
+                className={`w-full text-left p-4 rounded-lg border-2 transition-all duration-200 relative ${
+                  selectedTier === key 
+                    ? 'border-[#D4AF37] bg-[#D4AF37]/5' 
+                    : 'border-[#D4C5A5]/40 hover:border-[#D4C5A5]/70'
+                }`}
+              >
+                {key === 'reply' && (
+                  <span className="absolute -top-2.5 right-4 bg-[#D4AF37] text-[#1C1917] text-[7px] uppercase tracking-[0.2em] font-bold px-2.5 py-0.5 rounded-full">
+                    Recommended
+                  </span>
+                )}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-serif-elegant italic text-luxury-ink text-base">
+                      {t.name}
+                    </p>
+                    <p className="text-[9px] text-luxury-stone/60 mt-0.5 tracking-wide">
+                      {t.tagline}
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">
+                    ₹{t.price}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
 
           {/* Error */}
           {error && (
@@ -148,10 +205,10 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
           )}
 
           {/* Features */}
-          <div className="mb-10 space-y-4">
-            {FEATURES.map(f => (
+          <div className="mb-10 space-y-3">
+            {tier.features.map(f => (
               <div key={f} className="flex items-center text-xs font-bold uppercase tracking-widest text-luxury-ink/80">
-                <span className="w-2 h-2 bg-luxury-gold rounded-full mr-3 flex-shrink-0"></span>{f}
+                <span className="w-2 h-2 bg-luxury-gold rounded-full mr-3 flex-shrink-0" />{f}
               </div>
             ))}
           </div>
@@ -167,13 +224,13 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
             >
               {isProcessing ? (
                 <div className="flex items-center space-x-3">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>Processing...</span>
                 </div>
               ) : !scriptLoaded ? (
                 <span>Loading Payment...</span>
               ) : (
-                <span>Pay ₹99</span>
+                <span>Seal for ₹{tier.price}</span>
               )}
             </button>
 
@@ -192,7 +249,6 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
               🔒 Secured by Razorpay · PCI DSS Compliant · 256-bit Encryption
             </p>
           </div>
-
         </div>
       </div>
     </div>
