@@ -14,7 +14,7 @@
       "maxDuration": 30
     },
     "api/verify-payment.js": {
-      "maxDuration": 30
+      "maxDuration": 60
     }
   }
 }
