@@ -97,6 +97,8 @@ const App: React.FC = () => {
   const [isGlobalMuted, setIsGlobalMuted] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isCreatorPreview, setIsCreatorPreview] = useState(false);
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const [shareSlug, setShareSlug] = useState<string | null>(null);
 
   const previousStageRef = useRef<AppStage | null>(null);
 
@@ -570,8 +572,10 @@ const App: React.FC = () => {
           <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
             <PaymentStage 
               data={data} 
-              onPaymentComplete={(replyEnabled: boolean) => {
-                updateData({ replyEnabled, sealedAt: new Date().toISOString() });
+              onPaymentComplete={(result: { replyEnabled: boolean; sessionKey: string; shareSlug: string }) => {
+                updateData({ replyEnabled: result.replyEnabled, sealedAt: new Date().toISOString() });
+                setSessionKey(result.sessionKey);
+                setShareSlug(result.shareSlug);
                 safeSetStage(AppStage.SHARE);
               }}
               onBack={() => {
@@ -582,10 +586,12 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {stage === AppStage.SHARE && data && (
+        {stage === AppStage.SHARE && data && sessionKey && shareSlug && (
           <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
             <SharePackage 
               data={data} 
+              sessionKey={sessionKey}
+              shareSlug={shareSlug}
               onPreview={() => {
                  safeSetStage(AppStage.ENVELOPE);
                  setIsCreatorPreview(false); 

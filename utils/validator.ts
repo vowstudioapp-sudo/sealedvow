@@ -35,7 +35,7 @@ function isValidUrl(url: string): boolean {
       (
         parsed.hostname.includes('firebasestorage.googleapis.com') ||
         parsed.hostname.includes('storage.googleapis.com') ||
-        parsed.hostname.includes('googleapis.com') || // signed URLs
+        parsed.hostname.includes('googleapis.com') ||
         parsed.hostname.includes('archive.org') ||
         parsed.hostname.includes('youtube.com') ||
         parsed.hostname.includes('youtu.be') ||

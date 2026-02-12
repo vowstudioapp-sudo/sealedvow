@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
 
+// ════════════════════════════════════════════════════════════════════
+// CHANGED: onPaymentComplete now receives session info from server
+// instead of just a boolean. The server creates the session.
+// ════════════════════════════════════════════════════════════════════
+interface PaymentResult {
+  replyEnabled: boolean;
+  sessionKey: string;
+  shareSlug: string;
+}
+
 interface Props {
   data: CoupleData;
-  onPaymentComplete: (replyEnabled: boolean) => void;
+  onPaymentComplete: (result: PaymentResult) => void;
   onBack: () => void;
 }
 
@@ -109,6 +119,11 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         theme: { color: '#722F37' },
         handler: async (response: any) => {
           try {
+            // ════════════════════════════════════════════════════
+            // KEY CHANGE: Send full coupleData to server.
+            // Server verifies payment AND creates session.
+            // Client never calls saveSession().
+            // ════════════════════════════════════════════════════
             const verifyRes = await fetch('/api/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -116,15 +131,27 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                sessionKey: data.sessionId || null,
+                coupleData: data,
+                tier: selectedTier,
               }),
             });
+
+            if (!verifyRes.ok) {
+              const errBody = await verifyRes.json().catch(() => ({}));
+              throw new Error(errBody.error || 'Payment verification failed.');
+            }
+
             const result = await verifyRes.json();
-            if (result.verified) {
-              onPaymentComplete(selectedTier === 'reply');
+
+            if (result.verified && result.sessionKey) {
+              onPaymentComplete({
+                replyEnabled: result.replyEnabled,
+                sessionKey: result.sessionKey,
+                shareSlug: result.shareSlug,
+              });
               resolve();
             } else {
-              reject(new Error('Payment verification failed. Please contact support.'));
+              reject(new Error(result.error || 'Payment verification failed.'));
             }
           } catch {
             reject(new Error('Verification failed. Please check your connection.'));
@@ -166,8 +193,8 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
                 key={key}
                 onClick={() => setSelectedTier(key)}
                 className={`w-full text-left p-4 rounded-lg border-2 transition-all duration-200 relative ${
-                  selectedTier === key 
-                    ? 'border-[#D4AF37] bg-[#D4AF37]/5' 
+                  selectedTier === key
+                    ? 'border-[#D4AF37] bg-[#D4AF37]/5'
                     : 'border-[#D4C5A5]/40 hover:border-[#D4C5A5]/70'
                 }`}
               >
@@ -178,16 +205,10 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
                 )}
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-serif-elegant italic text-luxury-ink text-base">
-                      {t.name}
-                    </p>
-                    <p className="text-[9px] text-luxury-stone/60 mt-0.5 tracking-wide">
-                      {t.tagline}
-                    </p>
+                    <p className="font-serif-elegant italic text-luxury-ink text-base">{t.name}</p>
+                    <p className="text-[9px] text-luxury-stone/60 mt-0.5 tracking-wide">{t.tagline}</p>
                   </div>
-                  <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">
-                    ₹{t.price}
-                  </p>
+                  <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">₹{t.price}</p>
                 </div>
               </button>
             ))}

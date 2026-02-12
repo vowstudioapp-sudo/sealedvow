@@ -1,0 +1,40 @@
+{
+    "rules": {
+  
+      "shared": {
+        ".read": true,
+        ".write": false
+      },
+  
+      "payments": {
+        ".read": false,
+        ".write": false
+      },
+  
+      "orders": {
+        ".read": false,
+        ".write": false
+      },
+  
+      "sessions": {
+        "$sessionId": {
+          "sync": {
+            ".read": true,
+            ".write": "auth != null"
+          },
+          "status": {
+            ".read": true,
+            ".write": false
+          }
+        }
+      },
+  
+      "uploads": {
+        "$sessionId": {
+          ".read": true,
+          ".write": "auth != null"
+        }
+      }
+  
+    }
+  }

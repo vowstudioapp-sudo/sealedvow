@@ -360,8 +360,13 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                       This single photo will be the <strong>main cinematic background</strong> for the letter itself. Unlike the Memory Board below (which is a collage), this image sets the mood for the entire experience.
                     </span>
                   </label>
-                  <div onClick={() => fileInputRef.current?.click()} className="relative w-32 h-32 md:w-40 md:h-40 rounded-full bg-[#D6CDB8] border-2 border-luxury-ink/20 flex items-center justify-center cursor-pointer overflow-hidden group hover:border-luxury-gold-dark/60 transition-all shadow-inner">
-                    {data.userImageUrl ? (
+                  <div onClick={() => !media.isUploadingImage && fileInputRef.current?.click()} className={`relative w-32 h-32 md:w-40 md:h-40 rounded-full bg-[#D6CDB8] border-2 border-luxury-ink/20 flex items-center justify-center overflow-hidden group hover:border-luxury-gold-dark/60 transition-all shadow-inner ${media.isUploadingImage ? 'cursor-wait' : 'cursor-pointer'}`}>
+                    {media.isUploadingImage ? (
+                      <div className="text-center p-6 space-y-3">
+                        <div className="w-10 h-10 mx-auto border-2 border-luxury-ink/20 border-t-luxury-gold-dark rounded-full animate-spin" />
+                        <span className="text-[9px] uppercase tracking-[0.2em] text-luxury-ink/60 block font-bold">Uploading...</span>
+                      </div>
+                    ) : data.userImageUrl ? (
                       <img src={data.userImageUrl} className="w-full h-full object-cover grayscale-[0.3] group-hover:grayscale-0 transition-all duration-1000" alt="Preview" />
                     ) : (
                       <div className="text-center p-6 space-y-2">

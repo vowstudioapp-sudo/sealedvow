@@ -1,11 +1,12 @@
 import { CoupleData, SacredLocation, Occasion } from "../types.ts";
 
 /**
- * All Gemini calls are proxied through /api/gemini (Vercel serverless function).
- * The API key never touches the client.
+ * All AI calls are proxied through /api/ai (Vercel serverless function).
+ * Provider-agnostic: Gemini primary, OpenAI fallback.
+ * The API keys never touch the client.
  */
 const callAPI = async (action: string, payload: Record<string, any>): Promise<any> => {
-  const response = await fetch('/api/gemini', {
+  const response = await fetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, payload }),

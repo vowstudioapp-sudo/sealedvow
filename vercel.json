@@ -1,11 +1,20 @@
 {
-    "functions": {
-      "api/gemini.js": {
-        "maxDuration": 60
-      }
+  "framework": "vite",
+  "devCommand": "vite --port $PORT",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/ai.js": {
+      "maxDuration": 60
     },
-    "rewrites": [
-      { "source": "/api/(.*)", "destination": "/api/$1" },
-      { "source": "/((?!api/).*)", "destination": "/index.html" }
-    ]
+    "api/gemini.js": {
+      "maxDuration": 60
+    },
+    "api/create-order.js": {
+      "maxDuration": 30
+    },
+    "api/verify-payment.js": {
+      "maxDuration": 30
+    }
   }
+}
