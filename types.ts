@@ -195,6 +195,7 @@ export interface CoupleData {
   hasGift?: boolean;
   giftType?: GiftType;
   giftTitle?: string;
+  giftNote?: string;
   giftLink?: string;
 
   // -------------------------------------------------------------------------

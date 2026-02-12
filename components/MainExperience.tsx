@@ -83,6 +83,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [isVoicePlaying, setIsVoicePlaying] = useState(false);
   const [showReplyComposer, setShowReplyComposer] = useState(false);
+  const [locationExpanded, setLocationExpanded] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replySealed, setReplySealed] = useState(false);
   const [replySending, setReplySending] = useState(false);
@@ -94,15 +95,16 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
   // Exit intent — soft whisper when user tries to leave
   // Key trigger: location exists + not yet unlocked = receiver thinks it's over
   // Also triggers if user leaves before reaching end of any flow
+  // Also fires during creator preview so sender can see the full feature set
   useEffect(() => {
-    if (isPreview) return;
-
     const shouldTrigger = () => {
       if (exitWhisperShownRef.current) return false;
       // Primary case: location gate exists and hidden content waits
       if (data.sacredLocation && !locationUnlocked && !isPreview) return true;
       // Secondary case: no location but user hasn't reached end
       if (!data.sacredLocation && activeSection < sections.length - 1) return true;
+      // Preview case: always allow trigger so sender sees exit intent feature
+      if (isPreview && !exitWhisperShownRef.current) return true;
       return false;
     };
 
@@ -714,24 +716,85 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
             <div className="main-experience-location-ring main-experience-location-ring--inner" />
           </div>
 
-          <div className="main-experience-location-card">
+          {/* Compact Card — click to expand */}
+          <div 
+            className="main-experience-location-card cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(212,175,55,0.15)]"
+            onClick={() => setLocationExpanded(true)}
+          >
             <div className="text-2xl mb-4 animate-bounce" style={{ color: theme.gold }}>📍</div>
             <h3 className="text-[9px] uppercase tracking-[0.4em] font-bold mb-6" style={{ color: theme.gold, opacity: 0.8 }}>Cosmic Coordinate</h3>
             <h2 className="font-serif-elegant italic text-3xl text-white mb-6 leading-tight">{data.sacredLocation.placeName}</h2>
             <div className="w-12 h-px bg-white/10 mx-auto mb-6" />
-            <p className="text-white/60 text-xs italic leading-relaxed mb-10 font-serif-elegant">
+            <p className="text-white/60 text-xs italic leading-relaxed mb-6 font-serif-elegant line-clamp-2">
               "{data.sacredLocation.description}"
             </p>
-            <a 
-              href={data.sacredLocation.googleMapsUri} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="main-experience-location-link"
-            >
-              <span>View on Map</span>
-              <span className="group-hover:translate-x-1 transition-transform">→</span>
-            </a>
+            <div className="text-[8px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.5 }}>
+              Tap to explore →
+            </div>
           </div>
+
+          {/* Expanded Modal */}
+          {locationExpanded && (
+            <div 
+              className="fixed inset-0 z-[200] flex items-center justify-center p-6"
+              onClick={() => setLocationExpanded(false)}
+            >
+              {/* Backdrop */}
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-md" style={{ animation: 'fadeIn 0.3s ease' }} />
+              
+              {/* Modal Content */}
+              <div 
+                className="relative max-w-lg w-full rounded-2xl p-8 md:p-12 text-center border overflow-y-auto max-h-[85vh]"
+                style={{ 
+                  backgroundColor: 'rgba(15,15,15,0.95)', 
+                  borderColor: `${theme.gold}30`,
+                  boxShadow: `0 25px 60px rgba(0,0,0,0.6), 0 0 40px ${theme.gold}10`,
+                  animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close button */}
+                <button 
+                  onClick={() => setLocationExpanded(false)}
+                  className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+                  style={{ color: 'rgba(255,255,255,0.4)' }}
+                >
+                  ✕
+                </button>
+
+                <div className="text-3xl mb-6" style={{ color: theme.gold }}>📍</div>
+                <h3 className="text-[9px] uppercase tracking-[0.5em] font-bold mb-4" style={{ color: theme.gold, opacity: 0.8 }}>Cosmic Coordinate</h3>
+                <h2 className="font-serif-elegant italic text-2xl md:text-3xl text-white mb-6 leading-tight">{data.sacredLocation.placeName}</h2>
+                
+                <div className="w-16 h-px mx-auto mb-8" style={{ backgroundColor: `${theme.gold}30` }} />
+                
+                <p className="text-white/70 text-sm italic leading-relaxed mb-10 font-serif-elegant max-w-md mx-auto">
+                  "{data.sacredLocation.description}"
+                </p>
+
+                {data.sacredLocation.latLng && (
+                  <div className="mb-8 text-[10px] text-white/30 uppercase tracking-widest font-bold">
+                    {data.sacredLocation.latLng.lat.toFixed(4)}° N · {data.sacredLocation.latLng.lng.toFixed(4)}° E
+                  </div>
+                )}
+                
+                <a 
+                  href={data.sacredLocation.googleMapsUri} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-3 px-8 py-4 rounded-full text-[10px] uppercase tracking-[0.3em] font-bold transition-all hover:scale-[1.03]"
+                  style={{ 
+                    color: theme.gold,
+                    border: `1px solid ${theme.gold}40`,
+                    backgroundColor: `${theme.gold}08`
+                  }}
+                >
+                  <span>View on Map</span>
+                  <span>→</span>
+                </a>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -859,9 +922,16 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
                   <p className="text-[9px] uppercase tracking-[0.5em] mb-2 font-bold" style={{ color: theme.gold, opacity: 0.6 }}>Sealed For You</p>
                   <div className="w-8 h-px mb-10" style={{ backgroundColor: theme.gold, opacity: 0.2 }} />
                   
-                  <h2 className="font-serif-elegant italic text-4xl md:text-5xl text-white mb-10 leading-tight text-center relative z-10 drop-shadow-md">
+                  <h2 className="font-serif-elegant italic text-4xl md:text-5xl text-white mb-6 leading-tight text-center relative z-10 drop-shadow-md">
                     {data.giftTitle}
                   </h2>
+                  
+                  {data.giftNote && (
+                    <p className="font-serif-elegant italic text-sm text-white/50 text-center mb-10 max-w-xs mx-auto leading-relaxed">
+                      "{data.giftNote}"
+                    </p>
+                  )}
+                  {!data.giftNote && <div className="mb-4" />}
                   
                   {!isGiftRevealed ? (
                     <button 
@@ -1173,7 +1243,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
             className="text-[10px] tracking-[0.15em] font-serif-elegant italic"
             style={{ color: theme.text, opacity: 0.35, animation: 'closureReveal 0.8s ease-out 1.2s both' }}
           >
-            {data.senderName} left something more for you
+            {isPreview ? 'This is what your receiver will see when they try to leave' : `${data.senderName} left something more for you`}
           </p>
 
           <button
@@ -1305,7 +1375,13 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
                       <div className="main-experience-gift-punch main-experience-gift-punch--right" />
                       <p className="text-[9px] uppercase tracking-[0.5em] mb-2 font-bold" style={{ color: theme.gold, opacity: 0.6 }}>Sealed For You</p>
                       <div className="w-8 h-px mb-10" style={{ backgroundColor: theme.gold, opacity: 0.2 }} />
-                      <h2 className="font-serif-elegant italic text-4xl md:text-5xl text-white mb-10 leading-tight text-center relative z-10 drop-shadow-md">{data.giftTitle}</h2>
+                      <h2 className="font-serif-elegant italic text-4xl md:text-5xl text-white mb-6 leading-tight text-center relative z-10 drop-shadow-md">{data.giftTitle}</h2>
+                      {data.giftNote && (
+                        <p className="font-serif-elegant italic text-sm text-white/50 text-center mb-10 max-w-xs mx-auto leading-relaxed">
+                          "{data.giftNote}"
+                        </p>
+                      )}
+                      {!data.giftNote && <div className="mb-4" />}
                       {!isGiftRevealed ? (
                         <button onClick={() => setIsGiftRevealed(true)} className="main-experience-gift-reveal">
                           <span className="relative z-10">Reveal Gift</span>
@@ -1364,24 +1440,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
         </div>
       )}
 
-      {/* Preview Controls */}
-      {isPreview && (
-        <div className="fixed bottom-6 right-6 z-[100] flex gap-2">
-          <button 
-            onClick={onEdit} 
-            className="px-4 py-2 bg-white/10 backdrop-blur text-white text-[9px] uppercase tracking-widest border border-white/20 hover:bg-white/20"
-          >
-            Edit
-          </button>
-          <button 
-            onClick={onPayment} 
-            className="px-4 py-2 text-black text-[9px] uppercase tracking-widest hover:opacity-80"
-            style={{ backgroundColor: theme.gold }}
-          >
-            Finalize
-          </button>
-        </div>
-      )}
+      {/* Preview controls moved to PreviewWatermark overlay */}
     </div>
   );
 };

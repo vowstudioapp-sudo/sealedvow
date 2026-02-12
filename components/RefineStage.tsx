@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
 import { generateLoveLetter, generateCoupleMyth, generateValentineImage, generateCinematicVideo, generateSacredLocation, generateFutureProphecy } from '../services/geminiService';
@@ -80,7 +79,7 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
       // We run API calls sequentially to prevent hitting Google AI rate limits (429 Quota Exhausted)
       
       // 1. Myth Generation (Fast Text)
-      setPackageStatus("Writing your myth...");
+      setPackageStatus("Sealing your vow...");
       try {
         enrichedData.myth = await generateCoupleMyth({ ...data, finalLetter: letter });
       } catch (e) { console.warn("Myth failed", e); }

@@ -159,25 +159,29 @@
 }
 
 .main-experience-hero-title {
-  font-size: 1.875rem;
+  font-size: 1.25rem;
   font-family: 'Playfair Display', serif;
   font-style: italic;
-  line-height: 1.25;
+  line-height: 1.35;
   margin-bottom: 2rem;
   color: white;
   filter: drop-shadow(0 25px 25px rgb(0 0 0 / 0.5));
   opacity: 0.95;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 1.5rem;
 }
 
 @media (min-width: 768px) {
   .main-experience-hero-title {
-    font-size: 3rem;
+    font-size: 1.75rem;
   }
 }
 
 @media (min-width: 1024px) {
   .main-experience-hero-title {
-    font-size: 3.75rem;
+    font-size: 2.25rem;
   }
 }
 
@@ -908,4 +912,14 @@ to { width: 2rem; }
 @keyframes exitIntentIn {
 from { opacity: 0; }
 to { opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
 }
