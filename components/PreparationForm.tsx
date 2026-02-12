@@ -608,7 +608,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                         <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. Deeply romantic, playful, grateful, apologetic..." value={data.relationshipIntent} onChange={e => updateData({ relationshipIntent: e.target.value })} required />
                       </div>
                     </div>
-                    </div>
                   )}
 
                   {/* Vocal Vow Section (Fix #3) */}
