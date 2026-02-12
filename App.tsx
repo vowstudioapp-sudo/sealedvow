@@ -190,7 +190,7 @@ const App: React.FC = () => {
         musicUrl: '',
 
         // Reveal
-        revealMethod: 'direct',
+        revealMethod: 'immediate',
         replyEnabled: true,
 
         // Timestamps

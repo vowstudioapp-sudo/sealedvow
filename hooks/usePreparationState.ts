@@ -25,6 +25,7 @@ export function usePreparationState(initialCoupons: Coupon[] = []) {
     occasion: 'valentine',
     writingMode: 'assisted',
     finalLetter: '',
+    senderRawThoughts: '',
 
     theme: 'obsidian',
 

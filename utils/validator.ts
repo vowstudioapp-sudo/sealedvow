@@ -109,6 +109,7 @@ export const CoupleDataSchema = z.object({
   relationshipIntent: z.string().max(500).transform(sanitizeString).optional(),
   sharedMoment: z.string().max(2000).transform(sanitizeString).optional(),
   finalLetter: z.string().max(SECURITY_LIMITS.MAX_TEXT_LENGTH).transform(sanitizeString).optional(),
+  senderRawThoughts: z.string().max(SECURITY_LIMITS.MAX_TEXT_LENGTH).transform(sanitizeString).optional(),
   writingMode: z.enum(['self', 'assisted']).optional(),
   myth: z.string().max(1000).transform(sanitizeString).optional(),
 

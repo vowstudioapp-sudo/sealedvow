@@ -591,9 +591,23 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                       </div>
                     </div>
                   ) : (
-                    <div className="animate-fade-in space-y-4">
-                      <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80">Relationship Tone</label>
-                      <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. Deeply romantic, playful, grateful, apologetic..." value={data.relationshipIntent} onChange={e => updateData({ relationshipIntent: e.target.value })} required />
+                    <div className="animate-fade-in space-y-6">
+                      <div className="space-y-4">
+                        <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80">Your Words</label>
+                        <p className="text-[10px] text-luxury-ink/50 leading-relaxed -mt-2">Write a few lines in your own words. Don't worry about grammar or structure. Just say what you feel.</p>
+                        <textarea 
+                          className="w-full bg-luxury-ink/5 border-l-4 border-luxury-ink/30 pl-6 py-4 pr-4 focus:border-luxury-gold-dark outline-none transition-all font-serif-elegant text-lg italic h-32 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/40" 
+                          placeholder="I just want to say that... the way you... I feel like..." 
+                          value={data.senderRawThoughts || ''} 
+                          onChange={e => updateData({ senderRawThoughts: e.target.value })} 
+                        />
+                        <p className="text-[9px] text-luxury-ink/40 text-right">{(data.senderRawThoughts || '').split(/\s+/).filter(Boolean).length} words</p>
+                      </div>
+                      <div className="space-y-4">
+                        <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80">Relationship Tone</label>
+                        <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. Deeply romantic, playful, grateful, apologetic..." value={data.relationshipIntent} onChange={e => updateData({ relationshipIntent: e.target.value })} required />
+                      </div>
+                    </div>
                     </div>
                   )}
 

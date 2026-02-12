@@ -107,13 +107,152 @@ export default async function handler(req, res) {
 
     switch (action) {
       case 'generateLoveLetter': {
-        const { prompt } = payload;
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-preview-05-20',
-          contents: prompt,
-          config: { temperature: 0.8 }
-        });
-        result = { text: response.text || "I was just sitting here thinking about us. I'm glad we have this." };
+        const { prompt, enforcement } = payload;
+        
+        // ── GLOBAL FORBIDDEN WORDS ──
+        const GLOBAL_FORBIDDEN = [
+          'destiny', 'universe', 'soulmate', 'tapestry', 'intertwined', 'celestial',
+          'symphony', 'canvas', 'journey together', 'stars aligned', 'meant to be',
+          'other half', 'etched', 'blossomed', 'woven', 'beacon', 'chapter of',
+          'fairy tale', 'happily ever after', 'two souls'
+        ];
+        
+        // ── STRUCTURAL VALIDATOR ──
+        const validate = (text) => {
+          const violations = [];
+          const words = text.split(/\s+/).filter(Boolean);
+          const wordCount = words.length;
+          const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+          const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 3);
+          const avgSentenceLength = sentences.length > 0 
+            ? sentences.reduce((sum, s) => sum + s.trim().split(/\s+/).length, 0) / sentences.length 
+            : 0;
+          const lowerText = text.toLowerCase();
+          
+          // Combine global + occasion-specific forbidden
+          const allForbidden = [...GLOBAL_FORBIDDEN, ...(enforcement?.forbidden || [])];
+          const foundForbidden = allForbidden.filter(word => lowerText.includes(word.toLowerCase()));
+          if (foundForbidden.length > 0) {
+            violations.push(`FORBIDDEN_WORDS: ${foundForbidden.join(', ')}`);
+          }
+          
+          // Word count — hard ceiling
+          const [minWords, maxWords] = enforcement?.wordRange || [80, 200];
+          if (wordCount > maxWords + 10) violations.push(`TOO_LONG: ${wordCount} words (max ${maxWords})`);
+          if (wordCount < minWords - 15) violations.push(`TOO_SHORT: ${wordCount} words (min ${minWords})`);
+          
+          // Paragraph count
+          const expectedParagraphs = enforcement?.paragraphs || 3;
+          if (paragraphs.length !== expectedParagraphs && Math.abs(paragraphs.length - expectedParagraphs) > 1) {
+            violations.push(`PARAGRAPH_COUNT: ${paragraphs.length} (expected ${expectedParagraphs})`);
+          }
+          
+          // Average sentence length — kills poetic drift
+          if (avgSentenceLength > 18) {
+            violations.push(`SENTENCES_TOO_LONG: avg ${Math.round(avgSentenceLength)} words (max 18)`);
+          }
+          
+          // Required data fields must appear in output
+          if (enforcement?.requiredFields) {
+            const { sharedMoment, timeShared, senderKeyPhrases } = enforcement.requiredFields;
+            
+            // Shared moment — at least partial match (3+ word overlap)
+            if (sharedMoment && sharedMoment.length > 10) {
+              const momentWords = sharedMoment.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+              const matchCount = momentWords.filter(w => lowerText.includes(w)).length;
+              if (matchCount < Math.min(3, momentWords.length)) {
+                violations.push('MISSING_SHARED_MOMENT');
+              }
+            }
+            
+            // Time shared — for anniversary
+            if (timeShared && timeShared.length > 0) {
+              const timeWords = timeShared.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+              const matchCount = timeWords.filter(w => lowerText.includes(w)).length;
+              if (matchCount === 0) {
+                violations.push('MISSING_TIME_SHARED');
+              }
+            }
+            
+            // Sender key phrases — at least half should appear
+            if (senderKeyPhrases && senderKeyPhrases.length > 0) {
+              const preserved = senderKeyPhrases.filter(phrase => {
+                const phraseWords = phrase.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+                return phraseWords.filter(w => lowerText.includes(w)).length >= Math.ceil(phraseWords.length * 0.5);
+              });
+              if (preserved.length < Math.ceil(senderKeyPhrases.length * 0.5)) {
+                violations.push(`SENDER_VOICE_LOST: only ${preserved.length}/${senderKeyPhrases.length} phrases preserved`);
+              }
+            }
+          }
+          
+          // Check for markdown/formatting contamination
+          if (text.includes('**') || text.includes('##') || text.includes('- ') || text.includes('* ')) {
+            violations.push('MARKDOWN_CONTAMINATION');
+          }
+          
+          return { valid: violations.length === 0, violations, avgSentenceLength, wordCount, paragraphCount: paragraphs.length };
+        };
+        
+        // ── GENERATE → VALIDATE → RETRY LOOP ──
+        const generateLetter = async (attempt = 1) => {
+          let fullPrompt = prompt;
+          
+          if (attempt === 2) {
+            fullPrompt += '\n\nCRITICAL: Your previous output violated constraints. Write MORE SIMPLY. Shorter sentences. No metaphors. No markdown. Exact paragraph count required.';
+          } else if (attempt === 3) {
+            fullPrompt += '\n\nFINAL ATTEMPT. Write like a normal person texting. Ultra simple. Short sentences. No fancy words. No poetry.';
+          }
+          
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-05-20',
+            contents: fullPrompt,
+            config: { temperature: Math.max(0.5, 0.75 - (attempt - 1) * 0.12) }
+          });
+          
+          let text = (response.text || '').trim();
+          
+          // Strip markdown if present
+          text = text.replace(/\*\*/g, '').replace(/^#+\s*/gm, '').replace(/^[-*]\s+/gm, '');
+          
+          const check = validate(text);
+          
+          console.log(`[Letter] Attempt ${attempt}: ${check.wordCount} words, ${check.paragraphCount} paragraphs, avg sentence ${Math.round(check.avgSentenceLength)} words, violations: ${check.violations.join(', ') || 'none'}`);
+          
+          // Retry on hard violations
+          if (!check.valid && attempt < 3) {
+            return generateLetter(attempt + 1);
+          }
+          
+          return { text, check };
+        };
+        
+        let { text: letterText, check } = await generateLetter();
+        
+        // ── SIMPLIFIER PASS ──
+        // If sentences are too long even after retries, run a dedicated simplification
+        if (check.avgSentenceLength > 16 && letterText.length > 0) {
+          try {
+            const simplifyResponse = await ai.models.generateContent({
+              model: 'gemini-2.5-flash-preview-05-20',
+              contents: `Rewrite this letter more simply. Break long sentences into shorter ones. Remove any decorative language. Keep the same meaning and specific details. Do not add new content.\n\n${letterText}`,
+              config: { temperature: 0.4 }
+            });
+            const simplified = (simplifyResponse.text || '').trim().replace(/\*\*/g, '').replace(/^#+\s*/gm, '');
+            
+            // Only use simplified version if it's better
+            const simplifiedCheck = validate(simplified);
+            if (simplifiedCheck.avgSentenceLength < check.avgSentenceLength && !simplifiedCheck.violations.some(v => v.startsWith('FORBIDDEN'))) {
+              letterText = simplified;
+              console.log(`[Letter] Simplifier improved: avg sentence ${Math.round(check.avgSentenceLength)} → ${Math.round(simplifiedCheck.avgSentenceLength)} words`);
+            }
+          } catch (e) {
+            // Simplifier failed — use original, it's still acceptable
+            console.log('[Letter] Simplifier pass failed, using original');
+          }
+        }
+        
+        result = { text: letterText || "I was just sitting here thinking about us. I'm glad we have this." };
         break;
       }
 

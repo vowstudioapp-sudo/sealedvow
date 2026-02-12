@@ -146,6 +146,7 @@ export interface CoupleData {
   occasion: Occasion;
   writingMode?: WritingMode;
   finalLetter?: string;
+  senderRawThoughts?: string; // Sender's unstructured input for assisted mode
   myth?: string; // AI-generated poetic framing / narrative layer
 
   timeShared?: string;

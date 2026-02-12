@@ -19,69 +19,200 @@ const callAPI = async (action: string, payload: Record<string, any>): Promise<an
   return response.json();
 };
 
-const OCCASION_PROMPTS: Record<Occasion, string> = {
-  valentine: `
-    MODE: ROMANTIC & PRESENT.
-    Focus on the "now". The quiet joy of being their partner.
-    Key themes: Warmth, safety, desire, being "home".
-    Tone: Soft, intimate, whispering.
-  `,
-  anniversary: `
-    MODE: NOSTALGIC & EPIC.
-    Focus on the "timeline". The years past and the years to come.
-    Key themes: Endurance, growth, choosing each other again.
-    Tone: Proud, deep, steady.
-  `,
-  apology: `
-    MODE: HUMBLE & RAW.
-    Focus on "repair". Own the mistake without making excuses.
-    Key themes: Regret, learning, valuing the bond over the ego.
-    Tone: Vulnerable, lower-case energy, stripped back. NO flowery language.
-  `,
-  'just-because': `
-    MODE: SPONTANEOUS & OBSERVATIONAL.
-    Focus on "small details". The way they drink coffee, their laugh.
-    Key themes: Noticing them, appreciation without a calendar reason.
-    Tone: Light, affectionate, easy.
-  `,
-  'long-distance': `
-    MODE: LONGING & HOPEFUL.
-    Focus on the "distance" vs the "connection".
-    Key themes: Counting days, digital intimacy, the physical ache.
-    Tone: Melancholic but strong.
-  `,
-  'thank-you': `
-    MODE: GRATITUDE & SERVICE.
-    Focus on "what they do". Acknowledge their unseen labor or support.
-    Key themes: Being seen, partnership, thankfulness.
-    Tone: Sincere, clear, admiring.
-  `
+/* ------------------------------------------------------------------ */
+/* STRUCTURAL MATRIX — One template per occasion                       */
+/* Each has: structure, word budget, must-include, forbidden list       */
+/* ------------------------------------------------------------------ */
+
+interface OccasionContract {
+  structure: string;
+  wordRange: [number, number];
+  paragraphs: number;
+  mustInclude: string[];
+  forbidden: string[];
+  tone: string;
+}
+
+const OCCASION_CONTRACTS: Record<Occasion, OccasionContract> = {
+  valentine: {
+    structure: `
+      Paragraph 1: Present-day feeling. No backstory, no "from the moment". Start with right now.
+      Paragraph 2: One specific detail about them — a habit, a trait, something you noticed recently.
+      Paragraph 3: A simple forward-looking line. Not an eternal promise. Just what you want next.`,
+    wordRange: [130, 160],
+    paragraphs: 3,
+    mustInclude: ['one sensory or real-world detail', 'one direct "I love" statement'],
+    forbidden: ['destiny', 'universe', 'soulmate', 'forever and always', 'stars aligned', 'meant to be', 'other half'],
+    tone: 'intimate, modern, real. Like talking to them on a quiet night.',
+  },
+  anniversary: {
+    structure: `
+      Paragraph 1: Reference passage of time directly — the years, months, or seasons.
+      Paragraph 2: What changed. How you grew. What you learned.
+      Paragraph 3: A specific shared memory.
+      Paragraph 4: Where you're headed. Steady, not dramatic.`,
+    wordRange: [150, 180],
+    paragraphs: 4,
+    mustInclude: ['a time marker (years/months/seasons)', 'acknowledgment of growth or change'],
+    forbidden: ['from the moment I saw you', 'fairy tale', 'love story', 'chapter', 'journey together', 'happily ever after'],
+    tone: 'mature, steady, layered. Like someone who has been through things and is still here.',
+  },
+  'just-because': {
+    structure: `
+      Paragraph 1: Casual opening. No grand setup. Just start talking.
+      Paragraph 2: A small appreciation or random thought about them.`,
+    wordRange: [80, 100],
+    paragraphs: 2,
+    mustInclude: ['something ordinary — chai, a laugh, a random text, a habit'],
+    forbidden: ['big declarations', 'heavy romantic escalation', 'eternal', 'always', 'I cannot imagine life without'],
+    tone: 'spontaneous, relaxed, human. Should feel like a long text message, not a letter.',
+  },
+  apology: {
+    structure: `
+      First sentence: Acknowledge fault directly. Name the action. No softening.
+      Paragraph 1: What you did and why it was wrong. No justifications.
+      Paragraph 2: What you will do differently. Be specific.
+      Optional Paragraph 3: One line about what they mean to you. Brief.`,
+    wordRange: [90, 120],
+    paragraphs: 3,
+    mustInclude: ['direct ownership of specific action', 'one concrete behavior change commitment'],
+    forbidden: ['if I hurt you', 'you misunderstood', 'I was just trying to', 'but you also', 'self-pity', 'romantic escalation', 'you complete me'],
+    tone: 'accountable, calm, grounded. No begging. No drama. Just clarity.',
+  },
+  'long-distance': {
+    structure: `
+      Paragraph 1: Physical absence mentioned clearly. Where you are. What is missing.
+      Paragraph 2: A specific memory triggered by the distance — something you saw or heard that reminded you.
+      Paragraph 3: Looking forward to reunion. Realistic, not dramatic.`,
+    wordRange: [120, 150],
+    paragraphs: 3,
+    mustInclude: ['concrete distance reference — a room, a city, silence after a call, an empty side of bed'],
+    forbidden: ['dramatic longing metaphors', 'oceans between us', 'miles cannot separate', 'my heart aches', 'counting every second'],
+    tone: 'quiet longing, not dramatic ache. Like writing from a hotel room at night.',
+  },
+  'thank-you': {
+    structure: `
+      Paragraph 1: Clear appreciation for a specific action or pattern they do.
+      Paragraph 2: Why it mattered. What it meant. How it made you feel.`,
+    wordRange: [80, 110],
+    paragraphs: 2,
+    mustInclude: ['a specific action, event, or behavior being thanked'],
+    forbidden: ['romantic escalation', 'love declarations unless relevant', 'flowery adjectives', 'you are my everything', 'I do not deserve you'],
+    tone: 'sincere, simple, direct. Like thanking someone who actually helped you.',
+  },
 };
 
+/* ------------------------------------------------------------------ */
+/* VOW BRAND LOCK — Applied to ALL occasions                           */
+/* ------------------------------------------------------------------ */
+
+const BRAND_LOCK = `
+ABSOLUTE RULES — NEVER VIOLATE:
+- Short to medium sentences. Average 10-15 words per sentence.
+- No metaphors. Zero. Not even "subtle" ones.
+- No cosmic language: destiny, universe, stars, fate, celestial, cosmic.
+- No dramatic monologues. No rhetorical questions.
+- No abstract nouns: journey, chapter, story, canvas, tapestry, symphony.
+- No literary language: "intertwined", "blossomed", "woven", "etched".
+- Sound like a real person speaking honestly, not a writer performing.
+- No formal sign-off. No "Yours truly". No "With all my love". Just end naturally.
+- Every paragraph must contain at least one specific, concrete detail.
+- If the letter reads like literature or poetry, rewrite it more simply.
+
+LUXURY = RESTRAINT. Less is more. Simple is premium.`;
+
+/* ------------------------------------------------------------------ */
+/* LETTER GENERATION                                                    */
+/* ------------------------------------------------------------------ */
+
 export const generateLoveLetter = async (data: CoupleData): Promise<string> => {
-  const occasionInstruction = OCCASION_PROMPTS[data.occasion] || OCCASION_PROMPTS.valentine;
+  const contract = OCCASION_CONTRACTS[data.occasion] || OCCASION_CONTRACTS.valentine;
+  const hasSenderWords = data.senderRawThoughts && data.senderRawThoughts.trim().split(/\s+/).length >= 5;
 
-  const prompt = `Write a letter from ${data.senderName} to ${data.recipientName}. 
-  
-  ${occasionInstruction}
+  // Extract key phrases from sender's raw thoughts for enforceable preservation
+  const senderKeyPhrases = hasSenderWords
+    ? data.senderRawThoughts!.trim()
+        .split(/[.!?\n]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 10)
+        .slice(0, 6)
+    : [];
 
-  Context: ${data.relationshipIntent}. 
-  Time shared: ${data.timeShared}.
-  A specific memory: ${data.sharedMoment}.
-  
-  CRITICAL VOICE GUIDELINES:
-  - DO NOT use complex metaphors (avoid "tapestry", "intertwined", "celestial", "symphony").
-  - Use plain, everyday English. Be raw. 
-  - Write shorter sentences. It should sound like someone talking, not a writer writing.
-  - Mention the memory "${data.sharedMoment}" naturally.
-  - The tone should be honest and vulnerable. No formal closing.
-  - Keep it around 140-160 words.`;
+  const senderVoiceBlock = hasSenderWords
+    ? `
+SENDER'S OWN WORDS (CRITICAL — preserve these):
+"""
+${data.senderRawThoughts}
+"""
+
+VOICE PRESERVATION RULES:
+- Preserve the sender's exact key phrases verbatim. Do not paraphrase them.
+- Do not replace their nouns or verbs unless grammatically required.
+- Do not introduce new adjectives they did not use.
+- Do not add emotional claims the sender did not make.
+- Do not elevate casual language into literary language.
+- If the sender wrote "I miss your stupid laugh" — that exact phrase stays.
+- Only reorganize into paragraph structure. Minimal polish.
+`
+    : '';
+
+  const prompt = `You are writing a short personal letter from ${data.senderName} to ${data.recipientName}.
+
+OCCASION: ${data.occasion.toUpperCase().replace('-', ' ')}
+RELATIONSHIP CONTEXT: ${data.relationshipIntent || 'romantic partner'}
+TIME TOGETHER: ${data.timeShared || 'some time'}
+A SHARED MEMORY: ${data.sharedMoment || 'time spent together'}
+
+${senderVoiceBlock}
+
+STRUCTURE (follow exactly):
+${contract.structure}
+
+WORD COUNT: ${contract.wordRange[0]}–${contract.wordRange[1]} words. Hard limit. Not one word more.
+PARAGRAPHS: Exactly ${contract.paragraphs} paragraphs separated by exactly one blank line.
+No extra blank lines. No bullet points. No markdown. No headers.
+TONE: ${contract.tone}
+
+MUST INCLUDE:
+${contract.mustInclude.map(r => `- ${r}`).join('\n')}
+
+FORBIDDEN (never use these words or patterns):
+${contract.forbidden.map(f => `- "${f}"`).join('\n')}
+
+FORMAT RULE: Each paragraph separated by exactly one blank line. No other formatting.
+SENTENCE RULE: Average sentence length must be under 15 words. If a sentence exceeds 20 words, split it.
+
+${BRAND_LOCK}
+
+Write the letter now. Only the letter text. No title, no greeting like "Dear X", no sign-off. Just the raw paragraphs.`;
+
+  // Pass enforcement metadata to server for structural validation
+  const enforcement = {
+    occasion: data.occasion,
+    wordRange: contract.wordRange,
+    paragraphs: contract.paragraphs,
+    forbidden: contract.forbidden,
+    // Enforceable data fields — server checks these appear in output
+    requiredFields: {
+      sharedMoment: data.sharedMoment || '',
+      timeShared: data.occasion === 'anniversary' ? (data.timeShared || '') : '',
+      senderKeyPhrases,
+    },
+  };
 
   try {
-    const result = await callAPI('generateLoveLetter', { prompt });
+    const result = await callAPI('generateLoveLetter', { prompt, enforcement });
     return result.text;
   } catch (error) {
-    return "I don't really know how to put this into words, but I wanted to try anyway.";
+    const fallbacks: Record<Occasion, string> = {
+      valentine: "I keep thinking about you today. Not for any big reason. Just because you're you, and that's enough.",
+      anniversary: "Another year. I'd choose this again. Every part of it.",
+      'just-because': "No reason for this. Just wanted you to know I was thinking about you.",
+      apology: "I messed up. I know that. I'm not going to make excuses. I just want to do better.",
+      'long-distance': "It's quiet here without you. I keep reaching for my phone just to hear your voice.",
+      'thank-you': "I don't say this enough. But thank you. For everything you do that I forget to notice.",
+    };
+    return fallbacks[data.occasion] || fallbacks.valentine;
   }
 };
 
