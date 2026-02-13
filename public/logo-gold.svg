@@ -1,0 +1,38 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gold gradient for V letterform (matches bg-gradient-to-b from-[#D4AF37] via-[#F7E6A7] to-[#8B5E3C]) -->
+    <linearGradient id="goldGradient" x1="512" y1="280" x2="512" y2="750" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D4AF37"/>
+      <stop offset="50%" stop-color="#F7E6A7"/>
+      <stop offset="100%" stop-color="#8B5E3C"/>
+    </linearGradient>
+
+    <!-- Glow filter (matches box-shadow: 0 0 40px rgba(212,175,55,0.35)) -->
+    <filter id="outerGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="30" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.831  0 0 0 0 0.686  0 0 0 0 0.216  0 0 0 0.35 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Inner radial glow (matches monogram-glow) -->
+    <radialGradient id="innerGlow" cx="50%" cy="50%" r="35%">
+      <stop offset="0%" stop-color="#D4AF37" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#D4AF37" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Outer ring with glow (monogram-ring--outer: border 0.5px gold/50%, box-shadow 40px gold/35%) -->
+  <circle cx="512" cy="512" r="480" stroke="#D4AF37" stroke-opacity="0.5" stroke-width="3" fill="none" filter="url(#outerGlow)"/>
+
+  <!-- Inner ring (monogram-ring--inner: inset 6px, border gold/30%) -->
+  <circle cx="512" cy="512" r="440" stroke="#D4AF37" stroke-opacity="0.3" stroke-width="2" fill="none"/>
+
+  <!-- Radial glow background (monogram-glow: inset 18%, radial gold/40%) -->
+  <circle cx="512" cy="512" r="350" fill="url(#innerGlow)"/>
+
+  <!-- V letterform with gold gradient (font-serif-elegant italic, matching favicon path scaled up) -->
+  <path d="M330.8 316.8C330.8 307.2 337.2 300.8 351.6 300.8H411.6C450 300.8 467.6 318.4 483.6 363.2L518.8 466.4L551.6 363.2C566.8 316.8 586.8 300.8 622.8 300.8H673.2C687.6 300.8 694 307.2 694 316.8C694 321.6 691.6 325.6 687.6 332L566.8 691.2C550.8 738.4 534.8 756 501.2 756C464.4 756 449.2 736.8 433.2 691.2L323.6 332C319.6 324.8 330.8 320.8 330.8 316.8Z" fill="url(#goldGradient)"/>
+</svg>

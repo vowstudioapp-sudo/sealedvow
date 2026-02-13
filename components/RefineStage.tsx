@@ -166,7 +166,7 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-8 animate-fade-in text-[#E5D0A1]">
         <div className="w-24 h-24 border border-luxury-wine/40 rounded-full mb-8 relative flex items-center justify-center">
           <div className="absolute inset-0 border-t-luxury-wine border-r-luxury-wine border border-transparent rounded-full animate-spin duration-700"></div>
-          <span className="text-3xl animate-pulse">✨</span>
+          <span className="text-3xl animate-pulse"><img src="/logo-gold.webp" alt="VOW" className="w-14 h-14" /></span>
         </div>
         <h2 className="text-2xl font-serif-elegant italic mb-6 text-luxury-wine">Compiling Experience</h2>
         
