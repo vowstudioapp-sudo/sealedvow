@@ -914,12 +914,153 @@ from { opacity: 0; }
 to { opacity: 1; }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ================================================================
+   MOBILE TYPOGRAPHY FIX
+   Airy. Measured. Readable. Not dense and dramatic.
+   ================================================================ */
+
+@media (max-width: 767px) {
+  .main-experience-letter-text {
+    font-size: 0.95rem;
+    line-height: 1.85;
+  }
+
+  .main-experience-letter-card {
+    padding: 1.5rem 2rem;
+    max-width: 92vw;
+    min-height: 55vh;
+  }
+
+  .main-experience-letter-quote {
+    font-size: 40px;
+    top: -1rem;
+    left: -0.25rem;
+  }
 }
 
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.92); }
-  to { opacity: 1; transform: scale(1); }
+/* ================================================================
+   MOBILE SOFT CLOSURE
+   In-place epilogue transition. Not a modal. The letter closes itself.
+   ================================================================ */
+
+@keyframes softClosureFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-soft-closure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+}
+
+.mobile-soft-closure__headline {
+  font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(1.3rem, 5vw, 2rem);
+  line-height: 1.4;
+  opacity: 0;
+  animation: softClosureFadeIn 400ms ease-out 0ms forwards;
+}
+
+.mobile-soft-closure__divider {
+  width: 2rem;
+  height: 1px;
+  margin: 1.5rem auto;
+  opacity: 0.2;
+  animation: softClosureFadeIn 400ms ease-out 200ms forwards;
+  opacity: 0;
+}
+
+.mobile-soft-closure__subtext {
+  font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  opacity: 0;
+  animation: softClosureFadeIn 400ms ease-out 500ms forwards;
+}
+
+.mobile-soft-closure__cta {
+  margin-top: 2.5rem;
+  width: 100%;
+  max-width: 20rem;
+  padding: 1rem 2rem;
+  border: 1px solid;
+  font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  transition: all 300ms ease;
+  opacity: 0;
+  animation: softClosureFadeIn 400ms ease-out 800ms forwards;
+}
+
+.mobile-soft-closure__cta:active {
+  transform: scale(0.97);
+}
+
+.mobile-soft-closure__dismiss {
+  margin-top: 1rem;
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4em;
+  opacity: 0;
+  animation: softClosureFadeIn 400ms ease-out 1200ms forwards;
+}
+
+/* Override divider animation — needs to end at 0.2 opacity not 1 */
+.mobile-soft-closure__divider {
+  animation: softClosureDivider 400ms ease-out 200ms forwards;
+}
+
+@keyframes softClosureDivider {
+  from {
+    opacity: 0;
+    width: 0;
+  }
+  to {
+    opacity: 0.2;
+    width: 2rem;
+  }
+}
+
+/* Override subtext — ends at 0.35 opacity */
+.mobile-soft-closure__subtext {
+  animation: softClosureSubtext 400ms ease-out 500ms forwards;
+}
+
+@keyframes softClosureSubtext {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+}
+
+/* Override dismiss — ends at 0.15 opacity */
+.mobile-soft-closure__dismiss {
+  animation: softClosureDismiss 400ms ease-out 1200ms forwards;
+}
+
+@keyframes softClosureDismiss {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 0.15;
+    transform: translateY(0);
+  }
 }

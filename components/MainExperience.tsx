@@ -14,6 +14,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { CoupleData, Coupon, Theme, MemoryPhoto, Occasion } from '../types';
 import { generateAudioLetter, decodeAudioData } from '../services/geminiService';
 import { PaperSurface } from './PaperSurface';
+import { useMobileSoftClosure } from '../hooks/useMobileSoftClosure';
 
 /* ------------------------------------------------------------------ */
 /* TYPES                                                               */
@@ -155,6 +156,14 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Mobile soft closure — scroll-based epilogue trigger (receiver only)
+  const showMobileClosure = useMobileSoftClosure({
+    containerRef,
+    threshold: 0.92,
+    delayMs: 2000,
+    disabled: isPreview || showExitOverlay || showExitWhisper,
+  });
   const dragStartPos = useRef({ x: 0, y: 0 });
   const maxZ = useRef(20);
   const mountedRef = useRef(true);
@@ -983,7 +992,58 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
           as="section"
           className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-8"
         >
-          <div className="text-center">
+          {showMobileClosure ? (
+            /* ── Mobile Soft Closure: replaces final section in-place ── */
+            <div className="mobile-soft-closure text-center w-full max-w-sm mx-auto">
+              <p
+                className="mobile-soft-closure__headline"
+                style={{ color: theme.text }}
+              >
+                Before you go...
+              </p>
+
+              <div
+                className="mobile-soft-closure__divider"
+                style={{ backgroundColor: theme.gold }}
+              />
+
+              <p
+                className="mobile-soft-closure__subtext"
+                style={{ color: theme.text }}
+              >
+                {data.senderName} left something more for you
+              </p>
+
+              <button
+                onClick={() => {
+                  setShowExitOverlay(true);
+                }}
+                className="mobile-soft-closure__cta"
+                style={{
+                  borderColor: theme.gold + '55',
+                  color: theme.text,
+                }}
+              >
+                Show me
+              </button>
+
+              <button
+                onClick={() => {
+                  // Dismiss — unlock scroll, show normal closure
+                  if (containerRef.current) {
+                    containerRef.current.style.overflow = '';
+                    containerRef.current.style.scrollSnapType = '';
+                  }
+                }}
+                className="mobile-soft-closure__dismiss"
+                style={{ color: theme.text }}
+              >
+                Maybe later
+              </button>
+            </div>
+          ) : (
+            /* ── Normal closure (desktop + pre-trigger mobile) ── */
+            <div className="text-center">
             {/* Soft closure message — woven into the real ending */}
             <p 
               className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8"
@@ -1072,6 +1132,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
               )}
             </div>
           </div>
+          )}
         </PaperSurface>
       )}
 
