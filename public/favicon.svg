@@ -1,0 +1,18 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Obsidian Background Circle -->
+  <circle cx="256" cy="256" r="256" fill="#0C0A09"/>
+  
+  <!-- Outer Gold Rim (Brushed Effect Simulation via Opacity) -->
+  <circle cx="256" cy="256" r="248" stroke="#D4AF37" stroke-width="16" stroke-opacity="0.8"/>
+  <circle cx="256" cy="256" r="248" stroke="#997B19" stroke-width="2" stroke-opacity="0.5"/>
+
+  <!-- Inner Thin Ring for Detail -->
+  <circle cx="256" cy="256" r="210" stroke="#D4AF37" stroke-width="4" stroke-opacity="0.3"/>
+
+  <!-- The V Monogram -->
+  <!-- Using a path ensures the font renders correctly on all devices without needing the font installed -->
+  <path d="M165.4 158.4C165.4 153.6 168.6 150.4 175.8 150.4H205.8C225 150.4 233.8 159.2 241.8 181.6L259.4 233.2L275.8 181.6C283.4 158.4 293.4 150.4 311.4 150.4H336.6C343.8 150.4 347 153.6 347 158.4C347 160.8 345.8 162.8 343.8 166L283.4 345.6C275.4 369.2 267.4 378 250.6 378C232.2 378 224.6 368.4 216.6 345.6L161.8 166C159.8 162.4 165.4 160.4 165.4 158.4Z" fill="#D4AF37"/>
+  
+  <!-- Subtle Shine/Gloss Reflection at top -->
+  <ellipse cx="256" cy="120" rx="140" ry="60" fill="white" fill-opacity="0.05"/>
+</svg>
