@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
 
-// ════════════════════════════════════════════════════════════════════
-// CHANGED: onPaymentComplete now receives session info from server
-// instead of just a boolean. The server creates the session.
-// ════════════════════════════════════════════════════════════════════
 interface PaymentResult {
   replyEnabled: boolean;
   sessionKey: string;
@@ -65,9 +61,70 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const paymentInProgressRef = useRef(false);
 
+  // Founder access
+  const [founderCode, setFounderCode] = useState('');
+  const [founderError, setFounderError] = useState<string | null>(null);
+  const [founderApplying, setFounderApplying] = useState(false);
+  const [showCodeInput, setShowCodeInput] = useState(false);
+
   useEffect(() => { loadRazorpayScript().then(setScriptLoaded); }, []);
 
   const tier = TIERS[selectedTier];
+
+  // ── Founder code handler ──
+  // Step 1: Validate code on server (create-order) → get founderToken
+  // Step 2: Create session on server (verify-payment) using founderToken
+  // Frontend never decides if code is valid. Server does everything.
+  const handleFounderCode = async () => {
+    if (!founderCode.trim() || founderApplying) return;
+    setFounderApplying(true);
+    setFounderError(null);
+
+    try {
+      // Step 1: Server validates + consumes code, returns one-time token
+      const orderRes = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ founderCode: founderCode.trim() }),
+      });
+
+      const orderData = await orderRes.json();
+
+      if (!orderRes.ok || !orderData.founderApproved) {
+        setFounderError(orderData.error || 'Invalid or expired code.');
+        setFounderApplying(false);
+        return;
+      }
+
+      // Step 2: Create session using server-generated token
+      const verifyRes = await fetch('/api/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentMode: 'founder',
+          founderToken: orderData.founderToken,
+          coupleData: data,
+          tier: orderData.tier || 'reply',
+        }),
+      });
+
+      const result = await verifyRes.json();
+
+      if (result.verified && result.sessionKey) {
+        onPaymentComplete({
+          replyEnabled: result.replyEnabled,
+          sessionKey: result.sessionKey,
+          shareSlug: result.shareSlug,
+        });
+      } else {
+        setFounderError(result.error || 'Session creation failed.');
+      }
+    } catch (err: any) {
+      setFounderError('Something went wrong. Please try again.');
+    } finally {
+      setFounderApplying(false);
+    }
+  };
 
   const handlePay = async () => {
     if (paymentInProgressRef.current || isProcessing) return;
@@ -119,11 +176,6 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         theme: { color: '#722F37' },
         handler: async (response: any) => {
           try {
-            // ════════════════════════════════════════════════════
-            // KEY CHANGE: Send full coupleData to server.
-            // Server verifies payment AND creates session.
-            // Client never calls saveSession().
-            // ════════════════════════════════════════════════════
             const verifyRes = await fetch('/api/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -271,6 +323,46 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
             <p className="text-[9px] uppercase tracking-[0.3em] text-luxury-stone/40 font-bold">
               🔒 Secured by Razorpay · PCI DSS Compliant · 256-bit Encryption
             </p>
+          </div>
+
+          {/* Founder Access — subtle, minimal */}
+          <div className="mt-6 text-center">
+            {!showCodeInput ? (
+              <button
+                onClick={() => setShowCodeInput(true)}
+                className="text-[8px] uppercase tracking-[0.3em] text-luxury-stone/25 hover:text-luxury-stone/50 transition-colors font-bold"
+              >
+                Have a private access code?
+              </button>
+            ) : (
+              <div className="space-y-3 animate-fade-in">
+                <div className="flex items-center gap-2 max-w-xs mx-auto">
+                  <input
+                    type="text"
+                    value={founderCode}
+                    onChange={(e) => { setFounderCode(e.target.value.toUpperCase()); setFounderError(null); }}
+                    placeholder="ENTER CODE"
+                    className="flex-1 bg-transparent border-b border-luxury-stone/20 py-2 px-1 text-center text-[10px] uppercase tracking-[0.3em] text-luxury-ink font-bold focus:outline-none focus:border-luxury-gold placeholder-luxury-stone/30"
+                    disabled={founderApplying}
+                    onKeyDown={(e) => e.key === 'Enter' && handleFounderCode()}
+                  />
+                  <button
+                    onClick={handleFounderCode}
+                    disabled={!founderCode.trim() || founderApplying}
+                    className={`text-[8px] uppercase tracking-[0.2em] font-bold px-4 py-2 border rounded-full transition-all ${
+                      founderCode.trim() && !founderApplying
+                        ? 'border-luxury-gold/50 text-luxury-gold hover:bg-luxury-gold/5'
+                        : 'border-luxury-stone/15 text-luxury-stone/25 cursor-not-allowed'
+                    }`}
+                  >
+                    {founderApplying ? '...' : 'Apply'}
+                  </button>
+                </div>
+                {founderError && (
+                  <p className="text-[9px] text-red-400/70 tracking-wide">{founderError}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
