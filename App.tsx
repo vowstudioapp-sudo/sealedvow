@@ -219,7 +219,7 @@ const App: React.FC = () => {
     if (linkState === LoaderState.SUCCESS && sharedData) {
       setData(hydrateCoupleData(sharedData));
       setIsBooting(false);
-      setIsFadingOut(true);
+      setIsFadingOut(false);
       
       // Check for master role in query params (clean URLs) or hash params (legacy)
       const queryParams = new URLSearchParams(window.location.search);
@@ -245,6 +245,14 @@ const App: React.FC = () => {
   }, [linkState, sharedData, linkError]);
 
   useEffect(() => {
+    // Skip boot screen for receiver links — they go straight to PersonalIntro
+    const isReceiverLink = window.location.pathname.length > 1 && !window.location.pathname.startsWith('/api');
+    if (isReceiverLink) {
+      setIsFadingOut(false);
+      setIsBooting(false);
+      return;
+    }
+
     const fadeTimer = setTimeout(() => setIsFadingOut(true), 2200);
     const endTimer = setTimeout(() => setIsBooting(false), 3000);
 
