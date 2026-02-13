@@ -3,6 +3,10 @@
   "devCommand": "vite --port $PORT",
   "buildCommand": "vite build",
   "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "functions": {
     "api/ai.js": {
       "maxDuration": 60
@@ -14,7 +18,7 @@
       "maxDuration": 30
     },
     "api/verify-payment.js": {
-      "maxDuration": 60
+      "maxDuration": 30
     }
   }
 }
