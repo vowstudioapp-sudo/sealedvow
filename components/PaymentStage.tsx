@@ -242,7 +242,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         <div className="bg-[#1C1917] p-8 md:p-10 text-center relative">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-luxury-gold to-transparent opacity-50" />
           <div className="w-16 h-16 rounded-full bg-luxury-wine/30 border-2 border-luxury-gold/50 flex items-center justify-center mx-auto mb-6">
-            <span className="text-2xl text-luxury-gold">💎</span>
+            <img src="/favicon.svg" alt="VOW" className="w-10 h-10" />
           </div>
           <h2 className="text-[10px] uppercase tracking-[0.5em] text-luxury-gold font-bold mb-2">Finalize Your Gift</h2>
           <h1 className="text-3xl font-serif-elegant italic text-white">Choose Your Seal</h1>
