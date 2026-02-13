@@ -1440,7 +1440,31 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
         </div>
       )}
 
-      {/* Preview controls moved to PreviewWatermark overlay */}
+      {/* Creator Preview Controls — Modify + Seal & Deliver */}
+      {isPreview && (
+        <div className="fixed bottom-0 left-0 right-0 z-[200]" style={{ background: `linear-gradient(to top, ${theme.bg}, ${theme.bg}ee, transparent)` }}>
+          <div className="max-w-md mx-auto px-6 pb-8 pt-16 flex flex-col items-center gap-3">
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="w-full py-3.5 text-[10px] font-bold uppercase tracking-[0.4em] border rounded-full transition-all duration-300 hover:bg-white/5"
+                style={{ borderColor: theme.gold + '40', color: theme.text }}
+              >
+                ← Modify
+              </button>
+            )}
+            {onPayment && (
+              <button
+                onClick={onPayment}
+                className="w-full py-4 text-[10px] font-bold uppercase tracking-[0.4em] rounded-full transition-all duration-300 shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
+                style={{ backgroundColor: '#722F37', color: '#FFFFFF', letterSpacing: '0.4em' }}
+              >
+                Seal & Deliver
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
