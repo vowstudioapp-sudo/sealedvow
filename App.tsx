@@ -410,9 +410,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen relative overflow-hidden transition-colors duration-1000">
       {isBooting && !isReceiverLink && bootScreen}
-      {isReceiverLink && linkState === LoaderState.LOADING && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: '#000' }} />
-      )}
 
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")' }}></div>
       
@@ -423,7 +420,11 @@ const App: React.FC = () => {
         </>
       )}
 
-      <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${isBooting && !isReceiverLink ? 'opacity-0' : 'opacity-100'}`}>
+      <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${
+        isReceiverLink 
+          ? (stage === AppStage.PERSONAL_INTRO || stage === AppStage.ENVELOPE || stage === AppStage.MAIN_EXPERIENCE ? 'opacity-100' : 'opacity-0')
+          : (isBooting ? 'opacity-0' : 'opacity-100')
+      }`}>
         
         {stage === AppStage.LANDING && (
           <LandingPage onEnter={handleEnterStudio} />
