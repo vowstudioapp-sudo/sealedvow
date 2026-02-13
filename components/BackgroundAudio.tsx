@@ -30,6 +30,7 @@ export const BackgroundAudio: React.FC<BackgroundAudioProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [youtubeId, setYoutubeId] = useState<string | null>(null);
+  const retryCountRef = useRef(0);
 
   /* ----------------------------------------
    * Utilities
@@ -99,11 +100,28 @@ export const BackgroundAudio: React.FC<BackgroundAudioProps> = ({
     if (isPlaying) {
       audio
         .play()
-        .catch(() => onPlayError?.('AUTOPLAY_BLOCKED'));
+        .then(() => {
+          retryCountRef.current = 0; // Reset on success
+        })
+        .catch(() => {
+          retryCountRef.current += 1;
+          if (retryCountRef.current <= 2) {
+            // Retry after a short delay (browser may need user gesture warmup)
+            setTimeout(() => {
+              audio.play().catch(() => {
+                if (retryCountRef.current >= 2) {
+                  onPlayError?.('AUTOPLAY_BLOCKED');
+                }
+              });
+            }, 500 * retryCountRef.current);
+          } else {
+            onPlayError?.('AUTOPLAY_BLOCKED');
+          }
+        });
     } else {
       audio.pause();
     }
-  }, [isPlaying, musicType, volume, onPlayError]);
+  }, [isPlaying, musicType, musicUrl, volume, onPlayError]);
 
   /* ----------------------------------------
    * YouTube Playback Control
@@ -160,6 +178,10 @@ export const BackgroundAudio: React.FC<BackgroundAudioProps> = ({
         loop
         preload="auto"
         playsInline
+        onError={(e) => {
+          console.warn('[BackgroundAudio] Audio source error:', (e.target as HTMLAudioElement).error?.message);
+          onPlayError?.('INVALID_SOURCE');
+        }}
       />
     );
   }

@@ -153,8 +153,10 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
             } else {
               reject(new Error(result.error || 'Payment verification failed.'));
             }
-          } catch {
-            reject(new Error('Verification failed. Please check your connection.'));
+          } catch (verifyErr: any) {
+            const msg = verifyErr?.message || 'Verification failed. Please check your connection.';
+            console.error('[PaymentStage] Verification error:', msg);
+            reject(new Error(msg));
           }
         },
         modal: {

@@ -77,40 +77,40 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       >
 
         {/* Monogram */}
-        <div className="mb-12 relative w-24 h-24 flex items-center justify-center">
+        <div className="mb-6 md:mb-12 relative w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
           <div className="monogram-ring monogram-ring--outer" />
           <div className="monogram-ring monogram-ring--inner" />
-          <span className="font-serif-elegant italic text-5xl relative z-10 pt-2">
+          <span className="font-serif-elegant italic text-4xl md:text-5xl relative z-10 pt-2">
             V
           </span>
-          <div className="monogram-glow" />
+          <div className="monogram-glow monogram-glow--mobile-dim" />
         </div>
 
         {/* Branding */}
-        <p className="text-[10px] uppercase tracking-[0.8em] font-bold mb-8 animate-fade-in">
+        <p className="text-[10px] uppercase tracking-[0.8em] font-bold mb-4 md:mb-8 animate-fade-in">
           VOW
         </p>
 
         {/* Hero */}
-        <h1 className="text-5xl md:text-8xl font-serif-elegant italic mb-6 leading-[1.1] text-transparent bg-clip-text bg-gradient-to-b from-[#D4AF37] via-[#F7E6A7] to-[#8B5E3C]">
+        <h1 className="text-[2.6rem] md:text-8xl font-serif-elegant italic mb-4 md:mb-6 leading-[1.1] text-transparent bg-clip-text bg-gradient-to-b from-[#D4AF37] via-[#F7E6A7] to-[#8B5E3C]">
           Silence the noise.<br />
           Speak to the soul.
         </h1>
 
         {/* Subline */}
-        <p className="text-[#F7E6A7] text-base md:text-lg font-serif-elegant italic mb-6 max-w-lg mx-auto">
+        <p className="hidden md:block text-[#F7E6A7] text-base md:text-lg font-serif-elegant italic mb-6 max-w-lg mx-auto">
           “A private letter, created by you, for one person.”
         </p>
 
         {/* Whisper */}
-        <p className="text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold opacity-80 mb-12 animate-fade-in">
+        <p className="hidden md:block text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold opacity-80 mb-12 animate-fade-in">
           Designed for moments that deserve ceremony
         </p>
 
-        <div className="w-16 h-px bg-[#D4AF37]/60 mb-16" />
+        <div className="hidden md:block w-16 h-px bg-[#D4AF37]/60 mb-16" />
 
         {/* CTA */}
-        <div className="flex flex-col items-center min-h-[100px] justify-center space-y-6">
+        <div className="flex flex-col items-center min-h-[80px] md:min-h-[100px] justify-center space-y-4 md:space-y-6 mt-2 md:mt-0">
           {!isEntering ? (
             <>
               <button
@@ -123,8 +123,11 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <div className="landing-enter-fill" />
               </button>
 
-              <p className="text-[#AAA] text-[10px] uppercase tracking-[0.2em] font-bold opacity-0 animate-fade-in delay-2000">
+              <p className="hidden md:block text-[#AAA] text-[10px] uppercase tracking-[0.2em] font-bold opacity-0 animate-fade-in delay-2000">
                 Takes less than 5 minutes
+              </p>
+              <p className="md:hidden text-[#9A8F7E] text-[10px] uppercase tracking-[0.15em] font-bold animate-fade-in">
+                Private. Takes less than 5 minutes.
               </p>
             </>
           ) : (

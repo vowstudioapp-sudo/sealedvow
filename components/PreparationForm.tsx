@@ -29,9 +29,9 @@ const THEMES: { id: Theme; label: string; color: string; desc: string }[] = [
 ];
 
 const MUSIC_PRESETS = [
-  { id: 'piano', label: 'Eternal Piano (Satie)', url: 'https://ia800201.us.archive.org/12/items/GymnopedieNo1/GymnopedieNo1.mp3' },
-  { id: 'cello', label: 'Deep Cello Suite', url: 'https://ia800305.us.archive.org/24/items/BachCelloSuiteNo.1InGMajor/01-SuiteNo.1InGMajorBwv1007-IPrelude.mp3' },
-  { id: 'ambient', label: 'Ethereal Silence', url: 'https://ia902509.us.archive.org/9/items/N5280_Restoration/Restoration.mp3' }
+  { id: 'piano', label: 'Eternal Piano (Satie)', url: 'https://archive.org/download/gymnopedie-no-1-by-kevin-macleod/Gymnopedie_No_1.mp3' },
+  { id: 'cello', label: 'Deep Cello Suite', url: 'https://archive.org/download/BachCelloSuiteNo.1InGMajor/01-SuiteNo.1InGMajorBwv1007-IPrelude.mp3' },
+  { id: 'ambient', label: 'Ethereal Silence', url: 'https://archive.org/download/N5280_Restoration/Restoration.mp3' }
 ];
 
 const DEFAULT_COUPONS: Coupon[] = [
@@ -243,13 +243,14 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
             {step > 1 && step !== 2 && (
                 <div className="animate-fade-in text-[9px] uppercase tracking-[0.2em] text-green-400/80 font-bold mb-1 flex items-center gap-2">
                     <span>✓</span>
-                    <span>The narrative is complete</span>
+                    <span>{step === 2 ? "The foundation is complete" : "The narrative is complete"}</span>
                 </div>
             )}
 
             {step !== 2 && (
               <h1 className="text-3xl md:text-5xl font-serif-elegant italic text-[#E5D0A1] leading-tight animate-fade-in" key={step}>
                 {step === 1 && "You are shaping the foundation"}
+                {step === 2 && "You are crafting the narrative"}
                 {step === 3 && "You are preparing the ceremony"}
               </h1>
             )}

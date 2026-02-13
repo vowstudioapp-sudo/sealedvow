@@ -8,10 +8,9 @@ import { InteractiveQuestion } from './components/InteractiveQuestion.tsx';
 import { SoulmateSync } from './components/SoulmateSync.tsx';
 import { LandingPage } from './components/LandingPage.tsx';
 import { PaymentStage } from './components/PaymentStage.tsx';
-import { BackgroundAudio } from './components/BackgroundAudio.tsx';
+
 import { MasterControl } from './components/MasterControl.tsx';
 import { PersonalIntro } from './components/PersonalIntro.tsx';
-import { PreviewWatermark } from './components/PreviewWatermark.tsx';
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
@@ -26,7 +25,7 @@ const THEME_BG_COLORS: Record<Theme, string> = {
 };
 
 const STUDIO_BG_COLOR = '#1C1917';
-const DEFAULT_AMBIENT_MUSIC = 'https://ia800201.us.archive.org/12/items/GymnopedieNo1/GymnopedieNo1.mp3';
+
 
 const STORAGE_KEY = 'vday_data';
 
@@ -95,8 +94,6 @@ const App: React.FC = () => {
   const [isBooting, setIsBooting] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
   
-  const [isGlobalMuted, setIsGlobalMuted] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
   const [isCreatorPreview, setIsCreatorPreview] = useState(false);
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
@@ -259,24 +256,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (hasInteracted) return;
-
-    const unlockAudio = () => {
-      if (!hasInteracted) setHasInteracted(true);
-    };
-    
-    window.addEventListener('click', unlockAudio);
-    window.addEventListener('touchstart', unlockAudio);
-    window.addEventListener('keydown', unlockAudio);
-
-    return () => {
-      window.removeEventListener('click', unlockAudio);
-      window.removeEventListener('touchstart', unlockAudio);
-      window.removeEventListener('keydown', unlockAudio);
-    };
-  }, [hasInteracted]);
-
-  useEffect(() => {
     let timeoutId: number | null = null;
 
     const applyColor = (color: string) => {
@@ -376,17 +355,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Music logic (unchanged)
-  const currentMusicUrl = (stage === AppStage.MAIN_EXPERIENCE || stage === AppStage.ENVELOPE || stage === AppStage.PREVIEW || stage === AppStage.SHARE) && data?.musicUrl 
-    ? data.musicUrl 
-    : DEFAULT_AMBIENT_MUSIC;
-
-  const currentMusicType = (stage === AppStage.MAIN_EXPERIENCE || stage === AppStage.ENVELOPE || stage === AppStage.PREVIEW || stage === AppStage.SHARE) && data?.musicType 
-    ? data.musicType 
-    : 'preset';
-
-  const shouldPlay = hasInteracted && !isGlobalMuted && stage !== AppStage.MASTER_CONTROL;
-
   const bootScreen = (
     <div className={`boot-screen-container ${isFadingOut ? 'fade-out' : ''}`}>
       <div className="relative flex flex-col items-center">
@@ -434,41 +402,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen relative overflow-hidden transition-colors duration-1000">
       {isBooting && bootScreen}
-      
-      <BackgroundAudio 
-        musicUrl={currentMusicUrl} 
-        musicType={currentMusicType} 
-        isPlaying={shouldPlay} 
-        onPlayError={() => setIsGlobalMuted(true)}
-      />
-
-      {!isBooting && stage !== AppStage.MASTER_CONTROL && (
-          <button 
-            onClick={(e) => { 
-                e.stopPropagation(); 
-                setIsGlobalMuted(!isGlobalMuted); 
-                if (!hasInteracted) setHasInteracted(true);
-            }}
-            className={`fixed top-6 left-6 z-[100] p-3 rounded-full border backdrop-blur-md transition-all duration-500 group overflow-hidden ${shouldPlay ? 'border-luxury-gold/30 bg-black/20 hover:bg-luxury-gold/10' : 'border-white/10 bg-black/40 opacity-70 hover:opacity-100'}`}
-          >
-             {shouldPlay ? (
-               <div className="flex gap-1 h-3 items-end">
-                  <div className="w-0.5 bg-luxury-gold animate-[bounce_1s_infinite]"></div>
-                  <div className="w-0.5 bg-luxury-gold animate-[bounce_1.2s_infinite]"></div>
-                  <div className="w-0.5 bg-luxury-gold animate-[bounce_0.8s_infinite]"></div>
-               </div>
-             ) : (
-                <div className="relative">
-                   <span className="text-xs text-white/60">♪</span>
-                   <div className="absolute top-1/2 left-0 w-full h-[1px] bg-white/60 rotate-45 transform -translate-y-1/2"></div>
-                </div>
-             )}
-             
-             <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 text-[8px] uppercase tracking-widest text-luxury-gold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none bg-black/50 px-2 py-1 rounded">
-                {isGlobalMuted ? 'Unmute Sound' : 'Mute Sound'}
-             </span>
-          </button>
-      )}
 
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")' }}></div>
       
@@ -499,7 +432,7 @@ const App: React.FC = () => {
               const updated: CoupleData = hydrateCoupleData({ ...data, ...enrichedData, finalLetter });
               setData(updated);
               setIsCreatorPreview(true);
-              safeSetStage(AppStage.PERSONAL_INTRO); 
+              safeSetStage(AppStage.ENVELOPE); 
               writePersistedCoupleData(updated);
             }}
             onBack={() => safeSetStage(AppStage.PREPARE)}
@@ -521,10 +454,9 @@ const App: React.FC = () => {
         {stage === AppStage.ENVELOPE && data && (
           <div className="animate-fade-in flex items-center justify-center min-h-screen">
             {isCreatorPreview && (
-              <PreviewWatermark onSeal={() => {
-                safeSetStage(AppStage.MAIN_EXPERIENCE);
-                setIsCreatorPreview(true);
-              }} />
+               <div className="fixed top-0 left-0 w-full bg-[#1C1917] text-luxury-gold z-[100] py-3 text-center shadow-lg border-b border-luxury-gold/20">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.4em] animate-pulse">Previewing Receiver Experience</p>
+               </div>
             )}
             <Envelope 
               recipientName={data.recipientName} 
@@ -556,9 +488,6 @@ const App: React.FC = () => {
 
         {stage === AppStage.MAIN_EXPERIENCE && data && (
           <div className="animate-fade-in relative">
-            {isCreatorPreview && (
-              <PreviewWatermark onSeal={() => safeSetStage(AppStage.PAYMENT)} />
-            )}
             <MainExperience 
               data={data} 
               isPreview={isCreatorPreview}

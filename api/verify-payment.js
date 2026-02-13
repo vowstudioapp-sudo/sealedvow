@@ -178,6 +178,11 @@ export default async function handler(req, res) {
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expected = crypto.createHmac('sha256', keySecret).update(body).digest('hex');
 
+    console.log(`[Verify] order_id=${razorpay_order_id}, payment_id=${razorpay_payment_id}`);
+    console.log(`[Verify] signature_received=${razorpay_signature?.substring(0, 12)}...`);
+    console.log(`[Verify] signature_expected=${expected.substring(0, 12)}...`);
+    console.log(`[Verify] key_secret_prefix=${keySecret?.substring(0, 6)}...`);
+
     let isValid;
     try {
       isValid = crypto.timingSafeEqual(

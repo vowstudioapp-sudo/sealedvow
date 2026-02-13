@@ -220,3 +220,21 @@
       mix-blend-mode: screen;
     }
   }
+
+  /* ================================================================
+     MOBILE OPTIMIZATIONS
+     ================================================================ */
+
+  @media (max-width: 768px) {
+    .landing {
+      --landing-glow-opacity: 0.2;
+    }
+
+    .monogram-ring--outer {
+      box-shadow: 0 0 24px rgba(var(--landing-gold), 0.2);
+    }
+
+    .monogram-glow--mobile-dim {
+      opacity: 0.5;
+    }
+  }
