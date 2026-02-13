@@ -426,7 +426,7 @@ const App: React.FC = () => {
           : (isBooting ? 'opacity-0' : 'opacity-100')
       }`}>
         
-        {stage === AppStage.LANDING && (
+        {stage === AppStage.LANDING && !isReceiverLink && (
           <LandingPage onEnter={handleEnterStudio} />
         )}
 
