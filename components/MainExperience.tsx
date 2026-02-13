@@ -33,6 +33,31 @@ interface InteractivePhoto extends MemoryPhoto {
 }
 
 /* ------------------------------------------------------------------ */
+/* HELPERS                                                             */
+/* ------------------------------------------------------------------ */
+
+/** Detect if a URL is a YouTube link */
+function isYouTubeLink(url?: string): boolean {
+  if (!url) return false;
+  return /(?:youtube\.com|youtu\.be)/i.test(url);
+}
+
+/** Extract YouTube video ID from various URL formats */
+function getYouTubeEmbedId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+    /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const match = url.match(p);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
 /* CONSTANTS                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -622,6 +647,50 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
               <div className="w-8 h-px bg-white/30 mx-auto my-3" />
               <p className="text-[8px] uppercase tracking-[0.4em] opacity-50">Time Dilation</p>
             </div>
+          </div>
+        </PaperSurface>
+      )}
+
+      {/* SECTION: YouTube Video (soundtrack rendered as embedded player) */}
+      {data.musicType === 'youtube' && data.musicUrl && isYouTubeLink(data.musicUrl) && (
+        <PaperSurface
+          theme={data.theme || 'obsidian'}
+          as="section"
+          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-4 md:px-8"
+        >
+          <div className="text-center w-full max-w-2xl mx-auto">
+            <p 
+              className="text-[9px] uppercase tracking-[0.5em] font-bold mb-6"
+              style={{ color: theme.gold, opacity: 0.5, animation: 'closureReveal 0.8s ease-out both' }}
+            >
+              A Soundtrack For You
+            </p>
+
+            <div 
+              className="w-full rounded-xl overflow-hidden shadow-2xl"
+              style={{ 
+                border: `1px solid ${theme.gold}20`,
+                animation: 'closureReveal 1s ease-out 0.3s both',
+              }}
+            >
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  src={`https://www.youtube.com/embed/${getYouTubeEmbedId(data.musicUrl)}?rel=0&modestbranding=1`}
+                  title="Soundtrack"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                  style={{ border: 'none' }}
+                />
+              </div>
+            </div>
+
+            <p 
+              className="mt-6 text-[8px] uppercase tracking-[0.3em]"
+              style={{ color: theme.text, opacity: 0.2, animation: 'closureReveal 0.8s ease-out 0.8s both' }}
+            >
+              Press play
+            </p>
           </div>
         </PaperSurface>
       )}
