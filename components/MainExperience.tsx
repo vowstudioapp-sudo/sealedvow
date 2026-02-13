@@ -14,7 +14,6 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { CoupleData, Coupon, Theme, MemoryPhoto, Occasion } from '../types';
 import { generateAudioLetter, decodeAudioData } from '../services/geminiService';
 import { PaperSurface } from './PaperSurface';
-import { useMobileSoftClosure } from '../hooks/useMobileSoftClosure';
 
 /* ------------------------------------------------------------------ */
 /* TYPES                                                               */
@@ -94,21 +93,33 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
   const exitWhisperShownRef = useRef(false);
 
   // Exit intent — soft whisper when user tries to leave
-  // Key trigger: location exists + not yet unlocked = receiver thinks it's over
-  // Also triggers if user leaves before reaching end of any flow
-  // Also fires during creator preview so sender can see the full feature set
+  // Desktop: cursor moves to top of screen (desktop only)
+  // Mobile: user reaches last section + stays there for 2.5s
+  // Visibility: only triggers at last section (not mid-flow)
+  // Preview: always allow trigger so sender sees the feature
+  const mobileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Precise last-section check — exact match, not greater-than
+  const atLastSection = useMemo(() => {
+    const lastIndex = sections.length - 1;
+    return lastIndex >= 0 && activeSection === lastIndex;
+  }, [activeSection, sections.length]);
+
   useEffect(() => {
+    if (exitWhisperShownRef.current) return;
+
     const shouldTrigger = () => {
       if (exitWhisperShownRef.current) return false;
-      // Primary case: location gate exists and hidden content waits
-      if (data.sacredLocation && !locationUnlocked && !isPreview) return true;
-      // Secondary case: no location but user hasn't reached end
-      if (!data.sacredLocation && activeSection < sections.length - 1) return true;
-      // Preview case: always allow trigger so sender sees exit intent feature
-      if (isPreview && !exitWhisperShownRef.current) return true;
+      // Preview: always allow
+      if (isPreview) return true;
+      // Only at the emotional end — last section or location gate
+      if (atLastSection) return true;
+      if (data.sacredLocation && !locationUnlocked) return true;
       return false;
     };
 
+    // Desktop only: cursor leaves viewport at top
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches;
     const handleMouseLeave = (e: MouseEvent) => {
       if (e.clientY <= 5 && shouldTrigger()) {
         exitWhisperShownRef.current = true;
@@ -116,8 +127,10 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
       }
     };
 
+    // Both: tab switch / phone lock — only at last section
     const handleVisibility = () => {
-      if (document.visibilityState === 'hidden' && shouldTrigger()) {
+      if (document.visibilityState === 'hidden' && (atLastSection || (data.sacredLocation && !locationUnlocked) || isPreview)) {
+        if (exitWhisperShownRef.current) return;
         exitWhisperShownRef.current = true;
         const handleReturn = () => {
           if (document.visibilityState === 'visible') {
@@ -129,14 +142,52 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
       }
     };
 
-    document.addEventListener('mouseleave', handleMouseLeave);
+    if (isDesktop) {
+      document.addEventListener('mouseleave', handleMouseLeave);
+    }
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      document.removeEventListener('mouseleave', handleMouseLeave);
+      if (isDesktop) {
+        document.removeEventListener('mouseleave', handleMouseLeave);
+      }
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isPreview, activeSection, sections.length, locationUnlocked, data.sacredLocation]);
+  }, [isPreview, atLastSection, locationUnlocked, data.sacredLocation]);
+
+  // Mobile: trigger whisper when user reaches last section AND stays there
+  useEffect(() => {
+    if (isPreview) return;
+    if (exitWhisperShownRef.current) return;
+    if (sections.length === 0) return;
+
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    if (!isMobile) return;
+
+    if (atLastSection) {
+      if (!mobileTimerRef.current) {
+        mobileTimerRef.current = setTimeout(() => {
+          if (!exitWhisperShownRef.current) {
+            exitWhisperShownRef.current = true;
+            setShowExitWhisper(true);
+          }
+          mobileTimerRef.current = null;
+        }, 2500);
+      }
+    } else {
+      if (mobileTimerRef.current) {
+        clearTimeout(mobileTimerRef.current);
+        mobileTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (mobileTimerRef.current) {
+        clearTimeout(mobileTimerRef.current);
+        mobileTimerRef.current = null;
+      }
+    };
+  }, [atLastSection, sections.length, isPreview]);
 
 
   const [interactivePhotos, setInteractivePhotos] = useState<InteractivePhoto[]>(
@@ -156,14 +207,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Mobile soft closure — scroll-based epilogue trigger (receiver only)
-  const showMobileClosure = useMobileSoftClosure({
-    containerRef,
-    threshold: 0.92,
-    delayMs: 2000,
-    disabled: isPreview || showExitOverlay || showExitWhisper,
-  });
   const dragStartPos = useRef({ x: 0, y: 0 });
   const maxZ = useRef(20);
   const mountedRef = useRef(true);
@@ -992,59 +1035,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
           as="section"
           className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-8"
         >
-          {showMobileClosure ? (
-            /* ── Mobile Soft Closure: replaces final section in-place ── */
-            <div className="mobile-soft-closure text-center w-full max-w-sm mx-auto">
-              <p
-                className="mobile-soft-closure__headline"
-                style={{ color: theme.text }}
-              >
-                Before you go...
-              </p>
-
-              <div
-                className="mobile-soft-closure__divider"
-                style={{ backgroundColor: theme.gold }}
-              />
-
-              <p
-                className="mobile-soft-closure__subtext"
-                style={{ color: theme.text }}
-              >
-                {data.senderName} left something more for you
-              </p>
-
-              <button
-                onClick={() => {
-                  setShowExitOverlay(true);
-                }}
-                className="mobile-soft-closure__cta"
-                style={{
-                  borderColor: theme.gold + '55',
-                  color: theme.text,
-                }}
-              >
-                Show me
-              </button>
-
-              <button
-                onClick={() => {
-                  // Dismiss — unlock scroll, show normal closure
-                  if (containerRef.current) {
-                    containerRef.current.style.overflow = '';
-                    containerRef.current.style.scrollSnapType = '';
-                  }
-                }}
-                className="mobile-soft-closure__dismiss"
-                style={{ color: theme.text }}
-              >
-                Maybe later
-              </button>
-            </div>
-          ) : (
-            /* ── Normal closure (desktop + pre-trigger mobile) ── */
-            <div className="text-center">
-            {/* Soft closure message — woven into the real ending */}
+          <div className="text-center">
             <p 
               className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8"
               style={{ color: theme.gold, opacity: 0.25, animation: 'closureReveal 1s ease-out both' }}
@@ -1132,7 +1123,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
               )}
             </div>
           </div>
-          )}
         </PaperSurface>
       )}
 
