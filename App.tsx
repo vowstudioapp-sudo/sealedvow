@@ -421,9 +421,7 @@ const App: React.FC = () => {
       )}
 
       <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${
-        isReceiverLink 
-          ? (stage === AppStage.PERSONAL_INTRO || stage === AppStage.ENVELOPE || stage === AppStage.MAIN_EXPERIENCE ? 'opacity-100' : 'opacity-0')
-          : (isBooting ? 'opacity-0' : 'opacity-100')
+        isReceiverLink ? 'opacity-100' : (isBooting ? 'opacity-0' : 'opacity-100')
       }`}>
         
         {stage === AppStage.LANDING && !isReceiverLink && (
