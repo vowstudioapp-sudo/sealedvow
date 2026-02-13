@@ -22,12 +22,12 @@ const TIERS: Record<Tier, { name: string; price: number; tagline: string; featur
     price: 99,
     tagline: 'A private letter, sealed in time.',
     features: [
-      'AI-Crafted Personal Letter',
+      'Personalized Sealed Letter',
       'Interactive Envelope Experience',
       'Memory Board Gallery',
       'Audio Narration',
       'Private Shareable Link',
-      'Lifetime Hosting',
+      'One-Time Letter Generation',
     ],
   },
   reply: {
