@@ -243,14 +243,13 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
             {step > 1 && step !== 2 && (
                 <div className="animate-fade-in text-[9px] uppercase tracking-[0.2em] text-green-400/80 font-bold mb-1 flex items-center gap-2">
                     <span>✓</span>
-                    <span>{step === 2 ? "The foundation is complete" : "The narrative is complete"}</span>
+                    <span>The narrative is complete</span>
                 </div>
             )}
 
             {step !== 2 && (
               <h1 className="text-3xl md:text-5xl font-serif-elegant italic text-[#E5D0A1] leading-tight animate-fade-in" key={step}>
                 {step === 1 && "You are shaping the foundation"}
-                {step === 2 && "You are crafting the narrative"}
                 {step === 3 && "You are preparing the ceremony"}
               </h1>
             )}

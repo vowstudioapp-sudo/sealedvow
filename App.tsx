@@ -201,7 +201,6 @@ const App: React.FC = () => {
       setData(mockData);
       setIsBooting(false);
       setIsFadingOut(true);
-      setHasInteracted(true);
 
       if (preview === 'intro') safeSetStage(AppStage.PERSONAL_INTRO);
       else if (preview === 'envelope') safeSetStage(AppStage.ENVELOPE);
