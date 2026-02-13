@@ -1427,7 +1427,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
               )}
               <div className="h-px mx-auto my-10" style={{ backgroundColor: theme.gold, opacity: 0.15 }} />
 
-              {(onPayment || onEdit) ? (
+              {isPreview && (onPayment || onEdit) ? (
                 <>
                   <p className="text-[10px] tracking-[0.12em] font-serif-elegant italic mb-3" style={{ color: theme.text, opacity: 0.35 }}>
                     {data.replyEnabled 
@@ -1461,27 +1461,18 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
       )}
 
       {/* Creator Preview Controls — Modify + Seal & Deliver */}
-      {(onPayment || onEdit) && (
-        <div className="fixed bottom-0 left-0 right-0 z-[400]" style={{ background: `linear-gradient(to top, ${theme.bg}, ${theme.bg}ee, transparent)` }}>
+      {isPreview && (onPayment || onEdit) && (
+        <>
+          {/* Exit intent hint — fixed top banner */}
+          {!showExitOverlay && !showExitWhisper && !exitWhisperShownRef.current && (
+            <div className="fixed top-0 left-0 right-0 z-[400] text-center py-3 px-4" style={{ backgroundColor: theme.bg + 'ee', borderBottom: `1px solid ${theme.gold}15` }}>
+              <p className="text-[11px] font-serif-elegant italic" style={{ color: theme.gold, opacity: 0.7 }}>
+                ✨ Move your cursor toward the close button — see what your receiver experiences when they try to leave
+              </p>
+            </div>
+          )}
+          <div className="fixed bottom-0 left-0 right-0 z-[400]" style={{ background: `linear-gradient(to top, ${theme.bg}, ${theme.bg}ee, transparent)` }}>
           <div className="max-w-md mx-auto px-6 pb-8 pt-6 flex flex-col items-center gap-3">
-            {/* Exit intent hint card — only when exit overlay hasn't been shown yet */}
-            {!showExitOverlay && !showExitWhisper && !exitWhisperShownRef.current && (
-              <div 
-                className="w-full mb-1 px-5 py-4 rounded-xl border text-center animate-pulse"
-                style={{ 
-                  borderColor: theme.gold + '25', 
-                  backgroundColor: theme.bg + 'cc',
-                  backdropFilter: 'blur(8px)',
-                }}
-              >
-                <p className="text-xs font-serif-elegant italic leading-relaxed" style={{ color: theme.gold, opacity: 0.8 }}>
-                  ✨ Move your cursor toward the close button
-                </p>
-                <p className="text-[9px] mt-1.5 tracking-wide" style={{ color: theme.text, opacity: 0.35 }}>
-                  See what your receiver experiences when they try to leave
-                </p>
-              </div>
-            )}
             {onEdit && (
               <button
                 onClick={onEdit}
@@ -1502,6 +1493,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
             )}
           </div>
         </div>
+        </>
       )}
     </div>
   );
