@@ -244,14 +244,15 @@ const App: React.FC = () => {
     }
   }, [linkState, sharedData, linkError]);
 
+  // Detect receiver link (path has slug)
+  const isReceiverLink = useMemo(() => {
+    const path = window.location.pathname;
+    return path.length > 1 && !path.startsWith('/api');
+  }, []);
+
   useEffect(() => {
-    // Skip boot screen for receiver links — they go straight to PersonalIntro
-    const isReceiverLink = window.location.pathname.length > 1 && !window.location.pathname.startsWith('/api');
-    if (isReceiverLink) {
-      setIsFadingOut(false);
-      setIsBooting(false);
-      return;
-    }
+    // Skip boot animation entirely for receiver links
+    if (isReceiverLink) return;
 
     const fadeTimer = setTimeout(() => setIsFadingOut(true), 2200);
     const endTimer = setTimeout(() => setIsBooting(false), 3000);
@@ -260,7 +261,7 @@ const App: React.FC = () => {
       clearTimeout(fadeTimer);
       clearTimeout(endTimer);
     };
-  }, []);
+  }, [isReceiverLink]);
 
   useEffect(() => {
     let timeoutId: number | null = null;
@@ -408,7 +409,10 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden transition-colors duration-1000">
-      {isBooting && bootScreen}
+      {isBooting && !isReceiverLink && bootScreen}
+      {isReceiverLink && linkState === LoaderState.LOADING && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: '#000' }} />
+      )}
 
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")' }}></div>
       
@@ -419,7 +423,7 @@ const App: React.FC = () => {
         </>
       )}
 
-      <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${isBooting ? 'opacity-0' : 'opacity-100'}`}>
+      <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${isBooting && !isReceiverLink ? 'opacity-0' : 'opacity-100'}`}>
         
         {stage === AppStage.LANDING && (
           <LandingPage onEnter={handleEnterStudio} />
