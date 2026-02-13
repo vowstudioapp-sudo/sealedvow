@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
+import { FEATURES } from '../config/features';
 
 interface PaymentResult {
   replyEnabled: boolean;
@@ -55,11 +56,13 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack }) => {
-  const [selectedTier, setSelectedTier] = useState<Tier>('reply');
+  const [selectedTier, setSelectedTier] = useState<Tier>('standard');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const paymentInProgressRef = useRef(false);
+
+  const isReplyEnabled = FEATURES.replyTierEnabled;
 
   // Founder access
   const [founderCode, setFounderCode] = useState('');
@@ -69,7 +72,14 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
 
   useEffect(() => { loadRazorpayScript().then(setScriptLoaded); }, []);
 
-  const tier = TIERS[selectedTier];
+  useEffect(() => {
+    if (!isReplyEnabled && selectedTier === 'reply') {
+      setSelectedTier('standard');
+    }
+  }, [isReplyEnabled]);
+
+  const effectiveTier = isReplyEnabled ? selectedTier : 'standard';
+  const tier = TIERS[effectiveTier];
 
   // ── Founder code handler ──
   // Step 1: Validate code on server (create-order) → get founderToken
@@ -142,7 +152,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
       const orderRes = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: selectedTier }),
+        body: JSON.stringify({ tier: effectiveTier }),
       });
 
       if (!orderRes.ok) {
@@ -184,7 +194,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
                 coupleData: data,
-                tier: selectedTier,
+                tier: effectiveTier,
               }),
             });
 
@@ -242,30 +252,46 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
 
           {/* Tier Selection */}
           <div className="mb-8 space-y-3">
-            {(Object.entries(TIERS) as [Tier, typeof TIERS['standard']][]).map(([key, t]) => (
-              <button
-                key={key}
-                onClick={() => setSelectedTier(key)}
-                className={`w-full text-left p-4 rounded-lg border-2 transition-all duration-200 relative ${
-                  selectedTier === key
-                    ? 'border-[#D4AF37] bg-[#D4AF37]/5'
-                    : 'border-[#D4C5A5]/40 hover:border-[#D4C5A5]/70'
-                }`}
-              >
-                {key === 'reply' && (
-                  <span className="absolute -top-2.5 right-4 bg-[#D4AF37] text-[#1C1917] text-[7px] uppercase tracking-[0.2em] font-bold px-2.5 py-0.5 rounded-full">
-                    Recommended
-                  </span>
-                )}
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-serif-elegant italic text-luxury-ink text-base">{t.name}</p>
-                    <p className="text-[9px] text-luxury-stone/60 mt-0.5 tracking-wide">{t.tagline}</p>
+            {(Object.entries(TIERS) as [Tier, typeof TIERS['standard']][]).map(([key, t]) => {
+              const isDisabled = key === 'reply' && !isReplyEnabled;
+              return (
+                <button
+                  key={key}
+                  onClick={() => !isDisabled && setSelectedTier(key)}
+                  disabled={isDisabled}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-all duration-200 relative ${
+                    selectedTier === key && !isDisabled
+                      ? 'border-[#D4AF37] bg-[#D4AF37]/5'
+                      : 'border-[#D4C5A5]/40 hover:border-[#D4C5A5]/70'
+                  } ${isDisabled ? 'opacity-70 cursor-not-allowed hover:border-[#D4C5A5]/40' : ''}`}
+                >
+                  {key === 'reply' && !isReplyEnabled && (
+                    <span className="absolute -top-2.5 right-4 bg-[#D4AF37] text-[#1C1917] text-[7px] uppercase tracking-[0.2em] font-bold px-2.5 py-0.5 rounded-full">
+                      Coming Soon
+                    </span>
+                  )}
+                  {key === 'reply' && isReplyEnabled && (
+                    <span className="absolute -top-2.5 right-4 bg-[#D4AF37] text-[#1C1917] text-[7px] uppercase tracking-[0.2em] font-bold px-2.5 py-0.5 rounded-full">
+                      Recommended
+                    </span>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-serif-elegant italic text-luxury-ink text-base">{t.name}</p>
+                      <p className="text-[9px] text-luxury-stone/60 mt-0.5 tracking-wide">{t.tagline}</p>
+                      {key === 'reply' && !isReplyEnabled && (
+                        <p className="text-[9px] text-luxury-stone/60 mt-1 tracking-wide italic">
+                          Two-way sealed experience.
+                        </p>
+                      )}
+                    </div>
+                    {!isDisabled && (
+                      <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">₹{t.price}</p>
+                    )}
                   </div>
-                  <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">₹{t.price}</p>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
 
           {/* Error */}
