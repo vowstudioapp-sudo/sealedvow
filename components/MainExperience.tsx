@@ -1426,14 +1426,56 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
                 </p>
               )}
               <div className="h-px mx-auto my-10" style={{ backgroundColor: theme.gold, opacity: 0.15 }} />
-              {data.replyEnabled ? (
-                <button onClick={() => { setShowExitOverlay(false); setShowReplyComposer(true); }} className="inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
-                  Seal a reply
-                </button>
+
+              {isPreview ? (
+                <>
+                  <p className="text-[10px] tracking-[0.12em] font-serif-elegant italic mb-3" style={{ color: theme.text, opacity: 0.35 }}>
+                    {data.replyEnabled 
+                      ? `If ${data.recipientName || 'your receiver'} feels moved, they can seal a reply back to you right here.`
+                      : `${data.recipientName || 'Your receiver'} will see an option to create their own Sealed Vow for you.`
+                    }
+                  </p>
+                  <div className="inline-block px-8 py-3 border opacity-30 cursor-default" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
+                    {data.replyEnabled ? 'Seal a reply' : `Seal something back for ${data.senderName}`}
+                  </div>
+                  <p className="mt-3 text-[8px] uppercase tracking-[0.3em]" style={{ color: theme.gold, opacity: 0.25 }}>
+                    ↑ This is what your receiver will see
+                  </p>
+
+                  {/* Modify + Seal & Deliver inside exit overlay */}
+                  <div className="mt-16 max-w-sm mx-auto flex flex-col gap-3">
+                    {onEdit && (
+                      <button
+                        onClick={() => { setShowExitOverlay(false); onEdit(); }}
+                        className="w-full py-3.5 text-[10px] font-bold uppercase tracking-[0.4em] border rounded-full transition-all duration-300 hover:bg-white/5"
+                        style={{ borderColor: theme.gold + '40', color: theme.text }}
+                      >
+                        ← Modify
+                      </button>
+                    )}
+                    {onPayment && (
+                      <button
+                        onClick={() => { setShowExitOverlay(false); onPayment(); }}
+                        className="w-full py-4 text-[10px] font-bold uppercase tracking-[0.4em] rounded-full transition-all duration-300 shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
+                        style={{ backgroundColor: '#722F37', color: '#FFFFFF', letterSpacing: '0.4em' }}
+                      >
+                        Seal & Deliver
+                      </button>
+                    )}
+                  </div>
+                </>
               ) : (
-                <a href="/" className="inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
-                  Seal something back for {data.senderName}
-                </a>
+                <>
+                  {data.replyEnabled ? (
+                    <button onClick={() => { setShowExitOverlay(false); setShowReplyComposer(true); }} className="inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
+                      Seal a reply
+                    </button>
+                  ) : (
+                    <a href="/" className="inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
+                      Seal something back for {data.senderName}
+                    </a>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1442,8 +1484,14 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, onPay
 
       {/* Creator Preview Controls — Modify + Seal & Deliver */}
       {isPreview && (
-        <div className="fixed bottom-0 left-0 right-0 z-[200]" style={{ background: `linear-gradient(to top, ${theme.bg}, ${theme.bg}ee, transparent)` }}>
+        <div className="fixed bottom-0 left-0 right-0 z-[400]" style={{ background: `linear-gradient(to top, ${theme.bg}, ${theme.bg}ee, transparent)` }}>
           <div className="max-w-md mx-auto px-6 pb-8 pt-16 flex flex-col items-center gap-3">
+            {/* Exit intent hint — only when exit overlay hasn't been shown yet */}
+            {!showExitOverlay && !showExitWhisper && !exitWhisperShownRef.current && (
+              <p className="text-[9px] text-center tracking-wide mb-2 animate-pulse" style={{ color: theme.gold, opacity: 0.5 }}>
+                ✨ Try moving your cursor to close the tab — your receiver will see a hidden surprise
+              </p>
+            )}
             {onEdit && (
               <button
                 onClick={onEdit}
