@@ -3,6 +3,8 @@
 // Transaction-based single-use codes. Generic error messages. No info leaks.
 // ============================================================================
 
+import crypto from 'crypto';
+
 const TIER_PRICES = {
   standard: 9900,
   reply: 14900,
@@ -135,7 +137,7 @@ export default async function handler(req, res) {
     // Generate a one-time token for verify-payment to consume.
     // This prevents frontend from faking paymentMode=founder without
     // having gone through server-side code validation first.
-    const tokenBytes = require('crypto').randomBytes(16).toString('hex');
+    const tokenBytes = crypto.randomBytes(16).toString('hex');
     const tokenUrl = buildUrl(`founderTokens/${tokenBytes}`);
     await fetch(tokenUrl, {
       method: 'PUT',
