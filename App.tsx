@@ -14,6 +14,7 @@ import { PersonalIntro } from './components/PersonalIntro.tsx';
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
+import { getDemoData } from './data/demoData.ts';
 
 const THEME_BG_COLORS: Record<Theme, string> = {
   obsidian: '#050505',
@@ -216,6 +217,15 @@ const App: React.FC = () => {
       if (params.get('preview')) return;
     }
 
+    // Demo mode — load hardcoded data, skip all backend
+    if (isDemoMode && demoData) {
+      setData(demoData);
+      setIsBooting(false);
+      setIsFadingOut(false);
+      safeSetStage(AppStage.PERSONAL_INTRO);
+      return;
+    }
+
     if (linkState === LoaderState.SUCCESS && sharedData) {
       setData(hydrateCoupleData(sharedData));
       setIsBooting(false);
@@ -244,11 +254,21 @@ const App: React.FC = () => {
     }
   }, [linkState, sharedData, linkError]);
 
+  // Detect demo mode (/demo/slug)
+  const demoData = useMemo(() => {
+    const path = window.location.pathname;
+    const match = path.match(/^\/demo\/([a-z]+)$/);
+    if (match) return getDemoData(match[1]);
+    return null;
+  }, []);
+  const isDemoMode = !!demoData;
+
   // Detect receiver link (path has slug)
   const isReceiverLink = useMemo(() => {
+    if (isDemoMode) return true;
     const path = window.location.pathname;
-    return path.length > 1 && !path.startsWith('/api');
-  }, []);
+    return path.length > 1 && !path.startsWith('/api') && !path.startsWith('/demo');
+  }, [isDemoMode]);
 
   useEffect(() => {
     // Skip boot animation entirely for receiver links
@@ -498,6 +518,22 @@ const App: React.FC = () => {
 
         {stage === AppStage.MAIN_EXPERIENCE && data && (
           <div className="animate-fade-in relative">
+            {isDemoMode && (
+              <>
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#1C1917]/90 border border-[#D4AF37]/30 px-4 py-1.5 rounded-full">
+                  <span className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/70 font-bold">Public Preview</span>
+                </div>
+                <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/95 to-transparent pt-10 pb-6 px-6 text-center">
+                  <button
+                    onClick={() => { window.location.href = '/'; }}
+                    className="bg-[#722F37] hover:bg-black text-white font-bold text-[10px] tracking-[0.4em] uppercase px-8 py-4 rounded-full shadow-2xl transition-all active:scale-[0.98] mb-3"
+                  >
+                    Create Your Own
+                  </button>
+                  <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/30 font-bold">This is a demonstration experience.</p>
+                </div>
+              </>
+            )}
             <MainExperience 
               data={data} 
               isPreview={isCreatorPreview}
