@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { PreparationForm } from './components/PreparationForm.tsx';
 import { RefineStage } from './components/RefineStage.tsx';
 import { Envelope } from './components/Envelope.tsx';
