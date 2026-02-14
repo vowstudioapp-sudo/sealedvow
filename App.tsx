@@ -518,22 +518,38 @@ const App: React.FC = () => {
 
         {stage === AppStage.MAIN_EXPERIENCE && data && (
           <div className="animate-fade-in relative">
-            {isDemoMode && (
+            {isDemoMode && (() => {
+              const isValentine = window.location.pathname === '/demo/valentines';
+              return (
               <>
                 <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#1C1917]/90 border border-[#D4AF37]/30 px-4 py-1.5 rounded-full">
                   <span className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/70 font-bold">Public Preview</span>
                 </div>
-                <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/95 to-transparent pt-10 pb-6 px-6 text-center">
+                <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/95 to-transparent pt-12 pb-6 px-6 text-center">
+                  {isValentine && (
+                    <p className="text-[10px] text-[#E5D0A1]/50 italic font-serif mb-4 leading-relaxed">
+                      If you watched this and felt something — maybe it's time you said it too.
+                    </p>
+                  )}
                   <button
                     onClick={() => { window.location.href = '/'; }}
-                    className="bg-[#722F37] hover:bg-black text-white font-bold text-[10px] tracking-[0.4em] uppercase px-8 py-4 rounded-full shadow-2xl transition-all active:scale-[0.98] mb-3"
+                    className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[10px] tracking-[0.4em] uppercase px-10 py-4 rounded-full shadow-2xl transition-all active:scale-[0.98] mb-3"
                   >
-                    Create Your Own
+                    {isValentine ? 'Seal Yours Now' : 'Create Your Own'}
                   </button>
-                  <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/30 font-bold">This is a demonstration experience.</p>
+                  {isValentine ? (
+                    <div className="space-y-1.5 mt-1">
+                      <p className="text-[9px] text-[#D4AF37]/40 font-bold uppercase tracking-[0.25em]">Valentine's Day ends at midnight.</p>
+                      <p className="text-[8px] text-[#E5D0A1]/25 italic">Moments delayed become regrets.</p>
+                      <p className="text-[7px] text-[#D4AF37]/20 uppercase tracking-[0.3em] mt-3">This is how people are saying it this year.</p>
+                    </div>
+                  ) : (
+                    <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/30 font-bold">This is a demonstration experience.</p>
+                  )}
                 </div>
               </>
-            )}
+              );
+            })()}
             <MainExperience 
               data={data} 
               isPreview={isCreatorPreview}
