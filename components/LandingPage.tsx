@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PrivacyModal } from './PrivacyModal';
 import { TermsModal } from './TermsModal';
+import { HelpModal } from './HelpModal';
 
 interface Props {
   onEnter: () => void;
@@ -12,6 +13,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const [progress, setProgress] = useState(0);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const intervalRef = useRef<number | null>(null);
 
@@ -61,6 +63,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       {/* Modals */}
       <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
       <TermsModal isOpen={showTerms} onClose={() => setShowTerms(false)} />
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
 
       {/* Cinematic Background */}
       <div className="landing-background">
@@ -181,6 +184,13 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
             </div>
             <p className="text-[10px] tracking-widest font-bold">© 2026</p>
           </div>
+
+          <button 
+            onClick={() => setShowHelp(true)}
+            className="text-[9px] uppercase tracking-[0.2em] font-bold opacity-40 hover:opacity-70 hover:text-[#D4AF37] transition-all mt-4"
+          >
+            Help
+          </button>
         </div>
 
         <div className="w-[240px] h-px bg-[#D4AF37]/30" />
