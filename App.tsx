@@ -411,9 +411,8 @@ const App: React.FC = () => {
             VOW
           </h1>
           <p 
-            className="text-[7px] uppercase mt-3 animate-fade-in"
+            className="text-[7px] uppercase mt-3 animate-boot-line"
             style={{ 
-              animationDelay: '1.2s',
               color: 'rgba(198,168,90,0.6)',
               letterSpacing: '0.7em',
             }}
