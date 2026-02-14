@@ -528,20 +528,20 @@ const App: React.FC = () => {
                 <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/95 to-transparent pt-12 pb-6 px-6 text-center">
                   {isValentine && (
                     <p className="text-[10px] text-[#E5D0A1]/50 italic font-serif mb-4 leading-relaxed">
-                      If you watched this and felt something — maybe it's time you said it too.
+                      If you watched this and thought of someone — the silence is yours now.
                     </p>
                   )}
                   <button
                     onClick={() => { window.location.href = '/'; }}
                     className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[10px] tracking-[0.4em] uppercase px-10 py-4 rounded-full shadow-2xl transition-all active:scale-[0.98] mb-3"
                   >
-                    {isValentine ? 'Seal Yours Now' : 'Create Your Own'}
+                    {isValentine ? 'Say It Before Midnight' : 'Create Your Own'}
                   </button>
                   {isValentine ? (
                     <div className="space-y-1.5 mt-1">
                       <p className="text-[9px] text-[#D4AF37]/40 font-bold uppercase tracking-[0.25em]">Valentine's Day ends at midnight.</p>
-                      <p className="text-[8px] text-[#E5D0A1]/25 italic">Moments delayed become regrets.</p>
-                      <p className="text-[7px] text-[#D4AF37]/20 uppercase tracking-[0.3em] mt-3">This is how people are saying it this year.</p>
+                      <p className="text-[8px] text-[#E5D0A1]/25 italic">If you're still waiting for the right moment — this is it.</p>
+                      <p className="text-[7px] text-[#D4AF37]/20 uppercase tracking-[0.3em] mt-3">This is how people are choosing to say it this year.</p>
                     </div>
                   ) : (
                     <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/30 font-bold">This is a demonstration experience.</p>
@@ -553,6 +553,7 @@ const App: React.FC = () => {
             <MainExperience 
               data={data} 
               isPreview={isCreatorPreview}
+              isDemoMode={isDemoMode}
               onEdit={() => {
                 safeSetStage(AppStage.REFINE);
                 setIsCreatorPreview(false);

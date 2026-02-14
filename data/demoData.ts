@@ -78,7 +78,7 @@ Pallav`,
     timeShared: '2 years, 3 months',
     relationshipIntent: 'You are the reason I stopped being afraid of permanence.',
     sharedMoment: 'When you held my hand during the turbulence on that Goa flight and whispered "I got you" like it was nothing.',
-    myth: 'Some people send flowers. He sent the truth.',
+    myth: 'Some people sent flowers. He finally said it.',
     userImageUrl: 'https://images.unsplash.com/photo-1545389336-cf090694435e?w=800&q=80',
     memoryBoard: [
       { url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80', caption: 'Baga at midnight — waves louder than our thoughts', angle: -5, xOffset: -20, yOffset: 15 },
@@ -89,9 +89,7 @@ Pallav`,
     ],
     finalLetter: `Richa,
 
-I almost didn't write this.
-
-Not because I don't feel it. Because I do. And saying it out loud makes it real in a way I can't take back.
+I've rewritten this five times. Because once I say it, I can't hide behind jokes anymore.
 
 I used to think Valentine's Day was for people who needed a calendar to remind them. Roses that die by Thursday. Cards written by strangers. Dinners where you perform love instead of feeling it.
 
@@ -103,13 +101,11 @@ It's the way you argue with auto drivers like you're defending a court case. It'
 
 You don't just make me a better person. You make me a less afraid one.
 
-Here's what I've been postponing: I need you to know that I think about you in the middle of ordinary moments. Not sunsets. Not songs. Just standing in line at a grocery store, wondering what you'd pick.
+Here's what I should have said months ago: I think about you in the middle of ordinary moments. Not sunsets. Not songs. Just standing in line at a grocery store, wondering what you'd pick.
 
-I don't need a special day to feel this. But today felt like the right day to finally stop keeping it inside.
+I don't want this to be another thing I almost said.
 
-If you're reading someone else's letter right now and thinking about the person you haven't told yet — maybe today is your day too.
-
-You are my favorite person in any room. And I'm done being quiet about it.
+You are my favorite person in any room. And I'm done hiding that behind sarcasm and safe words.
 
 Yours. Not just today.
 Rahul`,
@@ -125,11 +121,11 @@ Rahul`,
     coupons: [
       { id: 'c1', title: 'Breakfast in Bed', description: 'Paranthas, chai, and nowhere to be. You stay in bed. I handle the rest.', icon: '🥞', isOpen: false },
       { id: 'c2', title: 'Movie Night — Your Pick', description: 'Even that one you\'ve watched eleven times. I won\'t say a word.', icon: '🎬', isOpen: false },
-      { id: 'c3', title: 'One Full Day Without My Phone', description: 'Just you. No scrolling. No notifications. You have my full attention.', icon: '📵', isOpen: false },
+      { id: 'c3', title: 'One Day Where You Come Before Everything', description: 'No work. No calls. No distractions. Just you, first and only.', icon: '📵', isOpen: false },
     ],
     hasGift: true,
     giftType: 'treasure',
-    giftTitle: 'The Necklace You Looked At Twice',
+    giftTitle: 'The Necklace You Pretended You Didn\'t Want',
     giftNote: 'In that store. You touched it, checked the price, and put it back. You thought I wasn\'t looking. I was.',
     giftLink: 'https://www.caratlane.com/jewellery/necklaces.html',
   },
