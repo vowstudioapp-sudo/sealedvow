@@ -72,7 +72,7 @@ export const PersonalIntro: React.FC<Props> = ({ recipientName, theme = 'obsidia
           transition: 'opacity 600ms ease-out',
         }}
       >
-        Someone sealed this for you
+        This wasn't sent by accident.
       </p>
     </div>
   );

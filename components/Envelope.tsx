@@ -185,14 +185,22 @@ export const Envelope: React.FC<Props> = ({
           style={{ borderColor: styles.border }}
         />
 
+        {/* Paper grain texture */}
+        <div
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'200\' height=\'200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'1\'/%3E%3C/svg%3E")',
+          }}
+        />
+
         {/* Center Text */}
         {phase === 'idle' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
             <p
-              className="text-[10px] uppercase tracking-[0.6em] mb-4 opacity-60"
+              className="text-[9px] uppercase tracking-[0.6em] mb-4 opacity-60 font-bold"
               style={{ color: styles.subtext }}
             >
-              Confidential
+              Private &amp; Sealed
             </p>
             <h2
               className="text-3xl italic font-serif"
@@ -203,20 +211,21 @@ export const Envelope: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Wax Seal — sits below center text like a real envelope seal */}
+        {/* Wax Seal — gold ring + gloss highlight */}
         <div
-          className={`absolute left-1/2 w-16 h-16 rounded-full flex items-center justify-center transition-transform ${
-            phase === 'breaking' ? 'animate-seal-explode' : ''
+          className={`absolute left-1/2 w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-300 ${
+            phase === 'breaking' ? 'animate-seal-explode' : 'hover:scale-105'
           }`}
           style={{
             background: styles.seal,
             transform: 'translateX(-50%)',
             bottom: '1.5rem',
+            boxShadow: `0 0 0 3px ${styles.border}40, 0 8px 24px rgba(0,0,0,0.4), inset 0 -2px 4px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.15)`,
           }}
         >
           <span
             className="text-2xl italic font-serif select-none"
-            style={{ color: styles.sealText }}
+            style={{ color: styles.sealText, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
           >
             V
           </span>
@@ -250,7 +259,7 @@ export const Envelope: React.FC<Props> = ({
             className="text-xs uppercase tracking-widest"
             style={{ color: styles.subtext, opacity: 0.9 }}
           >
-            Tap the seal to begin
+            Tap to break the seal
           </p>
         </div>
       )}
