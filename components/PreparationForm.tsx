@@ -456,6 +456,9 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           )}
                         </div>
                         <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                        <p className="text-[10px] text-luxury-stone/50 mt-2 text-center leading-relaxed">
+                          🔒 Your images are stored securely and are only accessible through your private link.
+                        </p>
                       </div>
 
                       {/* Memory Board */}
