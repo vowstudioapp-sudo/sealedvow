@@ -1593,21 +1593,26 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           {/* Closure + Reply */}
           <div className="min-h-screen w-full flex flex-col items-center justify-center px-8 py-20" style={{ backgroundColor: theme.bg }}>
             <div className="text-center">
-              <p className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8" style={{ color: theme.gold, opacity: 0.25 }}>
-                Created for you. Only you.
-              </p>
-              <p style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(1.2rem, 4vw, 2rem)', color: theme.text, lineHeight: 1.6 }}>
-                Sealed by {data.senderName}
-              </p>
-              {(data.sealedAt || data.createdAt) && (
-                <p className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.4 }}>
-                  {(() => {
-                    const d = new Date(data.sealedAt || data.createdAt || '');
-                    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                  })()}
-                </p>
-              )}
-              <div className="h-px mx-auto my-10" style={{ backgroundColor: theme.gold, opacity: 0.15 }} />
+              {/* Seal block - only show for preview and demo, not for actual receivers (they have detailed version below) */}
+              {(isPreview && (onPayment || onEdit)) || isDemoMode ? (
+                <>
+                  <p className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8" style={{ color: theme.gold, opacity: 0.25 }}>
+                    Created for you. Only you.
+                  </p>
+                  <p style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(1.2rem, 4vw, 2rem)', color: theme.text, lineHeight: 1.6 }}>
+                    Sealed by {data.senderName}
+                  </p>
+                  {(data.sealedAt || data.createdAt) && (
+                    <p className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.4 }}>
+                      {(() => {
+                        const d = new Date(data.sealedAt || data.createdAt || '');
+                        return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                      })()}
+                    </p>
+                  )}
+                  <div className="h-px mx-auto my-10" style={{ backgroundColor: theme.gold, opacity: 0.15 }} />
+                </>
+              ) : null}
 
               {isPreview && (onPayment || onEdit) ? (
                 <>
