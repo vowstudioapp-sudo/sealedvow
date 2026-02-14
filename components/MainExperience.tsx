@@ -1215,33 +1215,39 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
               <div className="w-px h-12 bg-gradient-to-b from-transparent via-[#D4AF37]/20 to-transparent mx-auto mb-10" style={{ animation: 'closureReveal 0.8s ease-out 1s both' }} />
 
+              <div style={{ animation: 'closureReveal 0.8s ease-out 1.2s both' }}>
+                <p className="text-[11px] italic font-serif-elegant mb-10 leading-relaxed" style={{ color: '#E5D0A1', opacity: 0.3 }}>
+                  If this reminded you of someone — don't scroll away.
+                </p>
+              </div>
+
               {isValentine ? (
-                <div style={{ animation: 'closureReveal 1s ease-out 1.4s both' }}>
+                <div style={{ animation: 'closureReveal 1s ease-out 1.6s both' }}>
                   <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/35 font-bold mb-2">Valentine's Day ends at midnight.</p>
-                  <p className="text-[9px] text-[#E5D0A1]/20 italic mb-10">This moment doesn't wait.</p>
+                  <p className="text-[9px] text-[#E5D0A1]/20 italic mb-10">Moments delayed become regrets.</p>
                 </div>
               ) : (
-                <div style={{ animation: 'closureReveal 1s ease-out 1.4s both' }}>
+                <div style={{ animation: 'closureReveal 1s ease-out 1.6s both' }}>
                   <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/35 font-bold mb-2">Love should not be assumed.</p>
                   <p className="text-[9px] text-[#E5D0A1]/20 italic mb-10">It should be expressed.</p>
                 </div>
               )}
 
-              <div style={{ animation: 'closureReveal 0.8s ease-out 2s both' }}>
+              <div style={{ animation: 'closureReveal 0.8s ease-out 2.2s both' }}>
                 <button
                   onClick={() => { window.location.href = '/'; }}
-                  className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[10px] tracking-[0.4em] uppercase px-12 py-5 rounded-full shadow-2xl transition-all duration-300 active:scale-[0.98]"
+                  className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[11px] tracking-[0.4em] uppercase px-14 py-5 rounded-full shadow-2xl transition-all duration-300 active:scale-[0.98]"
                 >
                   {isValentine ? 'Seal Yours Before Midnight' : 'Create Your Own'}
                 </button>
               </div>
 
-              <div className="mt-8" style={{ animation: 'closureReveal 0.8s ease-out 2.8s both' }}>
-                <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/20 font-bold">171 people sealed something today.</p>
+              <div className="mt-8" style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}>
+                <p className="text-[7px] uppercase tracking-[0.3em] text-[#D4AF37]/15">This is how people are choosing to say it this year.</p>
               </div>
 
               {isValentine && (
-                <div className="mt-6" style={{ animation: 'closureReveal 0.8s ease-out 3.4s both' }}>
+                <div className="mt-6" style={{ animation: 'closureReveal 0.8s ease-out 3.6s both' }}>
                   <p className="text-[9px] text-[#E5D0A1]/15 italic">Tomorrow, someone will wish they had sent this.</p>
                 </div>
               )}
@@ -1438,7 +1444,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               color: theme.text,
             }}
           >
-            Show me
+            Reveal it
           </button>
 
           <button
@@ -1618,17 +1624,63 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                     ↑ This is what your receiver will see
                   </p>
                 </>
+              ) : isDemoMode ? (
+                <>
+                  <div className="text-center mt-2">
+                    <p className="text-[11px] italic font-serif-elegant mb-8 leading-relaxed" style={{ color: theme.text, opacity: 0.3 }}>
+                      If this reminded you of someone — don't scroll away.
+                    </p>
+                    <a
+                      href="/"
+                      className="inline-block px-14 py-5 rounded-full font-bold text-[11px] tracking-[0.4em] uppercase transition-all duration-300 active:scale-[0.98]"
+                      style={{
+                        backgroundColor: '#722F37',
+                        color: '#fff',
+                        boxShadow: '0 10px 30px rgba(114,47,55,0.4)',
+                      }}
+                    >
+                      {data.occasion === 'valentine' ? 'Seal Yours Before Midnight' : 'Create Your Own'}
+                    </a>
+                    {data.occasion === 'valentine' && (
+                      <div className="mt-6 space-y-2">
+                        <p className="text-[9px] uppercase tracking-[0.25em] font-bold" style={{ color: theme.gold, opacity: 0.3 }}>Valentine's Day ends at midnight.</p>
+                        <p className="text-[8px] italic" style={{ color: theme.text, opacity: 0.15 }}>Moments delayed become regrets.</p>
+                        <p className="text-[7px] uppercase tracking-[0.3em] mt-3" style={{ color: theme.gold, opacity: 0.15 }}>This is how people are choosing to say it this year.</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
                 <>
-                  {data.replyEnabled ? (
-                    <button onClick={() => { setShowExitOverlay(false); setShowReplyComposer(true); }} className="inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
-                      Seal a reply
-                    </button>
-                  ) : (
-                    <a href="/" className="inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
-                      Seal something back for {data.senderName}
-                    </a>
-                  )}
+                  <div className="text-center mt-4">
+                    <p className="text-[8px] uppercase tracking-[0.3em] mb-3" style={{ color: theme.gold, opacity: 0.25 }}>
+                      Created for you. Only you.
+                    </p>
+                    <p
+                      className="font-serif-elegant italic mb-6"
+                      style={{
+                        fontSize: 'clamp(1rem, 3vw, 1.4rem)',
+                        color: theme.text,
+                        opacity: 0.5,
+                      }}
+                    >
+                      Sealed by {data.senderName}
+                    </p>
+                    <div style={{ color: theme.gold, opacity: 0.2 }}>
+                      <p className="text-[8px] uppercase tracking-[0.3em] mb-1">Sealed on</p>
+                      <p className="text-[10px] font-bold tracking-[0.15em]">
+                        {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                      <p className="text-[9px] tracking-[0.1em] mt-0.5">
+                        {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} IST
+                      </p>
+                    </div>
+                    {data.replyEnabled && (
+                      <button onClick={() => { setShowExitOverlay(false); setShowReplyComposer(true); }} className="mt-8 inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '44', color: theme.text, opacity: 0.5 }}>
+                        Seal a reply
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
             </div>
