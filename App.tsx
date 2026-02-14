@@ -427,7 +427,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen relative overflow-hidden transition-colors duration-1000">
+    <div className="min-h-screen relative overflow-hidden transition-colors duration-1000" style={{ backgroundColor: '#0C0A09' }}>
       {isBooting && !isReceiverLink && bootScreen}
 
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")' }}></div>
