@@ -688,7 +688,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
             <p 
               className="mt-6 text-[8px] uppercase tracking-[0.3em]"
-              style={{ color: theme.text, opacity: 0.2, animation: 'closureReveal 0.8s ease-out 0.8s both' }}
+              style={{ color: theme.text, opacity: 0.5, animation: 'closureReveal 0.8s ease-out 0.8s both' }}
             >
               Press play
             </p>
@@ -765,7 +765,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             )}
             
             {currentParagraph < letterParagraphs.length - 1 && (
-              <div className="mt-12 animate-pulse opacity-30 text-[9px] uppercase tracking-widest" style={{ color: theme.gold }}>
+              <div className="mt-12 animate-pulse opacity-60 text-[9px] uppercase tracking-widest" style={{ color: theme.gold }}>
                 Tap to continue
               </div>
             )}
@@ -775,7 +775,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
         {currentParagraph === letterParagraphs.length - 1 && (
           <button 
             onClick={resetParagraph} 
-            className="absolute top-10 right-10 text-[8px] uppercase tracking-widest opacity-30 hover:opacity-100 transition-opacity border-b border-white/20 pb-1 z-20"
+            className="absolute top-10 right-10 text-[8px] uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity border-b border-white/20 pb-1 z-20"
           >
             Read Again
           </button>
@@ -877,7 +877,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 <button 
                   onClick={() => setLocationExpanded(false)}
                   className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.4)' }}
+                  style={{ color: 'rgba(255,255,255,0.6)' }}
                 >
                   ✕
                 </button>
@@ -984,7 +984,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 >
                   <div className="main-experience-coupon-texture" />
 
-                  <div className="flex justify-between items-start opacity-40 relative z-10">
+                  <div className="flex justify-between items-start opacity-60 relative z-10">
                     <span className="text-[9px] font-bold uppercase tracking-widest">NO. 0{index + 1}</span>
                     <span className="text-2xl">{coupon.icon}</span>
                   </div>
@@ -995,7 +995,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                     <p className="font-sans text-sm leading-relaxed opacity-70">{coupon.description}</p>
                   </div>
 
-                  <div className="text-center opacity-40 relative z-10">
+                  <div className="text-center opacity-60 relative z-10">
                     <span className="text-[9px] uppercase tracking-[0.3em] font-bold pb-1" style={{ borderBottom: `1px solid ${theme.text}20` }}>
                       {isTop ? 'Accept Vow' : 'Locked'}
                     </span>
@@ -1106,7 +1106,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           <div className="text-center">
             <p 
               className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8"
-              style={{ color: theme.gold, opacity: 0.25, animation: 'closureReveal 1s ease-out both' }}
+              style={{ color: theme.gold, opacity: 0.6, animation: 'closureReveal 1s ease-out both' }}
             >
               Created for you. Only you.
             </p>
@@ -1127,7 +1127,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             {(data.sealedAt || data.createdAt) && (
               <p 
                 className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold"
-                style={{ color: theme.gold, opacity: 0.4, animation: 'closureReveal 1s ease-out 1s both' }}
+                style={{ color: theme.gold, opacity: 0.6, animation: 'closureReveal 1s ease-out 1s both' }}
               >
                 {(() => {
                   const d = new Date(data.sealedAt || data.createdAt || '');
@@ -1203,10 +1203,10 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
               {isValentine && (
                 <div className="mb-16" style={{ animation: 'closureReveal 1.2s ease-out 0.2s both' }}>
-                  <p className="text-[13px] text-[#E5D0A1]/40 italic leading-relaxed mb-3" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
+                  <p className="text-[13px] text-[#E5D0A1]/60 italic leading-relaxed mb-3" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
                     She didn't speak for a few seconds.
                   </p>
-                  <p className="text-[13px] text-[#E5D0A1]/30 italic leading-relaxed" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
+                  <p className="text-[13px] text-[#E5D0A1]/60 italic leading-relaxed" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
                     Then softly,<br/>
                     "You actually made this for me?"
                   </p>
@@ -1216,20 +1216,20 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               <div className="w-px h-12 bg-gradient-to-b from-transparent via-[#D4AF37]/20 to-transparent mx-auto mb-10" style={{ animation: 'closureReveal 0.8s ease-out 1s both' }} />
 
               <div style={{ animation: 'closureReveal 0.8s ease-out 1.2s both' }}>
-                <p className="text-[11px] italic font-serif-elegant mb-10 leading-relaxed" style={{ color: '#E5D0A1', opacity: 0.3 }}>
+                <p className="text-[11px] italic font-serif-elegant mb-10 leading-relaxed" style={{ color: '#E5D0A1', opacity: 0.6 }}>
                   If this reminded you of someone — don't scroll away.
                 </p>
               </div>
 
               {isValentine ? (
                 <div style={{ animation: 'closureReveal 1s ease-out 1.6s both' }}>
-                  <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/35 font-bold mb-2">Valentine's Day ends at midnight.</p>
-                  <p className="text-[9px] text-[#E5D0A1]/20 italic mb-10">Moments delayed become regrets.</p>
+                  <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/60 font-bold mb-2">Valentine's Day ends at midnight.</p>
+                  <p className="text-[9px] text-[#E5D0A1]/50 italic mb-10">Moments delayed become regrets.</p>
                 </div>
               ) : (
                 <div style={{ animation: 'closureReveal 1s ease-out 1.6s both' }}>
-                  <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/35 font-bold mb-2">Love should not be assumed.</p>
-                  <p className="text-[9px] text-[#E5D0A1]/20 italic mb-10">It should be expressed.</p>
+                  <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/60 font-bold mb-2">Love should not be assumed.</p>
+                  <p className="text-[9px] text-[#E5D0A1]/50 italic mb-10">It should be expressed.</p>
                 </div>
               )}
 
@@ -1243,12 +1243,12 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               </div>
 
               <div className="mt-8" style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}>
-                <p className="text-[7px] uppercase tracking-[0.3em] text-[#D4AF37]/15">This is how people are choosing to say it this year.</p>
+                <p className="text-[7px] uppercase tracking-[0.3em] text-[#D4AF37]/50">This is how people are choosing to say it this year.</p>
               </div>
 
               {isValentine && (
                 <div className="mt-6" style={{ animation: 'closureReveal 0.8s ease-out 3.6s both' }}>
-                  <p className="text-[9px] text-[#E5D0A1]/15 italic">Tomorrow, someone will wish they had sent this.</p>
+                  <p className="text-[9px] text-[#E5D0A1]/50 italic">Tomorrow, someone will wish they had sent this.</p>
                 </div>
               )}
 
@@ -1377,7 +1377,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
           <p 
             className="text-[10px] uppercase tracking-[0.3em] font-bold"
-            style={{ color: theme.gold, opacity: 0.3, animation: 'closureReveal 0.8s ease-out 2s both' }}
+            style={{ color: theme.gold, opacity: 0.6, animation: 'closureReveal 0.8s ease-out 2s both' }}
           >
             {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             {' · '}
@@ -1423,7 +1423,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
           <p 
             className="text-[10px] tracking-[0.15em] font-serif-elegant italic"
-            style={{ color: theme.text, opacity: 0.35, animation: 'closureReveal 0.8s ease-out 1.2s both' }}
+            style={{ color: theme.text, opacity: 0.6, animation: 'closureReveal 0.8s ease-out 1.2s both' }}
           >
             {isPreview ? 'This is what your receiver will see when they try to leave' : `${data.senderName} left something more for you`}
           </p>
@@ -1450,7 +1450,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           <button
             onClick={() => setShowExitWhisper(false)}
             className="mt-4 text-[8px] uppercase tracking-[0.4em] transition-colors"
-            style={{ color: theme.text, opacity: 0.15, animation: 'closureReveal 0.6s ease-out 2.2s both' }}
+            style={{ color: theme.text, opacity: 0.5, animation: 'closureReveal 0.6s ease-out 2.2s both' }}
           >
             Maybe later
           </button>
@@ -1467,7 +1467,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           <button
             onClick={() => setShowExitOverlay(false)}
             className="fixed top-6 right-6 z-[290] text-xs uppercase tracking-widest transition-colors"
-            style={{ color: theme.text, opacity: 0.2 }}
+            style={{ color: theme.text, opacity: 0.5 }}
           >
             ✕
           </button>
@@ -1504,7 +1504,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                         style={!isTop ? ({ '--coupon-offset-y': `${offset * 15}px`, '--coupon-scale': 1 - offset * 0.05 } as React.CSSProperties) : undefined}
                       >
                         <div className="main-experience-coupon-texture" />
-                        <div className="flex justify-between items-start opacity-40 relative z-10">
+                        <div className="flex justify-between items-start opacity-60 relative z-10">
                           <span className="text-[9px] font-bold uppercase tracking-widest">NO. 0{index + 1}</span>
                           <span className="text-2xl">{coupon.icon}</span>
                         </div>
@@ -1513,7 +1513,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                           <div className="w-8 h-0.5 mx-auto opacity-10 mb-6" style={{ backgroundColor: theme.text }} />
                           <p className="font-sans text-sm leading-relaxed opacity-70">{coupon.description}</p>
                         </div>
-                        <div className="text-center opacity-40 relative z-10">
+                        <div className="text-center opacity-60 relative z-10">
                           <span className="text-[9px] uppercase tracking-[0.3em] font-bold pb-1" style={{ borderBottom: `1px solid ${theme.text}20` }}>
                             {isTop ? 'Accept Vow' : 'Locked'}
                           </span>
@@ -1531,8 +1531,8 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
                 {/* Scroll hint */}
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center animate-pulse">
-                  <p className="text-[8px] uppercase tracking-[0.4em] mb-2" style={{ color: theme.gold, opacity: 0.3 }}>Scroll</p>
-                  <span className="text-xs" style={{ color: theme.gold, opacity: 0.25 }}>↓</span>
+                  <p className="text-[8px] uppercase tracking-[0.4em] mb-2" style={{ color: theme.gold, opacity: 0.6 }}>Scroll</p>
+                  <span className="text-xs" style={{ color: theme.gold, opacity: 0.6 }}>↓</span>
                 </div>
               </div>
             </>
@@ -1596,14 +1596,14 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               {/* Seal block - only show for preview and demo, not for actual receivers (they have detailed version below) */}
               {(isPreview && (onPayment || onEdit)) || isDemoMode ? (
                 <>
-                  <p className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8" style={{ color: theme.gold, opacity: 0.25 }}>
+                  <p className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8" style={{ color: theme.gold, opacity: 0.6 }}>
                     Created for you. Only you.
                   </p>
                   <p style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(1.2rem, 4vw, 2rem)', color: theme.text, lineHeight: 1.6 }}>
                     Sealed by {data.senderName}
                   </p>
                   {(data.sealedAt || data.createdAt) && (
-                    <p className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.4 }}>
+                    <p className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.6 }}>
                       {(() => {
                         const d = new Date(data.sealedAt || data.createdAt || '');
                         return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -1616,23 +1616,23 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
               {isPreview && (onPayment || onEdit) ? (
                 <>
-                  <p className="text-[10px] tracking-[0.12em] font-serif-elegant italic mb-3" style={{ color: theme.text, opacity: 0.35 }}>
+                  <p className="text-[10px] tracking-[0.12em] font-serif-elegant italic mb-3" style={{ color: theme.text, opacity: 0.6 }}>
                     {data.replyEnabled 
                       ? `If ${data.recipientName || 'your receiver'} feels moved, they can seal a reply back to you right here.`
                       : `${data.recipientName || 'Your receiver'} will see an option to create their own Sealed Vow for you.`
                     }
                   </p>
-                  <div className="inline-block px-8 py-3 border opacity-30 cursor-default" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
+                  <div className="inline-block px-8 py-3 border opacity-60 cursor-default" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
                     {data.replyEnabled ? 'Seal a reply' : `Seal something back for ${data.senderName}`}
                   </div>
-                  <p className="mt-3 text-[8px] uppercase tracking-[0.3em]" style={{ color: theme.gold, opacity: 0.25 }}>
+                  <p className="mt-3 text-[8px] uppercase tracking-[0.3em]" style={{ color: theme.gold, opacity: 0.6 }}>
                     ↑ This is what your receiver will see
                   </p>
                 </>
               ) : isDemoMode ? (
                 <>
                   <div className="text-center mt-2">
-                    <p className="text-[11px] italic font-serif-elegant mb-8 leading-relaxed" style={{ color: theme.text, opacity: 0.3 }}>
+                    <p className="text-[11px] italic font-serif-elegant mb-8 leading-relaxed" style={{ color: theme.text, opacity: 0.6 }}>
                       If this reminded you of someone — don't scroll away.
                     </p>
                     <a
@@ -1648,9 +1648,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                     </a>
                     {data.occasion === 'valentine' && (
                       <div className="mt-6 space-y-2">
-                        <p className="text-[9px] uppercase tracking-[0.25em] font-bold" style={{ color: theme.gold, opacity: 0.3 }}>Valentine's Day ends at midnight.</p>
-                        <p className="text-[8px] italic" style={{ color: theme.text, opacity: 0.15 }}>Moments delayed become regrets.</p>
-                        <p className="text-[7px] uppercase tracking-[0.3em] mt-3" style={{ color: theme.gold, opacity: 0.15 }}>This is how people are choosing to say it this year.</p>
+                        <p className="text-[9px] uppercase tracking-[0.25em] font-bold" style={{ color: theme.gold, opacity: 0.6 }}>Valentine's Day ends at midnight.</p>
+                        <p className="text-[8px] italic" style={{ color: theme.text, opacity: 0.5 }}>Moments delayed become regrets.</p>
+                        <p className="text-[7px] uppercase tracking-[0.3em] mt-3" style={{ color: theme.gold, opacity: 0.5 }}>This is how people are choosing to say it this year.</p>
                       </div>
                     )}
                   </div>
@@ -1658,7 +1658,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               ) : (
                 <>
                   <div className="text-center mt-4">
-                    <p className="text-[8px] uppercase tracking-[0.3em] mb-3" style={{ color: theme.gold, opacity: 0.25 }}>
+                    <p className="text-[8px] uppercase tracking-[0.3em] mb-3" style={{ color: theme.gold, opacity: 0.6 }}>
                       Created for you. Only you.
                     </p>
                     <p

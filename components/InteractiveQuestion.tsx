@@ -262,7 +262,7 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
 
         <p 
           className="mb-16 text-[10px] uppercase tracking-[0.3em]"
-          style={{ color: `rgba(${tc.goldRgb}, 0.4)` }}
+          style={{ color: `rgba(${tc.goldRgb}, 0.6)` }}
         >
           Something awaits you
         </p>
