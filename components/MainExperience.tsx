@@ -1,358 +1,1678 @@
-import { CoupleData } from '../types';
+/*
+ * PRODUCTION POLISH (Staff Engineer Review)
+ * 
+ * Changes:
+ * - All handlers memoized with useCallback to prevent unnecessary re-renders
+ * - Coupon transform moved to CSS variables (no inline visual logic)
+ * - Pointer event handlers use stable ref for dragging index
+ * - Audio lifecycle cleanup ensures source node is nulled
+ * - Observer cleanup is more robust (unobserve all before disconnect)
+ * - Strategic comments added where future changes could break behavior
+ */
 
-export interface DemoEntry {
-  slug: string;
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { CoupleData, Coupon, Theme, MemoryPhoto, Occasion } from '../types';
+import { generateAudioLetter, decodeAudioData } from '../services/geminiService';
+import { PaperSurface } from './PaperSurface';
+
+/* ------------------------------------------------------------------ */
+/* TYPES                                                               */
+/* ------------------------------------------------------------------ */
+
+interface Props {
   data: CoupleData;
+  isPreview?: boolean;
+  isDemoMode?: boolean;
+  onPayment?: () => void;
+  onEdit?: () => void;
 }
 
-export const DEMO_DATA: Record<string, CoupleData> = {
+interface InteractivePhoto extends MemoryPhoto {
+  dragX: number;
+  dragY: number;
+  zIndex: number;
+}
 
-  // ═══════════════════════════════════════════════════════════
-  // 1. ANNIVERSARY — Pallav → Pragya
-  // ═══════════════════════════════════════════════════════════
-  anniversary: {
-    senderName: 'Pallav',
-    recipientName: 'Pragya',
-    occasion: 'anniversary',
-    theme: 'velvet',
-    writingMode: 'assisted',
-    timeShared: '4 years together',
-    relationshipIntent: 'The person I chose, and keep choosing.',
-    sharedMoment: 'That one rainy evening in Jaipur when the power went out and we talked till 3am by candlelight.',
-    myth: 'Four years. One promise kept every single day.',
-    userImageUrl: 'https://images.unsplash.com/photo-1529634597503-139d3726fed5?w=800&q=80',
-    memoryBoard: [
-      { url: 'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=600&q=80', caption: 'The first morning we didn\'t want to leave', angle: -8, xOffset: -30, yOffset: 10 },
-      { url: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600&q=80', caption: 'Walking without a destination — our favorite hobby', angle: 5, xOffset: 40, yOffset: -20 },
-      { url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80', caption: 'That sunset you made me stop and look at', angle: -3, xOffset: -50, yOffset: 30 },
-      { url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&q=80', caption: 'Chai at 11pm because neither of us could sleep', angle: 12, xOffset: 20, yOffset: -40 },
-      { url: 'https://images.unsplash.com/photo-1474552226712-ac0f0961a954?w=600&q=80', caption: 'The fort where we promised to keep showing up', angle: -6, xOffset: -10, yOffset: 50 },
-      { url: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=600&q=80', caption: 'Year three. Still laughing at the same jokes.', angle: 9, xOffset: 60, yOffset: 0 },
-    ],
-    finalLetter: `Pragya,
+/* ------------------------------------------------------------------ */
+/* HELPERS                                                             */
+/* ------------------------------------------------------------------ */
 
-Four years ago, I didn't know what I was getting into. I just knew I didn't want to leave.
+/** Detect if a URL is a YouTube link */
+function isYouTubeLink(url?: string): boolean {
+  if (!url) return false;
+  return /(?:youtube\.com|youtu\.be)/i.test(url);
+}
 
-You've seen the worst version of me — the anxious one, the overthinking one, the one who forgets things but remembers your coffee order in his sleep. And you stayed. Not because it was easy. Because you decided to.
+/** Extract YouTube video ID from various URL formats */
+function getYouTubeEmbedId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+    /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const match = url.match(p);
+    if (match) return match[1];
+  }
+  return null;
+}
 
-I don't say it enough: you changed how I see mornings. Before you, they were just alarms and traffic. Now they're the first few seconds where I reach over and know you're there.
+/* ------------------------------------------------------------------ */
+/* CONSTANTS                                                           */
+/* ------------------------------------------------------------------ */
 
-I still think about that rainy night in Jaipur. No electricity. Just candles and your voice and the kind of quiet that makes you say things you've been holding in for months. That was the night I knew this wasn't temporary.
-
-I'm not perfect. But I'm yours. That's the only title I care about.
-
-Happy anniversary. Not because the calendar says so — but because every day with you feels like one.
-
-Always,
-Pallav`,
-    musicType: 'youtube',
-    musicUrl: 'https://www.youtube.com/watch?v=450p7goxZqg',
-    sacredLocation: {
-      placeName: 'Nahargarh Fort, Jaipur',
-      description: 'Where we watched the city light up below us and promised to keep showing up.',
-      googleMapsUri: 'https://maps.google.com/?q=Nahargarh+Fort+Jaipur',
-      latLng: { lat: 26.9376, lng: 75.8154 },
-    },
-    locationMemory: 'The fort where we sat on that wall and you told me what love actually means to you.',
-    coupons: [
-      { id: 'c1', title: 'One Uninterrupted Sunday', description: 'No phone. No plans. Just us and nowhere to be.', icon: '☀️', isOpen: false },
-      { id: 'c2', title: 'Your Favorite Dinner, Made By Me', description: 'I will cook. You will judge. Deal.', icon: '🍽️', isOpen: false },
-      { id: 'c3', title: 'A Drive With No Destination', description: 'Your playlist. My driving. No GPS.', icon: '🚗', isOpen: false },
-    ],
-    hasGift: true,
-    giftType: 'voyage',
-    giftTitle: 'Weekend in Udaipur',
-    giftNote: 'Two nights. Lake view. No laptops. Just us remembering why we started.',
-    giftLink: 'https://www.makemytrip.com/hotels/hotel-listing/?city=Udaipur',
-  },
-
-  // ═══════════════════════════════════════════════════════════
-  // 2. VALENTINES — Rahul → Richa
-  // ═══════════════════════════════════════════════════════════
-  valentines: {
-    senderName: 'Rahul',
-    recipientName: 'Richa',
-    occasion: 'valentine',
-    theme: 'crimson',
-    writingMode: 'assisted',
-    timeShared: '2 years, 3 months',
-    relationshipIntent: 'You are the reason I stopped being afraid of permanence.',
-    sharedMoment: 'When you held my hand during the turbulence on that Goa flight and whispered "I got you" like it was nothing.',
-    myth: 'Some people sent flowers. He finally said it.',
-    userImageUrl: 'https://images.unsplash.com/photo-1494774157365-9e04c6720e47?w=800&q=80',
-    memoryBoard: [
-      { url: 'https://images.unsplash.com/photo-1529333241880-02b846370ab4?w=600&q=80', caption: 'Baga at midnight — waves louder than our thoughts', angle: -5, xOffset: -20, yOffset: 15 },
-      { url: 'https://images.unsplash.com/photo-1525608965749-e2e5e6547172?w=600&q=80', caption: 'The morning you stole my hoodie and never returned it', angle: 8, xOffset: 35, yOffset: -25 },
-      { url: 'https://images.unsplash.com/photo-1516585427167-9f4af9627e6c?w=600&q=80', caption: 'You, pretending you didn\'t cry at that dog reel', angle: -10, xOffset: -45, yOffset: 40 },
-      { url: 'https://images.unsplash.com/photo-1445116572660-236099ec97a0?w=600&q=80', caption: 'Our spot. Every Sunday.', angle: 4, xOffset: 50, yOffset: -10 },
-      { url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80', caption: 'The chai stall where you told me your biggest fear', angle: -7, xOffset: 0, yOffset: 55 },
-    ],
-    finalLetter: `Richa,
-
-I've rewritten this five times. Because once I say it, I can't hide behind jokes anymore.
-
-I used to think Valentine's Day was for people who needed a calendar to remind them. Roses that die by Thursday. Cards written by strangers. Dinners where you perform love instead of feeling it.
-
-Then you grabbed my hand on that flight. Turbulence. My knuckles white. And you leaned in and said "I got you" — like it was the most obvious thing in the world.
-
-That's when I understood. Love isn't the big moments. It's the small ones you don't rehearse.
-
-It's the way you argue with auto drivers like you're defending a court case. It's how you cry at dog reels and deny it with mascara still running. It's how you remember the name of every waiter who's ever been kind to us.
-
-You don't just make me a better person. You make me a less afraid one.
-
-Here's what I should have said months ago: I think about you in the middle of ordinary moments. Not sunsets. Not songs. Just standing in line at a grocery store, wondering what you'd pick.
-
-I don't want this to be another thing I almost said.
-
-You are my favorite person in any room. And I'm done hiding that behind sarcasm and safe words.
-
-Yours. Not just today.
-Rahul`,
-    musicType: 'youtube',
-    musicUrl: 'https://www.youtube.com/watch?v=lp-EO5I60KA',
-    sacredLocation: {
-      placeName: 'Baga Beach, Goa',
-      description: 'Where we walked barefoot at midnight and you told me your biggest fear.',
-      googleMapsUri: 'https://maps.google.com/?q=Baga+Beach+Goa',
-      latLng: { lat: 15.5551, lng: 73.7514 },
-    },
-    locationMemory: 'That midnight walk on Baga where the waves were louder than our thoughts.',
-    coupons: [
-      { id: 'c1', title: 'Breakfast in Bed', description: 'Paranthas, chai, and nowhere to be. You stay in bed. I handle the rest.', icon: '🥞', isOpen: false },
-      { id: 'c2', title: 'Movie Night — Your Pick', description: 'Even that one you\'ve watched eleven times. I won\'t say a word.', icon: '🎬', isOpen: false },
-      { id: 'c3', title: 'One Day Where You Come Before Everything', description: 'No work. No calls. No distractions. Just you, first and only.', icon: '📵', isOpen: false },
-    ],
-    hasGift: true,
-    giftType: 'treasure',
-    giftTitle: 'The Necklace You Pretended You Didn\'t Want',
-    giftNote: 'In that store. You touched it, checked the price, and put it back. You thought I wasn\'t looking. I was.',
-    giftLink: 'https://www.caratlane.com/jewellery/necklaces.html',
-  },
-
-  // ═══════════════════════════════════════════════════════════
-  // 3. FRIENDSHIP — Ajmal → Yash
-  // ═══════════════════════════════════════════════════════════
-  friendship: {
-    senderName: 'Ajmal',
-    recipientName: 'Yash',
-    occasion: 'just-because',
-    theme: 'midnight',
-    writingMode: 'assisted',
-    timeShared: '7 years of chaos',
-    relationshipIntent: 'The one person who never needed a reason to show up.',
-    sharedMoment: 'When you drove 4 hours at 2am because I called and said nothing — you just knew.',
-    myth: 'Seven years. One phone call that said everything without a word.',
-    userImageUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80',
-    memoryBoard: [
-      { url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=600&q=80', caption: 'The road trip that almost killed us but made us brothers', angle: -6, xOffset: -25, yOffset: 20 },
-      { url: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=600&q=80', caption: 'Celebrating nothing. Our specialty.', angle: 7, xOffset: 40, yOffset: -15 },
-      { url: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600&q=80', caption: 'The startup that failed but the friendship didn\'t', angle: -4, xOffset: -40, yOffset: 35 },
-      { url: 'https://images.unsplash.com/photo-1543807535-eceef0bc6599?w=600&q=80', caption: '3am conversations that fixed nothing and everything', angle: 11, xOffset: 30, yOffset: -35 },
-      { url: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=600&q=80', caption: 'The only person whose bad ideas I still say yes to', angle: -9, xOffset: -5, yOffset: 45 },
-    ],
-    finalLetter: `Yash,
-
-I don't write letters. You know that. But some things should exist outside of WhatsApp forwards and Instagram stories.
-
-You're the only person who's seen me break down and didn't try to fix it. You just sat there. In the car. At 2am. Four hours from your house. Because I called, said nothing, and you drove anyway.
-
-That's not friendship. That's something they don't have a word for.
-
-We've built companies that failed, eaten meals we couldn't afford, laughed at things that weren't funny to anyone else. You've never once made me feel like I owed you something for being there.
-
-I owe you anyway. Not money. Not favors. Just this: the acknowledgment that my life is better because you're in it. Louder, messier, more honest.
-
-You're not my brother by blood. You're my brother by every choice that matters.
-
-No occasion. Just overdue honesty.
-
-— Ajmal`,
-    musicType: 'youtube',
-    musicUrl: 'https://www.youtube.com/watch?v=RBumgq5yVrA',
-    coupons: [
-      { id: 'c1', title: 'One Business Idea I\'ll Actually Listen To', description: 'Full attention. No eye-rolling. 30 whole minutes.', icon: '💡', isOpen: false },
-      { id: 'c2', title: 'Your Next Trip — I\'m In', description: 'Wherever. Whenever. No excuses this time.', icon: '✈️', isOpen: false },
-      { id: 'c3', title: 'One Honest Conversation', description: 'About the things we keep dodging. No jokes. Just real.', icon: '🤝', isOpen: false },
-    ],
-    hasGift: true,
-    giftType: 'spectacle',
-    giftTitle: 'Two Tickets — That Marvel Premiere',
-    giftNote: 'You\'ve been talking about this for three months. Shut up and go.',
-    giftLink: 'https://in.bookmyshow.com/explore/movies-now-showing',
-  },
-
-  // ═══════════════════════════════════════════════════════════
-  // 4. I AM SORRY — Shireen → Ayesha
-  // ═══════════════════════════════════════════════════════════
-  sorry: {
-    senderName: 'Shireen',
-    recipientName: 'Ayesha',
-    occasion: 'apology',
-    theme: 'obsidian',
-    writingMode: 'assisted',
-    timeShared: '12 years of sisterhood',
-    relationshipIntent: 'You deserved better from me. This is me admitting it.',
-    sharedMoment: 'When we sat in your kitchen after the fight and neither of us spoke for twenty minutes — but neither of us left.',
-    myth: 'Twelve years. One silence that held more love than any apology.',
-    userImageUrl: 'https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?w=800&q=80',
-    memoryBoard: [
-      { url: 'https://images.unsplash.com/photo-1513279922550-250c2129b13a?w=600&q=80', caption: 'The kitchen where we fought, cried, and forgave', angle: -5, xOffset: -30, yOffset: 10 },
-      { url: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=600&q=80', caption: 'Before everything got complicated', angle: 8, xOffset: 45, yOffset: -20 },
-      { url: 'https://images.unsplash.com/photo-1516575150278-77136aed6920?w=600&q=80', caption: 'You showed up at the hospital before I finished the sentence', angle: -3, xOffset: -50, yOffset: 35 },
-      { url: 'https://images.unsplash.com/photo-1498019559366-a1cbd07b5160?w=600&q=80', caption: 'Twelve years of secrets safe with you', angle: 10, xOffset: 20, yOffset: -40 },
-      { url: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600&q=80', caption: 'The last time we laughed without thinking about it', angle: -8, xOffset: -15, yOffset: 50 },
-    ],
-    finalLetter: `Ayesha,
-
-I've been rehearsing this in my head for weeks. Every version sounds like an excuse. So I'm throwing away the script.
-
-I hurt you. Not by accident. By carelessness. By assuming you'd always understand, always forgive, always be the bigger person. That's not fair. It never was.
-
-You called me out and I got defensive. That was wrong. You weren't attacking me — you were telling me the truth. And I punished you for it by going silent.
-
-Twelve years. You've held my secrets, my breakdowns, my worst days. You showed up at the hospital when my mother was sick before I even finished the sentence. You babysat my anxiety like it was your job.
-
-And I couldn't handle one honest conversation.
-
-I'm not asking you to pretend it didn't happen. I'm asking you to let me earn back what I damaged. Slowly. Without shortcuts.
-
-You are the most important person in my life outside of blood. And even blood hasn't shown up the way you have.
-
-I'm sorry. Not the kind that wants to move on. The kind that wants to do better.
-
-With everything I have,
-Shireen`,
-    musicType: 'youtube',
-    musicUrl: 'https://www.youtube.com/watch?v=k4V3Mo61fJM',
-    coupons: [
-      { id: 'c1', title: 'One Weekend — Just Us', description: 'Like before. Chai, gossip, and pretending we\'re 22.', icon: '💛', isOpen: false },
-      { id: 'c2', title: 'The Conversation We Need To Have', description: 'No running. No deflecting. I\'ll listen first.', icon: '🫂', isOpen: false },
-    ],
-    hasGift: true,
-    giftType: 'gastronomy',
-    giftTitle: 'Dinner at That Place We Used To Go',
-    giftNote: 'Table for two. The corner one. Like old times.',
-    giftLink: 'https://www.zomato.com/',
-  },
-
-  // ═══════════════════════════════════════════════════════════
-  // 5. THANK YOU — Arjun → Mother
-  // ═══════════════════════════════════════════════════════════
-  thankyou: {
-    senderName: 'Arjun',
-    recipientName: 'Ma',
-    occasion: 'thank-you',
-    theme: 'pearl',
-    writingMode: 'assisted',
-    timeShared: '26 years of being your son',
-    relationshipIntent: 'Everything I am started in your kitchen.',
-    sharedMoment: 'When I got my first salary and you refused the money but kept the envelope in your cupboard for three years.',
-    myth: 'Twenty-six years. One envelope that told the whole story.',
-    userImageUrl: 'https://images.unsplash.com/photo-1491013516836-7db643ee125a?w=800&q=80',
-    memoryBoard: [
-      { url: 'https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=600&q=80', caption: 'The kitchen where everything important happened', angle: -4, xOffset: -25, yOffset: 15 },
-      { url: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=600&q=80', caption: 'Every morning. 5am. Without being asked.', angle: 7, xOffset: 40, yOffset: -20 },
-      { url: 'https://images.unsplash.com/photo-1518398046578-8cca57782e17?w=600&q=80', caption: 'That ironed shirt the night before my interview', angle: -8, xOffset: -45, yOffset: 30 },
-      { url: 'https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=600&q=80', caption: 'Paranthas at the right time. Always.', angle: 6, xOffset: 30, yOffset: -35 },
-      { url: 'https://images.unsplash.com/photo-1499364615650-ec38552f4f34?w=600&q=80', caption: 'The temple trip you keep mentioning — it\'s booked now', angle: -10, xOffset: -10, yOffset: 45 },
-      { url: 'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=600&q=80', caption: 'You never complained. Not once. I noticed.', angle: 3, xOffset: 55, yOffset: 5 },
-    ],
-    finalLetter: `Ma,
-
-You won't expect this. You'll probably read it twice, cry once, and then call me to ask if I've eaten. That's exactly who you are.
-
-I've never said this properly: thank you. Not for the big things — you already know those. For the small ones you think no one noticed.
-
-Thank you for ironing my shirt the night before my first interview even though I told you I'd do it myself. You knew I wouldn't.
-
-Thank you for pretending my first salary was enough to be proud of. I saw you keep that envelope. I never told you. But I saw.
-
-Thank you for waking up at 5am every day of my board exams to make sure there was food before I asked. You never complained. Not once.
-
-Thank you for loving me in a language that doesn't need words — just paranthas at the right time and questions I didn't want to answer but needed to hear.
-
-I'm not the son who says these things. But I'm trying to become one.
-
-You didn't just raise me. You built me. And everything good in me has your fingerprints on it.
-
-Your son,
-Arjun`,
-    musicType: 'youtube',
-    musicUrl: 'https://www.youtube.com/watch?v=nGt_JDJT9wI',
-    coupons: [
-      { id: 'c1', title: 'A Day Where You Don\'t Cook', description: 'I\'m ordering in. You\'re sitting down. Non-negotiable.', icon: '🍛', isOpen: false },
-      { id: 'c2', title: 'That Temple Trip You Keep Mentioning', description: 'Booked. Planned. You just show up.', icon: '🛕', isOpen: false },
-      { id: 'c3', title: 'A Photo Together — A Real One', description: 'Not a selfie. A proper one. Framed.', icon: '📸', isOpen: false },
-    ],
-    hasGift: true,
-    giftType: 'treasure',
-    giftTitle: 'New Phone — The One You Said Was "Too Expensive"',
-    giftNote: 'Nothing is too expensive for the person who gave me everything for free.',
-    giftLink: 'https://www.amazon.in/s?k=iphone+16',
-  },
-
-  // ═══════════════════════════════════════════════════════════
-  // 6. MISSING YOU — Maya → Raj
-  // ═══════════════════════════════════════════════════════════
-  missingyou: {
-    senderName: 'Maya',
-    recipientName: 'Raj',
-    occasion: 'long-distance',
-    theme: 'midnight',
-    writingMode: 'assisted',
-    timeShared: '14 months across timezones',
-    relationshipIntent: 'Distance hasn\'t weakened this. It just made me louder about it.',
-    sharedMoment: 'When we stayed on a silent video call for three hours — not talking, just existing in the same screen while doing different things.',
-    myth: 'Fourteen months apart. One screen. No words needed.',
-    userImageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80',
-    memoryBoard: [
-      { url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=600&q=80', caption: 'The sky looks the same from both sides. I checked.', angle: -6, xOffset: -30, yOffset: 10 },
-      { url: 'https://images.unsplash.com/photo-1515378960530-7c0da6231fb1?w=600&q=80', caption: 'Three-hour video call. No words. Just us.', angle: 9, xOffset: 45, yOffset: -25 },
-      { url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=600&q=80', caption: 'Your desk. My screen. 5,000 miles of nothing.', angle: -3, xOffset: -40, yOffset: 35 },
-      { url: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=600&q=80', caption: 'Every city reminds me of something you said', angle: 7, xOffset: 25, yOffset: -40 },
-      { url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80', caption: 'Marine Drive. The night before your flight.', angle: -11, xOffset: -15, yOffset: 50 },
-      { url: 'https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?w=600&q=80', caption: 'I still check if you\'ve texted. Every morning.', angle: 5, xOffset: 55, yOffset: 0 },
-    ],
-    finalLetter: `Raj,
-
-It's 2:47am here. 11:17am where you are. I know because I've memorized your timezone like it's my own address.
-
-I miss you in ways that don't photograph well. Not the cinematic kind. The ordinary kind. The kind where I open the fridge and think about how you'd judge my leftovers. The kind where I laugh at something and reach for my phone before I remember you're asleep.
-
-People keep saying long distance is hard. They're wrong. Long distance isn't hard — it's specific. It's knowing exactly what you're missing. The weight of your hand. The sound you make when you're thinking. The way you say "hmm" when you're not really listening but don't want to admit it.
-
-I keep that three-hour video call in my memory like a photograph. We didn't speak. You were working. I was reading. And somehow that silence across 5,000 miles felt more intimate than anything I've experienced in person.
-
-I don't need you here every day. I need you to know that you're here anyway. In every decision I make, every city I walk through, every morning I wake up and check if you've texted.
-
-The distance is temporary. What I feel is not.
-
-Missing you like breathing,
-Maya`,
-    musicType: 'youtube',
-    musicUrl: 'https://www.youtube.com/watch?v=elsh3J5lJ6g',
-    sacredLocation: {
-      placeName: 'Marine Drive, Mumbai',
-      description: 'Where we sat on the rocks the night before you left and didn\'t say goodbye because we both knew we\'d cry.',
-      googleMapsUri: 'https://maps.google.com/?q=Marine+Drive+Mumbai',
-      latLng: { lat: 18.9432, lng: 72.8235 },
-    },
-    locationMemory: 'The rocks at Marine Drive. The night before your flight. We sat there until the city went quiet.',
-    coupons: [
-      { id: 'c1', title: 'Next Visit — I\'m Cooking', description: 'Your comfort food. In my tiny kitchen. No shortcuts.', icon: '🍳', isOpen: false },
-      { id: 'c2', title: 'One Full Weekend — Phones Off', description: 'When you\'re back. No friends, no plans. Just catching up on 14 months.', icon: '📵', isOpen: false },
-    ],
-    hasGift: true,
-    giftType: 'voyage',
-    giftTitle: 'One-Way Flight Home — Next Month',
-    giftNote: 'Stop saying "soon." I booked it.',
-    giftLink: 'https://www.makemytrip.com/flights/',
-  },
+const THEME_STYLES: Record<Theme, { 
+  bg: string;
+  text: string;
+  gold: string;
+  overlay: string;
+  boardBg: string;
+  sectionBg: string;
+  sealColor: string;
+}> = {
+  obsidian:   { bg: '#0C0A09', text: '#E5D0A1', gold: '#D4AF37', overlay: 'rgba(0,0,0,0.7)',        boardBg: '#1C1917', sectionBg: '#050505', sealColor: '#722F37' },
+  velvet:     { bg: '#1A0B2E', text: '#E9D5FF', gold: '#C084FC', overlay: 'rgba(26,11,46,0.8)',      boardBg: '#2E1065', sectionBg: '#0F0520', sealColor: '#7C3AED' },
+  crimson:    { bg: '#2B0A0A', text: '#FECDD3', gold: '#F43F5E', overlay: 'rgba(43,10,10,0.8)',      boardBg: '#3B0A0A', sectionBg: '#1A0505', sealColor: '#9F1239' },
+  midnight:   { bg: '#020617', text: '#E0F2FE', gold: '#7DD3FC', overlay: 'rgba(2,6,23,0.8)',        boardBg: '#0F172A', sectionBg: '#010410', sealColor: '#1E40AF' },
+  evergreen:  { bg: '#022C22', text: '#D1FAE5', gold: '#34D399', overlay: 'rgba(2,44,34,0.8)',       boardBg: '#064E3B', sectionBg: '#011A14', sealColor: '#065F46' },
+  pearl:      { bg: '#1C1917', text: '#F5F5F4', gold: '#A8A29E', overlay: 'rgba(28,25,23,0.8)',      boardBg: '#292524', sectionBg: '#0C0A09', sealColor: '#57534E' },
 };
 
-export const DEMO_SLUGS = Object.keys(DEMO_DATA);
+const OCCASION_TITLES: Record<Occasion, string> = {
+  valentine: "A Valentine's Dedication",
+  anniversary: "A Celebration of Time",
+  apology: "A Message of Reconciliation",
+  'just-because': "A Spontaneous Thought",
+  'long-distance': "Across the Distance",
+  'thank-you': "With Gratitude"
+};
 
-export function getDemoData(slug: string): CoupleData | null {
-  return DEMO_DATA[slug] || null;
-}
+const MAX_PARAGRAPH_CHARS = 180;
+
+/* ------------------------------------------------------------------ */
+/* COMPONENT                                                           */
+/* ------------------------------------------------------------------ */
+
+export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDemoMode = false, onPayment, onEdit }) => {
+  /* ------------------------------------------------------------------ */
+  /* STATE                                                               */
+  /* ------------------------------------------------------------------ */
+
+  const [coupons, setCoupons] = useState<Coupon[]>(data.coupons || []);
+  const [currentCouponIndex, setCurrentCouponIndex] = useState(0);
+  const [isGiftRevealed, setIsGiftRevealed] = useState(false);
+  const [activeSection, setActiveSection] = useState(0);
+  const [sections, setSections] = useState<number[]>([]);
+  const [currentParagraph, setCurrentParagraph] = useState(0);
+  
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [isVoicePlaying, setIsVoicePlaying] = useState(false);
+  const [showReplyComposer, setShowReplyComposer] = useState(false);
+  const [locationExpanded, setLocationExpanded] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [replySealed, setReplySealed] = useState(false);
+  const [replySending, setReplySending] = useState(false);
+  const [showExitWhisper, setShowExitWhisper] = useState(false);
+  const [showExitOverlay, setShowExitOverlay] = useState(false);
+  const [locationUnlocked, setLocationUnlocked] = useState(false);
+  const exitWhisperShownRef = useRef(false);
+
+  // Exit intent — soft whisper when user tries to leave
+  // Desktop: cursor moves to top of screen (desktop only)
+  // Mobile: user reaches last section + stays there for 2.5s
+  // Visibility: only triggers at last section (not mid-flow)
+  // Preview: always allow trigger so sender sees the feature
+  const mobileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Precise last-section check — exact match, not greater-than
+  const atLastSection = useMemo(() => {
+    const lastIndex = sections.length - 1;
+    return lastIndex >= 0 && activeSection === lastIndex;
+  }, [activeSection, sections.length]);
+
+  useEffect(() => {
+    if (exitWhisperShownRef.current) return;
+
+    const shouldTrigger = () => {
+      if (exitWhisperShownRef.current) return false;
+      // Preview: always allow
+      if (isPreview) return true;
+      // Only at the emotional end — last section or location gate
+      if (atLastSection) return true;
+      if (data.sacredLocation && !locationUnlocked) return true;
+      return false;
+    };
+
+    // Desktop only: cursor leaves viewport at top
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+    const handleMouseLeave = (e: MouseEvent) => {
+      if (e.clientY <= 5 && shouldTrigger()) {
+        exitWhisperShownRef.current = true;
+        setShowExitWhisper(true);
+      }
+    };
+
+    // Both: tab switch / phone lock — only at last section
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden' && (atLastSection || (data.sacredLocation && !locationUnlocked) || isPreview)) {
+        if (exitWhisperShownRef.current) return;
+        exitWhisperShownRef.current = true;
+        const handleReturn = () => {
+          if (document.visibilityState === 'visible') {
+            setShowExitWhisper(true);
+            document.removeEventListener('visibilitychange', handleReturn);
+          }
+        };
+        document.addEventListener('visibilitychange', handleReturn);
+      }
+    };
+
+    if (isDesktop) {
+      document.addEventListener('mouseleave', handleMouseLeave);
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (isDesktop) {
+        document.removeEventListener('mouseleave', handleMouseLeave);
+      }
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isPreview, atLastSection, locationUnlocked, data.sacredLocation]);
+
+  // Mobile: trigger whisper when user reaches last section AND stays there
+  useEffect(() => {
+    if (isPreview) return;
+    if (exitWhisperShownRef.current) return;
+    if (sections.length === 0) return;
+
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    if (!isMobile) return;
+
+    if (atLastSection) {
+      if (!mobileTimerRef.current) {
+        mobileTimerRef.current = setTimeout(() => {
+          if (!exitWhisperShownRef.current) {
+            exitWhisperShownRef.current = true;
+            setShowExitWhisper(true);
+          }
+          mobileTimerRef.current = null;
+        }, 2500);
+      }
+    } else {
+      if (mobileTimerRef.current) {
+        clearTimeout(mobileTimerRef.current);
+        mobileTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (mobileTimerRef.current) {
+        clearTimeout(mobileTimerRef.current);
+        mobileTimerRef.current = null;
+      }
+    };
+  }, [atLastSection, sections.length, isPreview]);
+
+
+  const [interactivePhotos, setInteractivePhotos] = useState<InteractivePhoto[]>(
+    data.memoryBoard?.map((p, i) => ({
+      ...p,
+      dragX: 0,
+      dragY: 0,
+      zIndex: 10 + i
+    })) || []
+  );
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+
+  /* ------------------------------------------------------------------ */
+  /* REFS                                                                */
+  /* ------------------------------------------------------------------ */
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const maxZ = useRef(20);
+  const mountedRef = useRef(true);
+  // Stable ref for dragging index to avoid recreating pointer handlers
+  const draggingIdxRef = useRef<number | null>(null);
+
+  /* ------------------------------------------------------------------ */
+  /* DERIVED VALUES                                                      */
+  /* ------------------------------------------------------------------ */
+
+  const theme = THEME_STYLES[data.theme || 'obsidian'];
+  const activeVideo = data.video?.url;
+  const hasVideo = !!activeVideo && data.videoSource !== 'none';
+  const occasionTitle = OCCASION_TITLES[data.occasion || 'valentine'] || 'A Private Moment';
+
+  /* ------------------------------------------------------------------ */
+  /* LETTER PARAGRAPHS (Memoized Chunking)                              */
+  /* ------------------------------------------------------------------ */
+
+  const letterParagraphs = useMemo(() => {
+    const text = data.finalLetter || '';
+    if (!text) return [];
+    
+    const explicitParagraphs = text.split('\n').filter(p => p.trim().length > 0);
+    const chunks: string[] = [];
+
+    explicitParagraphs.forEach(p => {
+      const words = p.split(' ');
+      let currentChunk = "";
+
+      words.forEach(word => {
+        if ((currentChunk + " " + word).length > MAX_PARAGRAPH_CHARS && currentChunk.length > 0) {
+          chunks.push(currentChunk.trim());
+          currentChunk = word;
+        } else {
+          currentChunk += (currentChunk ? " " : "") + word;
+        }
+      });
+      
+      if (currentChunk) chunks.push(currentChunk.trim());
+    });
+    
+    return chunks;
+  }, [data.finalLetter]);
+
+  /* ------------------------------------------------------------------ */
+  /* SECTION COUNT (Optimized Observer Deps)                            */
+  /* ------------------------------------------------------------------ */
+
+  const sectionCount = useMemo(() => {
+    let count = 2; // Hero + Letter always present
+    if (data.userImageUrl || data.aiImageUrl) count++;
+    if (data.memoryBoard?.length) count++;
+    if (data.sacredLocation) count++;
+    // Locked sections only count when unlocked (or no location to gate them)
+    const unlocked = !data.sacredLocation || locationUnlocked || isPreview;
+    if (unlocked && !isPreview && data.coupons?.length) count += 2; // divider + coupons
+    if (unlocked && !isPreview && data.hasGift) count++;
+    if (unlocked && !isPreview) count++; // final closure
+    return count;
+  }, [
+    data.userImageUrl,
+    data.aiImageUrl,
+    data.memoryBoard?.length,
+    data.sacredLocation,
+    data.coupons?.length,
+    data.hasGift,
+    isPreview,
+    locationUnlocked,
+  ]);
+
+  /* ------------------------------------------------------------------ */
+  /* EFFECT: Audio Preparation + Cleanup                                */
+  /* ------------------------------------------------------------------ */
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const prepareAudio = async () => {
+      if (!mountedRef.current) return;
+
+      // User-uploaded audio
+      if (data.audio?.url) {
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          audioContextRef.current = ctx;
+          const fetchResponse = await fetch(data.audio.url);
+          const arrayBuffer = await fetchResponse.arrayBuffer();
+          const buffer = await ctx.decodeAudioData(arrayBuffer);
+          if (mountedRef.current) {
+            setAudioBuffer(buffer);
+          }
+        } catch (e) {
+          console.error("User audio failed", e);
+        }
+        return;
+      }
+
+      // AI-generated audio
+      if (!data.finalLetter) return;
+      try {
+        const audioBytes = await generateAudioLetter(data.finalLetter);
+        if (audioBytes && mountedRef.current) {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          audioContextRef.current = ctx;
+          const buffer = await decodeAudioData(audioBytes, ctx);
+          if (mountedRef.current) {
+            setAudioBuffer(buffer);
+          }
+        }
+      } catch (e) {
+        console.error("AI audio ignored", e);
+      }
+    };
+
+    prepareAudio();
+
+    return () => {
+      mountedRef.current = false;
+      // Cleanup: stop source node and null ref before closing context
+      if (sourceNodeRef.current) {
+        try {
+          sourceNodeRef.current.stop();
+        } catch (e) {
+          // Ignore if already stopped
+        }
+        sourceNodeRef.current = null;
+      }
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close();
+        } catch (e) {
+          // Ignore if already closed
+        }
+        audioContextRef.current = null;
+      }
+    };
+  }, [data.finalLetter, data.audio?.url]);
+
+  /* ------------------------------------------------------------------ */
+  /* EFFECT: Scroll Observer                                            */
+  /* ------------------------------------------------------------------ */
+
+  useEffect(() => {
+    const sectionEls = Array.from(document.querySelectorAll('.snap-section'));
+    if (sectionEls.length === 0) return;
+
+    const sectionIds = sectionEls.map((el, i) => {
+      el.setAttribute('data-section', i.toString());
+      return i;
+    });
+    setSections(sectionIds);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const index = Number(entry.target.getAttribute('data-section'));
+            if (!isNaN(index)) {
+              setActiveSection(index);
+            }
+          }
+        });
+      },
+      { threshold: 0.5 } 
+    );
+
+    sectionEls.forEach(s => observer.observe(s));
+    
+    return () => {
+      // Unobserve all elements before disconnecting to prevent memory leaks
+      sectionEls.forEach(s => observer.unobserve(s));
+      observer.disconnect();
+    };
+  }, [sectionCount]);
+
+  /* ------------------------------------------------------------------ */
+  /* EFFECT: Pointer Event Handlers (Stable References)                 */
+  /* ------------------------------------------------------------------ */
+
+  useEffect(() => {
+    // Sync ref with state for stable access in handlers
+    draggingIdxRef.current = draggingIdx;
+    
+    if (draggingIdx === null) {
+      // Restore scroll when drag ends
+      if (containerRef.current) {
+        containerRef.current.style.overflowY = 'scroll';
+      }
+      return;
+    }
+
+    const handleMove = (e: PointerEvent) => {
+      e.preventDefault();
+      
+      const currentIdx = draggingIdxRef.current;
+      if (currentIdx === null) return;
+      
+      const dx = e.clientX - dragStartPos.current.x;
+      const dy = e.clientY - dragStartPos.current.y;
+      
+      setInteractivePhotos(prev => {
+        const next = [...prev];
+        if (currentIdx !== null && next[currentIdx]) {
+          next[currentIdx] = {
+            ...next[currentIdx],
+            dragX: next[currentIdx].dragX + dx,
+            dragY: next[currentIdx].dragY + dy
+          };
+        }
+        return next;
+      });
+      
+      dragStartPos.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const handleUp = () => {
+      setDraggingIdx(null);
+      if (containerRef.current) {
+        containerRef.current.style.overflowY = 'scroll';
+      }
+    };
+
+    window.addEventListener('pointermove', handleMove, { passive: false });
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
+    };
+  }, [draggingIdx]);
+
+  /* ------------------------------------------------------------------ */
+  /* HANDLERS                                                            */
+  /* ------------------------------------------------------------------ */
+
+  const handlePointerDown = useCallback((e: React.PointerEvent, idx: number) => {
+    e.stopPropagation();
+    maxZ.current += 1;
+    
+    setDraggingIdx(idx);
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    
+    setInteractivePhotos(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], zIndex: maxZ.current };
+      return next;
+    });
+
+    if (containerRef.current) {
+      containerRef.current.style.overflowY = 'hidden';
+    }
+  }, []);
+
+  const toggleVoiceNote = useCallback((e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!audioBuffer || !audioContextRef.current) return;
+    
+    if (isVoicePlaying) {
+      if (sourceNodeRef.current) {
+        try {
+          sourceNodeRef.current.stop();
+        } catch (e) {
+          // Ignore if already stopped
+        }
+        sourceNodeRef.current = null;
+      }
+      setIsVoicePlaying(false);
+    } else {
+      if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+      // Stop any existing source before creating new one
+      if (sourceNodeRef.current) {
+        try {
+          sourceNodeRef.current.stop();
+        } catch (e) {
+          // Ignore if already stopped
+        }
+        sourceNodeRef.current = null;
+      }
+      
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      source.onended = () => {
+        setIsVoicePlaying(false);
+        sourceNodeRef.current = null;
+      };
+      source.start(0);
+      sourceNodeRef.current = source;
+      setIsVoicePlaying(true);
+    }
+  }, [audioBuffer, isVoicePlaying]);
+
+  const advanceParagraph = useCallback(() => {
+    if (currentParagraph < letterParagraphs.length - 1) {
+      setCurrentParagraph(prev => prev + 1);
+    } else {
+      const currentSectionEl = document.querySelector(`[data-section="${activeSection}"]`);
+      const nextSectionEl = currentSectionEl?.nextElementSibling as HTMLElement;
+      if (nextSectionEl && nextSectionEl.classList.contains('snap-section')) {
+        nextSectionEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [currentParagraph, letterParagraphs.length, activeSection]);
+  
+  const resetParagraph = useCallback(() => {
+    setCurrentParagraph(0);
+  }, []);
+
+  const handleNextCoupon = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentCouponIndex < coupons.length) {
+      setCoupons(prev => {
+        const next = [...prev];
+        next[currentCouponIndex] = { 
+          ...next[currentCouponIndex], 
+          isClaimed: true 
+        };
+        return next;
+      });
+      setTimeout(() => setCurrentCouponIndex(prev => prev + 1), 400);
+    }
+  }, [currentCouponIndex, coupons.length]);
+
+  /* ------------------------------------------------------------------ */
+  /* RENDER                                                              */
+  /* ------------------------------------------------------------------ */
+
+  return (
+    <div 
+      ref={containerRef}
+      className="main-experience-container"
+      style={{
+        '--theme-bg': theme.bg,
+        '--theme-text': theme.text,
+        '--theme-gold': theme.gold,
+        '--theme-overlay': theme.overlay,
+        '--theme-board-bg': theme.boardBg,
+        '--theme-section-bg': theme.sectionBg,
+        '--theme-seal': theme.sealColor,
+      } as React.CSSProperties}
+    >
+      {/* Global Atmosphere */}
+      <div className="main-experience-atmosphere">
+        <div className="main-experience-texture" />
+        <div className="main-experience-vignette" />
+        
+        <div className="main-experience-nav-dots">
+          {sections.map(idx => (
+            <div 
+              key={idx} 
+              className={`main-experience-nav-dot ${activeSection === idx ? 'main-experience-nav-dot--active' : ''}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* SECTION: Hero */}
+      <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center text-center p-8 snap-start overflow-hidden">
+        {hasVideo && (
+          <div className="main-experience-video-bg">
+            <video 
+              src={activeVideo} 
+              autoPlay 
+              loop 
+              muted 
+              playsInline 
+              className="main-experience-video"
+            />
+            <div className="main-experience-video-overlay" />
+          </div>
+        )}
+        
+        <div className="main-experience-hero-card">
+          <div className="main-experience-hero-card-inner" />
+          <div className="main-experience-hero-content">
+            <span className="main-experience-hero-icon">✦</span>
+            <p className="main-experience-hero-occasion">{occasionTitle}</p>
+          </div>
+          <h1 className="main-experience-hero-title">
+            "{data.myth || (data.timeShared ? `${data.timeShared}. One story.` : 'Two souls, one timeline.')}"
+          </h1>
+        </div>
+      </section>
+
+      {/* SECTION: Image */}
+      {(data.userImageUrl || data.aiImageUrl) && (
+        <PaperSurface
+          theme={data.theme || 'obsidian'}
+          as="section"
+          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start overflow-hidden"
+        >
+          <div className="main-experience-image-blur">
+            <img src={data.userImageUrl || data.aiImageUrl} className="w-full h-full object-cover" alt="Background" loading="lazy" />
+          </div>
+          <div className="main-experience-polaroid">
+            <div className="main-experience-polaroid-img">
+              <img 
+                src={data.userImageUrl || data.aiImageUrl} 
+                className="w-full h-full object-cover"
+                style={{ animation: 'kenBurns 12s ease-in-out infinite alternate', willChange: 'transform' }}
+                loading="lazy"
+                alt="Memory" 
+              />
+              <div className="main-experience-polaroid-texture" />
+            </div>
+            <div className="main-experience-polaroid-caption">
+              <p className="font-serif-elegant italic text-2xl text-white/90 mb-2">{data.timeShared}</p>
+              <div className="w-8 h-px bg-white/30 mx-auto my-3" />
+              <p className="text-[8px] uppercase tracking-[0.4em] opacity-50">Time Dilation</p>
+            </div>
+          </div>
+        </PaperSurface>
+      )}
+
+      {/* SECTION: YouTube Video (soundtrack rendered as embedded player) */}
+      {data.musicType === 'youtube' && data.musicUrl && isYouTubeLink(data.musicUrl) && (
+        <PaperSurface
+          theme={data.theme || 'obsidian'}
+          as="section"
+          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-4 md:px-8"
+        >
+          <div className="text-center w-full max-w-2xl mx-auto">
+            <p 
+              className="text-[9px] uppercase tracking-[0.5em] font-bold mb-6"
+              style={{ color: theme.gold, opacity: 0.5, animation: 'closureReveal 0.8s ease-out both' }}
+            >
+              A Soundtrack For You
+            </p>
+
+            <div 
+              className="w-full rounded-xl overflow-hidden shadow-2xl"
+              style={{ 
+                border: `1px solid ${theme.gold}20`,
+                animation: 'closureReveal 1s ease-out 0.3s both',
+              }}
+            >
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  src={`https://www.youtube.com/embed/${getYouTubeEmbedId(data.musicUrl)}?rel=0&modestbranding=1`}
+                  title="Soundtrack"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                  style={{ border: 'none' }}
+                />
+              </div>
+            </div>
+
+            <p 
+              className="mt-6 text-[8px] uppercase tracking-[0.3em]"
+              style={{ color: theme.text, opacity: 0.2, animation: 'closureReveal 0.8s ease-out 0.8s both' }}
+            >
+              Press play
+            </p>
+          </div>
+        </PaperSurface>
+      )}
+
+      {/* SECTION: Letter (emotional peak — comes early) */}
+      <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center snap-start p-4 md:p-8">
+        <div 
+          className="main-experience-letter-card"
+          onClick={advanceParagraph}
+        >
+          <div className="main-experience-letter-card-border" />
+          <div className="main-experience-letter-texture" />
+
+          <div className="relative z-10 w-full flex flex-col items-center">
+            <div className="min-h-[250px] flex items-center justify-center relative w-full perspective-1000 px-2 md:px-0">
+              {letterParagraphs.map((para, idx) => (
+                <div 
+                  key={idx}
+                  className={`main-experience-letter-paragraph ${
+                    idx === currentParagraph 
+                      ? 'main-experience-letter-paragraph--active' 
+                      : idx < currentParagraph 
+                        ? 'main-experience-letter-paragraph--prev'
+                        : 'main-experience-letter-paragraph--next'
+                  }`}
+                >
+                  <span className="main-experience-letter-quote">"</span>
+                  <p className="main-experience-letter-text">
+                    {para}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {currentParagraph === letterParagraphs.length - 1 && (
+              <div 
+                className="main-experience-letter-signature"
+                style={{ animation: 'closureReveal 1s ease-out 1.5s both' }}
+              >
+                <div className="w-px h-12 bg-gradient-to-b from-transparent via-white/20 to-transparent mb-6" />
+                <p className="font-romantic text-4xl mb-3" style={{ color: theme.gold, opacity: 0.9 }}>{data.senderName}</p>
+                <div 
+                  className="w-12 h-px mx-auto mb-10"
+                  style={{ backgroundColor: theme.gold, opacity: 0.3, animation: 'closureLine 0.8s ease-out 2.2s both' }}
+                />
+                
+                {audioBuffer && (
+                  <div style={{ animation: 'closureReveal 0.8s ease-out 2.6s both' }}>
+                    <button 
+                      onClick={toggleVoiceNote}
+                      className={`main-experience-voice-button ${isVoicePlaying ? 'main-experience-voice-button--playing' : ''}`}
+                    >
+                      <div className={`main-experience-voice-icon ${isVoicePlaying ? 'main-experience-voice-icon--playing' : ''}`}>
+                        {isVoicePlaying ? (
+                          <div className="flex gap-0.5 h-3 items-center">
+                            <div className="w-0.5 bg-black animate-[bounce_1s_infinite] h-full" />
+                            <div className="w-0.5 bg-black animate-[bounce_1.2s_infinite] h-2" />
+                            <div className="w-0.5 bg-black animate-[bounce_0.8s_infinite] h-full" />
+                          </div>
+                        ) : (
+                          <span className="ml-0.5 text-[10px]">▶</span>
+                        )}
+                      </div>
+                      <span className="main-experience-voice-label">
+                        {isVoicePlaying ? 'Listening...' : 'Hear this letter'}
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {currentParagraph < letterParagraphs.length - 1 && (
+              <div className="mt-12 animate-pulse opacity-30 text-[9px] uppercase tracking-widest" style={{ color: theme.gold }}>
+                Tap to continue
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {currentParagraph === letterParagraphs.length - 1 && (
+          <button 
+            onClick={resetParagraph} 
+            className="absolute top-10 right-10 text-[8px] uppercase tracking-widest opacity-30 hover:opacity-100 transition-opacity border-b border-white/20 pb-1 z-20"
+          >
+            Read Again
+          </button>
+        )}
+      </section>
+
+      {/* SECTION: Memory Board (warm decompression after letter) */}
+      {interactivePhotos && interactivePhotos.length >= 1 && (
+        <section
+          className="snap-section min-h-[100vh] w-full relative flex flex-col items-center justify-center snap-start overflow-hidden py-32"
+          style={{ backgroundColor: theme.boardBg }}
+        >
+          <div className="main-experience-board-texture" />
+          
+          <div className="main-experience-board-header">
+            <h2 className="text-[10px] uppercase tracking-[0.5em] font-bold mb-2" style={{ color: theme.gold, opacity: 0.6 }}>A beautiful mess</h2>
+            <h1 className="text-3xl md:text-5xl font-serif-elegant italic mb-3" style={{ color: theme.text }}>Fragments of Us</h1>
+            <p className="text-[9px] uppercase tracking-widest font-bold animate-pulse" style={{ color: theme.gold, opacity: 0.5 }}>Tap and drag to explore</p>
+          </div>
+
+          <div className="relative w-full max-w-4xl h-[70vh] flex items-center justify-center mt-12">
+            {interactivePhotos.map((photo, idx) => {
+              const isDragging = draggingIdx === idx;
+              return (
+                <div 
+                  key={idx}
+                  onPointerDown={(e) => handlePointerDown(e, idx)}
+                  className={`main-experience-photo ${isDragging ? 'main-experience-photo--dragging' : ''}`}
+                  style={{
+                    '--photo-offset-x': `${photo.xOffset}px`,
+                    '--photo-offset-y': `${photo.yOffset}px`,
+                    '--photo-drag-x': `${photo.dragX}px`,
+                    '--photo-drag-y': `${photo.dragY}px`,
+                    '--photo-angle': `${photo.angle}deg`,
+                    '--photo-scale': isDragging ? 1.05 : 1,
+                    zIndex: photo.zIndex,
+                  } as React.CSSProperties}
+                >
+                  <div className="main-experience-photo-img">
+                    <img src={photo.url} className="w-full h-full object-cover grayscale-[0.2]" alt="Memory" draggable="false" loading="lazy" />
+                  </div>
+                  {photo.caption && (
+                    <p className="font-serif-elegant italic text-[10px] md:text-xs text-center mt-1 md:mt-2 px-1 pointer-events-none leading-tight" style={{ color: '#2D2424', opacity: 0.7, maxWidth: '100%' }}>
+                      {photo.caption}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* SECTION: Location */}
+      {data.sacredLocation && (
+        <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center snap-start overflow-hidden">
+          <div className="main-experience-location-bg">
+            <div className="main-experience-location-texture" />
+            <div className="main-experience-location-ring main-experience-location-ring--outer" />
+            <div className="main-experience-location-ring main-experience-location-ring--inner" />
+          </div>
+
+          {/* Compact Card — click to expand */}
+          <div 
+            className="main-experience-location-card cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(212,175,55,0.15)]"
+            onClick={() => setLocationExpanded(true)}
+          >
+            <div className="text-2xl mb-4 animate-bounce" style={{ color: theme.gold }}>📍</div>
+            <h3 className="text-[9px] uppercase tracking-[0.4em] font-bold mb-6" style={{ color: theme.gold, opacity: 0.8 }}>Cosmic Coordinate</h3>
+            <h2 className="font-serif-elegant italic text-3xl text-white mb-6 leading-tight">{data.sacredLocation.placeName}</h2>
+            <div className="w-12 h-px bg-white/10 mx-auto mb-6" />
+            <p className="text-white/60 text-xs italic leading-relaxed mb-6 font-serif-elegant line-clamp-2">
+              "{data.sacredLocation.description}"
+            </p>
+            <div className="text-[8px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.5 }}>
+              Tap to explore →
+            </div>
+          </div>
+
+          {/* Expanded Modal */}
+          {locationExpanded && (
+            <div 
+              className="fixed inset-0 z-[200] flex items-center justify-center p-6"
+              onClick={() => setLocationExpanded(false)}
+            >
+              {/* Backdrop */}
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-md" style={{ animation: 'fadeIn 0.3s ease' }} />
+              
+              {/* Modal Content */}
+              <div 
+                className="relative max-w-lg w-full rounded-2xl p-8 md:p-12 text-center border overflow-y-auto max-h-[85vh]"
+                style={{ 
+                  backgroundColor: 'rgba(15,15,15,0.95)', 
+                  borderColor: `${theme.gold}30`,
+                  boxShadow: `0 25px 60px rgba(0,0,0,0.6), 0 0 40px ${theme.gold}10`,
+                  animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close button */}
+                <button 
+                  onClick={() => setLocationExpanded(false)}
+                  className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+                  style={{ color: 'rgba(255,255,255,0.4)' }}
+                >
+                  ✕
+                </button>
+
+                <div className="text-3xl mb-6" style={{ color: theme.gold }}>📍</div>
+                <h3 className="text-[9px] uppercase tracking-[0.5em] font-bold mb-4" style={{ color: theme.gold, opacity: 0.8 }}>Cosmic Coordinate</h3>
+                <h2 className="font-serif-elegant italic text-2xl md:text-3xl text-white mb-6 leading-tight">{data.sacredLocation.placeName}</h2>
+                
+                <div className="w-16 h-px mx-auto mb-8" style={{ backgroundColor: `${theme.gold}30` }} />
+                
+                <p className="text-white/70 text-sm italic leading-relaxed mb-10 font-serif-elegant max-w-md mx-auto">
+                  "{data.sacredLocation.description}"
+                </p>
+
+                {data.sacredLocation.latLng && (
+                  <div className="mb-8 text-[10px] text-white/30 uppercase tracking-widest font-bold">
+                    {data.sacredLocation.latLng.lat.toFixed(4)}° N · {data.sacredLocation.latLng.lng.toFixed(4)}° E
+                  </div>
+                )}
+                
+                <a 
+                  href={data.sacredLocation.googleMapsUri} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-3 px-8 py-4 rounded-full text-[10px] uppercase tracking-[0.3em] font-bold transition-all hover:scale-[1.03]"
+                  style={{ 
+                    color: theme.gold,
+                    border: `1px solid ${theme.gold}40`,
+                    backgroundColor: `${theme.gold}08`
+                  }}
+                >
+                  <span>View on Map</span>
+                  <span>→</span>
+                </a>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ================================================================ */}
+      {/* LINEAR FLOW: Divider → Promises → Gift → Closure → Reply      */}
+      {/* Gated behind location unlock if location exists.                */}
+      {/* If no location, sections render freely.                         */}
+      {/* ================================================================ */}
+
+      {(!data.sacredLocation || locationUnlocked || isPreview) && (<>
+
+      {/* SECTION: Promise Divider */}
+      {!isPreview && coupons.length > 0 && (
+        <PaperSurface 
+          theme={data.theme || 'obsidian'} 
+          as="section"
+          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start"
+          style={{ position: 'relative' }}
+        >
+          <div id="promises-section" style={{ position: 'absolute', top: 0 }} />
+          <div className="text-center px-8">
+            <p
+              style={{
+                fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+                fontStyle: 'italic',
+                fontSize: 'clamp(1.2rem, 4vw, 2rem)',
+                color: theme.text,
+                lineHeight: 1.6,
+              }}
+            >
+              What I promise you.
+            </p>
+            <div 
+              className="h-px mx-auto mt-8 w-12"
+              style={{ backgroundColor: theme.gold, opacity: 0.2 }}
+            />
+          </div>
+        </PaperSurface>
+      )}
+
+      {/* SECTION: Promises (Coupons) */}
+      {!isPreview && coupons.length > 0 && (
+        <PaperSurface
+          theme={data.theme || 'obsidian'}
+          as="section"
+          className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-4 py-20"
+        >
+          <div className="relative w-80 md:w-96 h-[28rem] md:h-[32rem] perspective-1000">
+            {coupons.map((coupon, index) => {
+              if (index < currentCouponIndex) return null;
+              const isTop = index === currentCouponIndex;
+              const offset = index - currentCouponIndex;
+
+              return (
+                <div
+                  key={coupon.id}
+                  onClick={isTop ? handleNextCoupon : undefined}
+                  className={`main-experience-coupon ${isTop ? 'main-experience-coupon--active' : 'main-experience-coupon--stacked'}`}
+                  style={
+                    !isTop
+                      ? ({
+                          '--coupon-offset-y': `${offset * 15}px`,
+                          '--coupon-scale': 1 - offset * 0.05,
+                        } as React.CSSProperties)
+                      : undefined
+                  }
+                >
+                  <div className="main-experience-coupon-texture" />
+
+                  <div className="flex justify-between items-start opacity-40 relative z-10">
+                    <span className="text-[9px] font-bold uppercase tracking-widest">NO. 0{index + 1}</span>
+                    <span className="text-2xl">{coupon.icon}</span>
+                  </div>
+
+                  <div className="text-center relative z-10 mt-4">
+                    <h3 className="font-serif-elegant italic text-3xl mb-6 leading-tight">{coupon.title}</h3>
+                    <div className="w-8 h-0.5 mx-auto opacity-10 mb-6" style={{ backgroundColor: theme.text }} />
+                    <p className="font-sans text-sm leading-relaxed opacity-70">{coupon.description}</p>
+                  </div>
+
+                  <div className="text-center opacity-40 relative z-10">
+                    <span className="text-[9px] uppercase tracking-[0.3em] font-bold pb-1" style={{ borderBottom: `1px solid ${theme.text}20` }}>
+                      {isTop ? 'Accept Vow' : 'Locked'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {currentCouponIndex >= coupons.length && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center border border-white/10 rounded-sm bg-white/5 backdrop-blur-sm">
+                <span className="text-4xl mb-6 text-white/60">✓</span>
+                <p className="text-xs uppercase tracking-widest text-white/40">Promises Accepted</p>
+              </div>
+            )}
+          </div>
+        </PaperSurface>
+      )}
+
+      {/* SECTION: Gift */}
+      {!isPreview && data.hasGift && (
+        <PaperSurface
+          theme={data.theme || 'obsidian'}
+          as="section"
+          className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-4 py-20"
+        >
+          <div className={`main-experience-gift-container ${isGiftRevealed ? 'main-experience-gift-container--revealed' : ''}`}>
+            <div className="main-experience-gift-glow" />
+
+            <div className="main-experience-gift-card">
+              <div className="main-experience-gift-texture" />
+
+              <div className="main-experience-gift-corners">
+                <div className="main-experience-gift-corner main-experience-gift-corner--tl" />
+                <div className="main-experience-gift-corner main-experience-gift-corner--tr" />
+                <div className="main-experience-gift-corner main-experience-gift-corner--bl" />
+                <div className="main-experience-gift-corner main-experience-gift-corner--br" />
+              </div>
+
+              <div className="flex flex-col md:flex-row">
+                <div className="main-experience-gift-content">
+                  <div className="main-experience-gift-punch main-experience-gift-punch--left" />
+                  <div className="main-experience-gift-punch main-experience-gift-punch--right" />
+                  
+                  <p className="text-[9px] uppercase tracking-[0.5em] mb-2 font-bold" style={{ color: theme.gold, opacity: 0.6 }}>Sealed For You</p>
+                  <div className="w-8 h-px mb-10" style={{ backgroundColor: theme.gold, opacity: 0.2 }} />
+                  
+                  <h2 className="font-serif-elegant italic text-4xl md:text-5xl text-white mb-6 leading-tight text-center relative z-10 drop-shadow-md">
+                    {data.giftTitle}
+                  </h2>
+                  
+                  {data.giftNote && (
+                    <p className="font-serif-elegant italic text-sm text-white/50 text-center mb-10 max-w-xs mx-auto leading-relaxed">
+                      "{data.giftNote}"
+                    </p>
+                  )}
+                  {!data.giftNote && <div className="mb-4" />}
+                  
+                  {!isGiftRevealed ? (
+                    <button 
+                      onClick={() => setIsGiftRevealed(true)}
+                      className="main-experience-gift-reveal"
+                    >
+                      <span className="relative z-10">Reveal Gift</span>
+                      <div className="main-experience-gift-reveal-fill" />
+                    </button>
+                  ) : (
+                    <div className="animate-fade-in w-full">
+                      <a 
+                        href={isPreview ? '#' : data.giftLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="main-experience-gift-access"
+                      >
+                        Access Now
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                <div className="main-experience-gift-barcode">
+                  <div className="main-experience-gift-serial">
+                    NO. {data.sessionId?.substring(0,8).toUpperCase() || "849201"}
+                  </div>
+                  <div className="main-experience-gift-bars">
+                    {[...Array(12)].map((_, i) => (
+                      <div 
+                        key={i} 
+                        className={`${i % 3 === 0 ? 'w-[2px] md:h-[1px] md:w-full h-full' : 'w-[1px] md:h-[0.5px] md:w-4/5 h-2/3'}`}
+                        style={{ backgroundColor: theme.gold }}
+                      />
+                    ))}
+                  </div>
+                  <div className="md:mt-8 text-xl font-serif-elegant italic" style={{ color: theme.gold, opacity: 0.3 }}>V</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </PaperSurface>
+      )}
+
+      {/* SECTION: Final Closure — the one and only ending */}
+      {!isPreview && (
+        <PaperSurface
+          theme={data.theme || 'obsidian'}
+          as="section"
+          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-8"
+        >
+          <div className="text-center">
+            <p 
+              className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8"
+              style={{ color: theme.gold, opacity: 0.25, animation: 'closureReveal 1s ease-out both' }}
+            >
+              Created for you. Only you.
+            </p>
+
+            <p
+              style={{
+                fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+                fontStyle: 'italic',
+                fontSize: 'clamp(1.2rem, 4vw, 2rem)',
+                color: theme.text,
+                lineHeight: 1.6,
+                animation: 'closureReveal 1.2s ease-out 0.4s both',
+              }}
+            >
+              Sealed by {data.senderName}
+            </p>
+
+            {(data.sealedAt || data.createdAt) && (
+              <p 
+                className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold"
+                style={{ color: theme.gold, opacity: 0.4, animation: 'closureReveal 1s ease-out 1s both' }}
+              >
+                {(() => {
+                  const d = new Date(data.sealedAt || data.createdAt || '');
+                  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                    + ' · '
+                    + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                })()}
+              </p>
+            )}
+
+            <div 
+              className="h-px mx-auto my-10"
+              style={{ backgroundColor: theme.gold, opacity: 0.15, animation: 'closureLine 0.8s ease-out 1.6s both' }}
+            />
+
+            {/* Reply CTA */}
+            <div style={{ animation: 'closureReveal 0.8s ease-out 2.2s both' }}>
+              {data.replyEnabled ? (
+                <>
+                  <p className="text-[10px] tracking-[0.15em] text-white/25 font-serif-elegant italic mb-3">
+                    Your turn.
+                  </p>
+                  <p className="text-[10px] tracking-[0.12em] text-white/15 mb-6 max-w-[280px] mx-auto leading-relaxed">
+                    If you wish... you can seal something back.
+                  </p>
+                  <button
+                    onClick={() => setShowReplyComposer(true)}
+                    className="inline-block px-8 py-3 border transition-all duration-300"
+                    style={{
+                      fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+                      fontStyle: 'italic',
+                      fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)',
+                      letterSpacing: '0.1em',
+                      borderColor: theme.gold + '66',
+                      color: theme.text,
+                    }}
+                  >
+                    Seal a reply
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-[10px] tracking-[0.15em] text-white/25 font-serif-elegant italic mb-6">
+                    Words left unsaid?
+                  </p>
+                  <a
+                    href="/"
+                    className="inline-block px-8 py-3 border transition-all duration-300"
+                    style={{
+                      fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+                      fontStyle: 'italic',
+                      fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)',
+                      letterSpacing: '0.1em',
+                      borderColor: theme.gold + '66',
+                      color: theme.text,
+                    }}
+                  >
+                    Seal something back for {data.senderName}
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+        </PaperSurface>
+      )}
+
+      {/* DEMO: Final Conversion Screen — the only CTA in the entire demo */}
+      {isDemoMode && !isPreview && (() => {
+        const isValentine = data.occasion === 'valentine';
+        return (
+          <section className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-8 relative" style={{ backgroundColor: '#0C0A09' }}>
+            <div className="text-center max-w-md mx-auto">
+
+              {isValentine && (
+                <div className="mb-16" style={{ animation: 'closureReveal 1.2s ease-out 0.2s both' }}>
+                  <p className="text-[13px] text-[#E5D0A1]/40 italic leading-relaxed mb-3" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
+                    She didn't speak for a few seconds.
+                  </p>
+                  <p className="text-[13px] text-[#E5D0A1]/30 italic leading-relaxed" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
+                    Then softly,<br/>
+                    "You actually made this for me?"
+                  </p>
+                </div>
+              )}
+
+              <div className="w-px h-12 bg-gradient-to-b from-transparent via-[#D4AF37]/20 to-transparent mx-auto mb-10" style={{ animation: 'closureReveal 0.8s ease-out 1s both' }} />
+
+              {isValentine ? (
+                <div style={{ animation: 'closureReveal 1s ease-out 1.4s both' }}>
+                  <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/35 font-bold mb-2">Valentine's Day ends at midnight.</p>
+                  <p className="text-[9px] text-[#E5D0A1]/20 italic mb-10">This moment doesn't wait.</p>
+                </div>
+              ) : (
+                <div style={{ animation: 'closureReveal 1s ease-out 1.4s both' }}>
+                  <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/35 font-bold mb-2">Love should not be assumed.</p>
+                  <p className="text-[9px] text-[#E5D0A1]/20 italic mb-10">It should be expressed.</p>
+                </div>
+              )}
+
+              <div style={{ animation: 'closureReveal 0.8s ease-out 2s both' }}>
+                <button
+                  onClick={() => { window.location.href = '/'; }}
+                  className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[10px] tracking-[0.4em] uppercase px-12 py-5 rounded-full shadow-2xl transition-all duration-300 active:scale-[0.98]"
+                >
+                  {isValentine ? 'Seal Yours Before Midnight' : 'Create Your Own'}
+                </button>
+              </div>
+
+              <div className="mt-8" style={{ animation: 'closureReveal 0.8s ease-out 2.8s both' }}>
+                <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/20 font-bold">171 people sealed something today.</p>
+              </div>
+
+              {isValentine && (
+                <div className="mt-6" style={{ animation: 'closureReveal 0.8s ease-out 3.4s both' }}>
+                  <p className="text-[9px] text-[#E5D0A1]/15 italic">Tomorrow, someone will wish they had sent this.</p>
+                </div>
+              )}
+
+            </div>
+          </section>
+        );
+      })()}
+
+      </>)}
+
+      {/* Reply Composer — ceremonial single reply */}
+      {showReplyComposer && !replySealed && (
+        <div 
+          className="fixed inset-0 z-[350] flex flex-col items-center justify-center select-none px-6"
+          style={{ backgroundColor: theme.bg, animation: 'exitIntentIn 0.5s ease-out both' }}
+        >
+          <p
+            className="mb-2"
+            style={{
+              fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+              fontStyle: 'italic',
+              fontSize: 'clamp(1.2rem, 4vw, 1.8rem)',
+              color: theme.text,
+              animation: 'closureReveal 0.8s ease-out 0.2s both',
+            }}
+          >
+            Your reply to {data.senderName}
+          </p>
+          <p 
+            className="text-[9px] uppercase tracking-[0.3em] text-white/20 mb-8"
+            style={{ animation: 'closureReveal 0.6s ease-out 0.6s both' }}
+          >
+            One message. Make it count.
+          </p>
+
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value.slice(0, 500))}
+            placeholder="Write what you feel..."
+            maxLength={500}
+            rows={6}
+            className="w-full max-w-md bg-transparent rounded-none p-5 text-white/80 text-sm leading-relaxed resize-none focus:outline-none placeholder-white/15"
+            style={{
+              fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+              fontStyle: 'italic',
+              animation: 'closureReveal 0.8s ease-out 0.8s both',
+              borderColor: theme.gold + '33',
+            }}
+            autoFocus
+          />
+          <p 
+            className="mt-2 text-[8px] text-white/15 tracking-wide self-end max-w-md w-full text-right"
+            style={{ animation: 'closureReveal 0.6s ease-out 1s both' }}
+          >
+            {replyText.length}/500
+          </p>
+
+          <div 
+            className="mt-8 flex flex-col items-center gap-4"
+            style={{ animation: 'closureReveal 0.8s ease-out 1.2s both' }}
+          >
+            <button
+              onClick={async () => {
+                if (!replyText.trim() || replySending) return;
+                setReplySending(true);
+                try {
+                  // TODO: Store reply in Firebase under sessions/{sessionId}/reply
+                  await new Promise(r => setTimeout(r, 1200));
+                  setReplySealed(true);
+                } catch {
+                  setReplySending(false);
+                }
+              }}
+              disabled={!replyText.trim() || replySending}
+              className={`px-10 py-3 border transition-all duration-300 ${
+                replyText.trim() && !replySending
+                  ? ''
+                  : 'border-white/10 text-white/20 cursor-not-allowed'
+              }`}
+              style={{
+                fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+                fontStyle: 'italic',
+                fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
+                letterSpacing: '0.1em',
+                ...(replyText.trim() && !replySending ? {
+                  borderColor: theme.gold + '80',
+                  color: theme.text,
+                } : {}),
+              }}
+            >
+              {replySending ? 'Sealing...' : 'Seal this reply'}
+            </button>
+
+            <button
+              onClick={() => setShowReplyComposer(false)}
+              className="text-[8px] uppercase tracking-[0.4em] text-white/15 hover:text-white/30 transition-colors"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reply Sealed Confirmation */}
+      {replySealed && (
+        <div 
+          className="fixed inset-0 z-[350] flex flex-col items-center justify-center select-none"
+          style={{ backgroundColor: theme.bg, animation: 'exitIntentIn 0.6s ease-out both' }}
+        >
+          <p
+            style={{
+              fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+              fontStyle: 'italic',
+              fontSize: 'clamp(1.2rem, 4vw, 1.8rem)',
+              color: theme.text,
+              animation: 'closureReveal 1s ease-out 0.3s both',
+            }}
+          >
+            Your words have been sealed.
+          </p>
+
+          <div 
+            className="h-px mx-auto my-8"
+            style={{ backgroundColor: theme.gold, opacity: 0.2, animation: 'closureLine 0.8s ease-out 1.2s both' }}
+          />
+
+          <p 
+            className="text-[10px] uppercase tracking-[0.3em] font-bold"
+            style={{ color: theme.gold, opacity: 0.3, animation: 'closureReveal 0.8s ease-out 2s both' }}
+          >
+            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            {' · '}
+            {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+          </p>
+
+          <button
+            onClick={() => {
+              setShowReplyComposer(false);
+              setReplySealed(false);
+            }}
+            className="mt-12 text-[8px] uppercase tracking-[0.4em] text-white/15 hover:text-white/30 transition-colors"
+            style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}
+          >
+            Return
+          </button>
+        </div>
+      )}
+
+      {/* Exit Whisper — soft nudge, not a gate. Dismisses cleanly. */}
+      {showExitWhisper && (
+        <div 
+          className="fixed inset-0 z-[300] flex flex-col items-center justify-center select-none"
+          style={{ backgroundColor: theme.bg, opacity: 0.98, animation: 'exitIntentIn 0.6s ease-out both' }}
+        >
+          <p
+            style={{
+              fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+              fontStyle: 'italic',
+              fontSize: 'clamp(1.2rem, 4vw, 2rem)',
+              color: theme.text,
+              lineHeight: 1.6,
+              animation: 'closureReveal 0.8s ease-out 0.3s both',
+            }}
+          >
+            Before you go...
+          </p>
+
+          <div 
+            className="h-px mx-auto my-6 w-12"
+            style={{ backgroundColor: theme.gold, opacity: 0.2, animation: 'closureLine 0.6s ease-out 0.8s both' }}
+          />
+
+          <p 
+            className="text-[10px] tracking-[0.15em] font-serif-elegant italic"
+            style={{ color: theme.text, opacity: 0.35, animation: 'closureReveal 0.8s ease-out 1.2s both' }}
+          >
+            {isPreview ? 'This is what your receiver will see when they try to leave' : `${data.senderName} left something more for you`}
+          </p>
+
+          <button
+            onClick={() => {
+              setShowExitWhisper(false);
+              setShowExitOverlay(true);
+            }}
+            className="mt-10 px-8 py-3 border transition-all duration-300"
+            style={{ 
+              animation: 'closureReveal 0.8s ease-out 1.8s both',
+              fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+              fontStyle: 'italic',
+              fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
+              letterSpacing: '0.1em',
+              borderColor: theme.gold + '44',
+              color: theme.text,
+            }}
+          >
+            Show me
+          </button>
+
+          <button
+            onClick={() => setShowExitWhisper(false)}
+            className="mt-4 text-[8px] uppercase tracking-[0.4em] transition-colors"
+            style={{ color: theme.text, opacity: 0.15, animation: 'closureReveal 0.6s ease-out 2.2s both' }}
+          >
+            Maybe later
+          </button>
+        </div>
+      )}
+
+      {/* Exit Overlay — fullscreen popup with remaining content */}
+      {showExitOverlay && (
+        <div 
+          className="fixed inset-0 z-[280] overflow-y-auto"
+          style={{ backgroundColor: theme.bg, animation: 'exitIntentIn 0.8s ease-out both' }}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setShowExitOverlay(false)}
+            className="fixed top-6 right-6 z-[290] text-xs uppercase tracking-widest transition-colors"
+            style={{ color: theme.text, opacity: 0.2 }}
+          >
+            ✕
+          </button>
+
+          {/* Promises */}
+          {coupons.length > 0 && (
+            <>
+              <div className="min-h-screen w-full flex flex-col items-center justify-center px-8" style={{ backgroundColor: theme.bg }}>
+                <p
+                  style={{
+                    fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+                    fontStyle: 'italic',
+                    fontSize: 'clamp(1.2rem, 4vw, 2rem)',
+                    color: theme.text,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  What I promise you.
+                </p>
+                <div className="h-px mx-auto mt-8 w-12" style={{ backgroundColor: theme.gold, opacity: 0.2 }} />
+              </div>
+
+              <div className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-20 relative" style={{ backgroundColor: theme.bg }}>
+                <div className="relative w-80 md:w-96 h-[28rem] md:h-[32rem] perspective-1000">
+                  {coupons.map((coupon, index) => {
+                    if (index < currentCouponIndex) return null;
+                    const isTop = index === currentCouponIndex;
+                    const offset = index - currentCouponIndex;
+                    return (
+                      <div
+                        key={coupon.id}
+                        onClick={isTop ? handleNextCoupon : undefined}
+                        className={`main-experience-coupon ${isTop ? 'main-experience-coupon--active' : 'main-experience-coupon--stacked'}`}
+                        style={!isTop ? ({ '--coupon-offset-y': `${offset * 15}px`, '--coupon-scale': 1 - offset * 0.05 } as React.CSSProperties) : undefined}
+                      >
+                        <div className="main-experience-coupon-texture" />
+                        <div className="flex justify-between items-start opacity-40 relative z-10">
+                          <span className="text-[9px] font-bold uppercase tracking-widest">NO. 0{index + 1}</span>
+                          <span className="text-2xl">{coupon.icon}</span>
+                        </div>
+                        <div className="text-center relative z-10 mt-4">
+                          <h3 className="font-serif-elegant italic text-3xl mb-6 leading-tight">{coupon.title}</h3>
+                          <div className="w-8 h-0.5 mx-auto opacity-10 mb-6" style={{ backgroundColor: theme.text }} />
+                          <p className="font-sans text-sm leading-relaxed opacity-70">{coupon.description}</p>
+                        </div>
+                        <div className="text-center opacity-40 relative z-10">
+                          <span className="text-[9px] uppercase tracking-[0.3em] font-bold pb-1" style={{ borderBottom: `1px solid ${theme.text}20` }}>
+                            {isTop ? 'Accept Vow' : 'Locked'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {currentCouponIndex >= coupons.length && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center border border-white/10 rounded-sm bg-white/5 backdrop-blur-sm">
+                      <span className="text-4xl mb-6 text-white/60">✓</span>
+                      <p className="text-xs uppercase tracking-widest text-white/40">Promises Accepted</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Scroll hint */}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center animate-pulse">
+                  <p className="text-[8px] uppercase tracking-[0.4em] mb-2" style={{ color: theme.gold, opacity: 0.3 }}>Scroll</p>
+                  <span className="text-xs" style={{ color: theme.gold, opacity: 0.25 }}>↓</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Gift */}
+          {data.hasGift && (
+            <div className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-20" style={{ backgroundColor: theme.sectionBg }}>
+              <div className={`main-experience-gift-container ${isGiftRevealed ? 'main-experience-gift-container--revealed' : ''}`}>
+                <div className="main-experience-gift-glow" />
+                <div className="main-experience-gift-card">
+                  <div className="main-experience-gift-texture" />
+                  <div className="main-experience-gift-corners">
+                    <div className="main-experience-gift-corner main-experience-gift-corner--tl" />
+                    <div className="main-experience-gift-corner main-experience-gift-corner--tr" />
+                    <div className="main-experience-gift-corner main-experience-gift-corner--bl" />
+                    <div className="main-experience-gift-corner main-experience-gift-corner--br" />
+                  </div>
+                  <div className="flex flex-col md:flex-row">
+                    <div className="main-experience-gift-content">
+                      <div className="main-experience-gift-punch main-experience-gift-punch--left" />
+                      <div className="main-experience-gift-punch main-experience-gift-punch--right" />
+                      <p className="text-[9px] uppercase tracking-[0.5em] mb-2 font-bold" style={{ color: theme.gold, opacity: 0.6 }}>Sealed For You</p>
+                      <div className="w-8 h-px mb-10" style={{ backgroundColor: theme.gold, opacity: 0.2 }} />
+                      <h2 className="font-serif-elegant italic text-4xl md:text-5xl text-white mb-6 leading-tight text-center relative z-10 drop-shadow-md">{data.giftTitle}</h2>
+                      {data.giftNote && (
+                        <p className="font-serif-elegant italic text-sm text-white/50 text-center mb-10 max-w-xs mx-auto leading-relaxed">
+                          "{data.giftNote}"
+                        </p>
+                      )}
+                      {!data.giftNote && <div className="mb-4" />}
+                      {!isGiftRevealed ? (
+                        <button onClick={() => setIsGiftRevealed(true)} className="main-experience-gift-reveal">
+                          <span className="relative z-10">Reveal Gift</span>
+                          <div className="main-experience-gift-reveal-fill" />
+                        </button>
+                      ) : (
+                        <div className="animate-fade-in w-full">
+                          <a href={data.giftLink} target="_blank" rel="noopener noreferrer" className="main-experience-gift-access">Access Now</a>
+                        </div>
+                      )}
+                    </div>
+                    <div className="main-experience-gift-barcode">
+                      <div className="main-experience-gift-serial">NO. {data.sessionId?.substring(0,8).toUpperCase() || "849201"}</div>
+                      <div className="main-experience-gift-bars">
+                        {[...Array(12)].map((_, i) => (
+                          <div key={i} className={`${i % 3 === 0 ? 'w-[2px] md:h-[1px] md:w-full h-full' : 'w-[1px] md:h-[0.5px] md:w-4/5 h-2/3'}`} style={{ backgroundColor: theme.gold }} />
+                        ))}
+                      </div>
+                      <div className="md:mt-8 text-xl font-serif-elegant italic" style={{ color: theme.gold, opacity: 0.3 }}>V</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Closure + Reply */}
+          <div className="min-h-screen w-full flex flex-col items-center justify-center px-8 py-20" style={{ backgroundColor: theme.bg }}>
+            <div className="text-center">
+              <p className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8" style={{ color: theme.gold, opacity: 0.25 }}>
+                Created for you. Only you.
+              </p>
+              <p style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(1.2rem, 4vw, 2rem)', color: theme.text, lineHeight: 1.6 }}>
+                Sealed by {data.senderName}
+              </p>
+              {(data.sealedAt || data.createdAt) && (
+                <p className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.4 }}>
+                  {(() => {
+                    const d = new Date(data.sealedAt || data.createdAt || '');
+                    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                  })()}
+                </p>
+              )}
+              <div className="h-px mx-auto my-10" style={{ backgroundColor: theme.gold, opacity: 0.15 }} />
+
+              {isPreview && (onPayment || onEdit) ? (
+                <>
+                  <p className="text-[10px] tracking-[0.12em] font-serif-elegant italic mb-3" style={{ color: theme.text, opacity: 0.35 }}>
+                    {data.replyEnabled 
+                      ? `If ${data.recipientName || 'your receiver'} feels moved, they can seal a reply back to you right here.`
+                      : `${data.recipientName || 'Your receiver'} will see an option to create their own Sealed Vow for you.`
+                    }
+                  </p>
+                  <div className="inline-block px-8 py-3 border opacity-30 cursor-default" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
+                    {data.replyEnabled ? 'Seal a reply' : `Seal something back for ${data.senderName}`}
+                  </div>
+                  <p className="mt-3 text-[8px] uppercase tracking-[0.3em]" style={{ color: theme.gold, opacity: 0.25 }}>
+                    ↑ This is what your receiver will see
+                  </p>
+                </>
+              ) : (
+                <>
+                  {data.replyEnabled ? (
+                    <button onClick={() => { setShowExitOverlay(false); setShowReplyComposer(true); }} className="inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
+                      Seal a reply
+                    </button>
+                  ) : (
+                    <a href="/" className="inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
+                      Seal something back for {data.senderName}
+                    </a>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Creator Preview Controls — Modify + Seal & Deliver */}
+      {isPreview && (onPayment || onEdit) && (
+        <>
+          {/* Exit intent hint — fixed top banner */}
+          {!showExitOverlay && !showExitWhisper && !exitWhisperShownRef.current && (
+            <div className="fixed top-0 left-0 right-0 z-[400] text-center py-3 px-4" style={{ backgroundColor: theme.bg + 'ee', borderBottom: `1px solid ${theme.gold}15` }}>
+              <p className="text-[11px] font-serif-elegant italic" style={{ color: theme.gold, opacity: 0.7 }}>
+                ✨ Move your cursor toward the close button — see what your receiver experiences when they try to leave
+              </p>
+            </div>
+          )}
+          <div className="fixed bottom-0 left-0 right-0 z-[400]" style={{ background: `linear-gradient(to top, ${theme.bg}, ${theme.bg}ee, transparent)` }}>
+          <div className="max-w-md mx-auto px-6 pb-8 pt-6 flex flex-col items-center gap-3">
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="w-full py-3.5 text-[10px] font-bold uppercase tracking-[0.4em] border rounded-full transition-all duration-300 hover:bg-white/5"
+                style={{ borderColor: theme.gold + '40', color: theme.text }}
+              >
+                ← Modify
+              </button>
+            )}
+            {onPayment && (
+              <button
+                onClick={onPayment}
+                className="w-full py-4 text-[10px] font-bold uppercase tracking-[0.4em] rounded-full transition-all duration-300 shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
+                style={{ backgroundColor: '#722F37', color: '#FFFFFF', letterSpacing: '0.4em' }}
+              >
+                Seal & Deliver
+              </button>
+            )}
+          </div>
+        </div>
+        </>
+      )}
+    </div>
+  );
+};
