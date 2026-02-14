@@ -19,6 +19,9 @@
     },
     "api/verify-payment.js": {
       "maxDuration": 30
+    },
+    "api/admin-generate-founder-codes.js": {
+      "maxDuration": 30
     }
   }
 }

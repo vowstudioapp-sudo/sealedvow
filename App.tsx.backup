@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PreparationForm } from './components/PreparationForm.tsx';
 import { RefineStage } from './components/RefineStage.tsx';
 import { Envelope } from './components/Envelope.tsx';
@@ -8,14 +8,13 @@ import { InteractiveQuestion } from './components/InteractiveQuestion.tsx';
 import { SoulmateSync } from './components/SoulmateSync.tsx';
 import { LandingPage } from './components/LandingPage.tsx';
 import { PaymentStage } from './components/PaymentStage.tsx';
-import { Analytics } from '@vercel/analytics/react';
-
+import { BackgroundAudio } from './components/BackgroundAudio.tsx';
 import { MasterControl } from './components/MasterControl.tsx';
 import { PersonalIntro } from './components/PersonalIntro.tsx';
+import { PreviewWatermark } from './components/PreviewWatermark.tsx';
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
-import { getDemoData } from './data/demoData.ts';
 
 const THEME_BG_COLORS: Record<Theme, string> = {
   obsidian: '#050505',
@@ -27,7 +26,7 @@ const THEME_BG_COLORS: Record<Theme, string> = {
 };
 
 const STUDIO_BG_COLOR = '#1C1917';
-
+const DEFAULT_AMBIENT_MUSIC = 'https://ia800201.us.archive.org/12/items/GymnopedieNo1/GymnopedieNo1.mp3';
 
 const STORAGE_KEY = 'vday_data';
 
@@ -96,6 +95,8 @@ const App: React.FC = () => {
   const [isBooting, setIsBooting] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
   
+  const [isGlobalMuted, setIsGlobalMuted] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const [isCreatorPreview, setIsCreatorPreview] = useState(false);
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
@@ -203,6 +204,7 @@ const App: React.FC = () => {
       setData(mockData);
       setIsBooting(false);
       setIsFadingOut(true);
+      setHasInteracted(true);
 
       if (preview === 'intro') safeSetStage(AppStage.PERSONAL_INTRO);
       else if (preview === 'envelope') safeSetStage(AppStage.ENVELOPE);
@@ -218,19 +220,10 @@ const App: React.FC = () => {
       if (params.get('preview')) return;
     }
 
-    // Demo mode — load hardcoded data, skip all backend
-    if (isDemoMode && demoData) {
-      setData(demoData);
-      setIsBooting(false);
-      setIsFadingOut(false);
-      safeSetStage(AppStage.PERSONAL_INTRO);
-      return;
-    }
-
     if (linkState === LoaderState.SUCCESS && sharedData) {
       setData(hydrateCoupleData(sharedData));
       setIsBooting(false);
-      setIsFadingOut(false);
+      setIsFadingOut(true);
       
       // Check for master role in query params (clean URLs) or hash params (legacy)
       const queryParams = new URLSearchParams(window.location.search);
@@ -255,26 +248,7 @@ const App: React.FC = () => {
     }
   }, [linkState, sharedData, linkError]);
 
-  // Detect demo mode (/demo/slug)
-  const demoData = useMemo(() => {
-    const path = window.location.pathname;
-    const match = path.match(/^\/demo\/([a-z]+)$/);
-    if (match) return getDemoData(match[1]);
-    return null;
-  }, []);
-  const isDemoMode = !!demoData;
-
-  // Detect receiver link (path has slug)
-  const isReceiverLink = useMemo(() => {
-    if (isDemoMode) return true;
-    const path = window.location.pathname;
-    return path.length > 1 && !path.startsWith('/api') && !path.startsWith('/demo');
-  }, [isDemoMode]);
-
   useEffect(() => {
-    // Skip boot animation entirely for receiver links
-    if (isReceiverLink) return;
-
     const fadeTimer = setTimeout(() => setIsFadingOut(true), 2200);
     const endTimer = setTimeout(() => setIsBooting(false), 3000);
 
@@ -282,7 +256,25 @@ const App: React.FC = () => {
       clearTimeout(fadeTimer);
       clearTimeout(endTimer);
     };
-  }, [isReceiverLink]);
+  }, []);
+
+  useEffect(() => {
+    if (hasInteracted) return;
+
+    const unlockAudio = () => {
+      if (!hasInteracted) setHasInteracted(true);
+    };
+    
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, [hasInteracted]);
 
   useEffect(() => {
     let timeoutId: number | null = null;
@@ -384,6 +376,17 @@ const App: React.FC = () => {
     }
   };
 
+  // Music logic (unchanged)
+  const currentMusicUrl = (stage === AppStage.MAIN_EXPERIENCE || stage === AppStage.ENVELOPE || stage === AppStage.PREVIEW || stage === AppStage.SHARE) && data?.musicUrl 
+    ? data.musicUrl 
+    : DEFAULT_AMBIENT_MUSIC;
+
+  const currentMusicType = (stage === AppStage.MAIN_EXPERIENCE || stage === AppStage.ENVELOPE || stage === AppStage.PREVIEW || stage === AppStage.SHARE) && data?.musicType 
+    ? data.musicType 
+    : 'preset';
+
+  const shouldPlay = hasInteracted && !isGlobalMuted && stage !== AppStage.MASTER_CONTROL;
+
   const bootScreen = (
     <div className={`boot-screen-container ${isFadingOut ? 'fade-out' : ''}`}>
       <div className="relative flex flex-col items-center">
@@ -412,8 +415,9 @@ const App: React.FC = () => {
             VOW
           </h1>
           <p 
-            className="text-[7px] uppercase mt-3 animate-boot-line"
+            className="text-[7px] uppercase mt-3 animate-fade-in"
             style={{ 
+              animationDelay: '1.2s',
               color: 'rgba(198,168,90,0.6)',
               letterSpacing: '0.7em',
             }}
@@ -428,8 +432,43 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen relative overflow-hidden transition-colors duration-1000" style={{ backgroundColor: '#0C0A09' }}>
-      {isBooting && !isReceiverLink && bootScreen}
+    <div className="min-h-screen relative overflow-hidden transition-colors duration-1000">
+      {isBooting && bootScreen}
+      
+      <BackgroundAudio 
+        musicUrl={currentMusicUrl} 
+        musicType={currentMusicType} 
+        isPlaying={shouldPlay} 
+        onPlayError={() => setIsGlobalMuted(true)}
+      />
+
+      {!isBooting && stage !== AppStage.MASTER_CONTROL && (
+          <button 
+            onClick={(e) => { 
+                e.stopPropagation(); 
+                setIsGlobalMuted(!isGlobalMuted); 
+                if (!hasInteracted) setHasInteracted(true);
+            }}
+            className={`fixed top-6 left-6 z-[100] p-3 rounded-full border backdrop-blur-md transition-all duration-500 group overflow-hidden ${shouldPlay ? 'border-luxury-gold/30 bg-black/20 hover:bg-luxury-gold/10' : 'border-white/10 bg-black/40 opacity-70 hover:opacity-100'}`}
+          >
+             {shouldPlay ? (
+               <div className="flex gap-1 h-3 items-end">
+                  <div className="w-0.5 bg-luxury-gold animate-[bounce_1s_infinite]"></div>
+                  <div className="w-0.5 bg-luxury-gold animate-[bounce_1.2s_infinite]"></div>
+                  <div className="w-0.5 bg-luxury-gold animate-[bounce_0.8s_infinite]"></div>
+               </div>
+             ) : (
+                <div className="relative">
+                   <span className="text-xs text-white/60">♪</span>
+                   <div className="absolute top-1/2 left-0 w-full h-[1px] bg-white/60 rotate-45 transform -translate-y-1/2"></div>
+                </div>
+             )}
+             
+             <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 text-[8px] uppercase tracking-widest text-luxury-gold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none bg-black/50 px-2 py-1 rounded">
+                {isGlobalMuted ? 'Unmute Sound' : 'Mute Sound'}
+             </span>
+          </button>
+      )}
 
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")' }}></div>
       
@@ -440,11 +479,9 @@ const App: React.FC = () => {
         </>
       )}
 
-      <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${
-        isReceiverLink ? 'opacity-100' : (isBooting ? 'opacity-0' : 'opacity-100')
-      }`}>
+      <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${isBooting ? 'opacity-0' : 'opacity-100'}`}>
         
-        {stage === AppStage.LANDING && !isReceiverLink && (
+        {stage === AppStage.LANDING && (
           <LandingPage onEnter={handleEnterStudio} />
         )}
 
@@ -462,7 +499,7 @@ const App: React.FC = () => {
               const updated: CoupleData = hydrateCoupleData({ ...data, ...enrichedData, finalLetter });
               setData(updated);
               setIsCreatorPreview(true);
-              safeSetStage(AppStage.ENVELOPE); 
+              safeSetStage(AppStage.PERSONAL_INTRO); 
               writePersistedCoupleData(updated);
             }}
             onBack={() => safeSetStage(AppStage.PREPARE)}
@@ -477,8 +514,6 @@ const App: React.FC = () => {
           <PersonalIntro
             recipientName={data.recipientName}
             theme={data.theme}
-            isDemoMode={isDemoMode}
-            onThemeChange={isDemoMode ? (t: Theme) => setData(prev => ({ ...prev, theme: t })) : undefined}
             onComplete={() => safeSetStage(AppStage.ENVELOPE)}
           />
         )}
@@ -486,9 +521,10 @@ const App: React.FC = () => {
         {stage === AppStage.ENVELOPE && data && (
           <div className="animate-fade-in flex items-center justify-center min-h-screen">
             {isCreatorPreview && (
-               <div className="fixed top-0 left-0 w-full bg-[#1C1917] text-luxury-gold z-[100] py-3 text-center shadow-lg border-b border-luxury-gold/20">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.4em] animate-pulse">Previewing Receiver Experience</p>
-               </div>
+              <PreviewWatermark onSeal={() => {
+                safeSetStage(AppStage.MAIN_EXPERIENCE);
+                setIsCreatorPreview(true);
+              }} />
             )}
             <Envelope 
               recipientName={data.recipientName} 
@@ -520,42 +556,12 @@ const App: React.FC = () => {
 
         {stage === AppStage.MAIN_EXPERIENCE && data && (
           <div className="animate-fade-in relative">
-            {isDemoMode && (() => {
-              const isValentine = window.location.pathname === '/demo/valentines';
-              return (
-              <>
-                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#1C1917]/90 border border-[#D4AF37]/30 px-4 py-1.5 rounded-full">
-                  <span className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/70 font-bold">Public Preview</span>
-                </div>
-                <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/95 to-transparent pt-12 pb-6 px-6 text-center">
-                  {isValentine && (
-                    <p className="text-[10px] text-[#E5D0A1]/50 italic font-serif mb-4 leading-relaxed">
-                      If you watched this and thought of someone — the silence is yours now.
-                    </p>
-                  )}
-                  <button
-                    onClick={() => { window.location.href = '/'; }}
-                    className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[10px] tracking-[0.4em] uppercase px-10 py-4 rounded-full shadow-2xl transition-all active:scale-[0.98] mb-3"
-                  >
-                    {isValentine ? 'Say It Before Midnight' : 'Create Your Own'}
-                  </button>
-                  {isValentine ? (
-                    <div className="space-y-1.5 mt-1">
-                      <p className="text-[9px] text-[#D4AF37]/40 font-bold uppercase tracking-[0.25em]">Valentine's Day ends at midnight.</p>
-                      <p className="text-[8px] text-[#E5D0A1]/25 italic">If you're still waiting for the right moment — this is it.</p>
-                      <p className="text-[7px] text-[#D4AF37]/20 uppercase tracking-[0.3em] mt-3">This is how people are choosing to say it this year.</p>
-                    </div>
-                  ) : (
-                    <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/30 font-bold">This is a demonstration experience.</p>
-                  )}
-                </div>
-              </>
-              );
-            })()}
+            {isCreatorPreview && (
+              <PreviewWatermark onSeal={() => safeSetStage(AppStage.PAYMENT)} />
+            )}
             <MainExperience 
               data={data} 
               isPreview={isCreatorPreview}
-              isDemoMode={isDemoMode}
               onEdit={() => {
                 safeSetStage(AppStage.REFINE);
                 setIsCreatorPreview(false);
@@ -670,7 +676,6 @@ const App: React.FC = () => {
           })}
         </div>
       )}
-      <Analytics />
     </div>
   );
 };
