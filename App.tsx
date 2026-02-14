@@ -476,6 +476,8 @@ const App: React.FC = () => {
           <PersonalIntro
             recipientName={data.recipientName}
             theme={data.theme}
+            isDemoMode={isDemoMode}
+            onThemeChange={isDemoMode ? (t: Theme) => setData(prev => ({ ...prev, theme: t })) : undefined}
             onComplete={() => safeSetStage(AppStage.ENVELOPE)}
           />
         )}
