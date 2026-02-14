@@ -1137,59 +1137,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 })()}
               </p>
             )}
-
-            <div 
-              className="h-px mx-auto my-10"
-              style={{ backgroundColor: theme.gold, opacity: 0.15, animation: 'closureLine 0.8s ease-out 1.6s both' }}
-            />
-
-            {/* Reply CTA */}
-            <div style={{ animation: 'closureReveal 0.8s ease-out 2.2s both' }}>
-              {data.replyEnabled ? (
-                <>
-                  <p className="text-[10px] tracking-[0.15em] text-white/25 font-serif-elegant italic mb-3">
-                    Your turn.
-                  </p>
-                  <p className="text-[10px] tracking-[0.12em] text-white/15 mb-6 max-w-[280px] mx-auto leading-relaxed">
-                    If you wish... you can seal something back.
-                  </p>
-                  <button
-                    onClick={() => setShowReplyComposer(true)}
-                    className="inline-block px-8 py-3 border transition-all duration-300"
-                    style={{
-                      fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
-                      fontStyle: 'italic',
-                      fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)',
-                      letterSpacing: '0.1em',
-                      borderColor: theme.gold + '66',
-                      color: theme.text,
-                    }}
-                  >
-                    Seal a reply
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-[10px] tracking-[0.15em] text-white/25 font-serif-elegant italic mb-6">
-                    Words left unsaid?
-                  </p>
-                  <a
-                    href="/"
-                    className="inline-block px-8 py-3 border transition-all duration-300"
-                    style={{
-                      fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
-                      fontStyle: 'italic',
-                      fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)',
-                      letterSpacing: '0.1em',
-                      borderColor: theme.gold + '66',
-                      color: theme.text,
-                    }}
-                  >
-                    Seal something back for {data.senderName}
-                  </a>
-                </>
-              )}
-            </div>
           </div>
         </PaperSurface>
       )}
@@ -1680,11 +1627,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                         {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} IST
                       </p>
                     </div>
-                    {data.replyEnabled && (
-                      <button onClick={() => { setShowExitOverlay(false); setShowReplyComposer(true); }} className="mt-8 inline-block px-8 py-3 border transition-all duration-300" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '44', color: theme.text, opacity: 0.5 }}>
-                        Seal a reply
-                      </button>
-                    )}
                   </div>
                 </>
               )}
