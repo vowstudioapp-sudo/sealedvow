@@ -68,12 +68,18 @@ export const HelpModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <div className="p-8 md:p-12 max-h-[70vh] overflow-y-auto custom-scrollbar">
             <div className="space-y-6 text-center">
                 <div className="space-y-4">
-                    <p className="text-[#D4AF37] text-lg font-serif-elegant italic">
+                    <a 
+                      href="mailto:support@sealedvow.com"
+                      className="block text-[#D4AF37] text-lg font-serif-elegant italic hover:text-white transition-colors"
+                    >
                         📧 support@sealedvow.com
-                    </p>
-                    <p className="text-[#D4AF37] text-lg font-serif-elegant italic">
-                        📱 +91-XXXXXXXXXX
-                    </p>
+                    </a>
+                    <a 
+                      href="tel:+919654648484"
+                      className="block text-[#D4AF37] text-lg font-serif-elegant italic hover:text-white transition-colors"
+                    >
+                        📱 +91 96546 48484
+                    </a>
                     <p className="text-[#AAA] text-sm font-serif-elegant italic opacity-80 mt-6">
                         Response within 24 hours
                     </p>

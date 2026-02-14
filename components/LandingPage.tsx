@@ -189,7 +189,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
             onClick={() => setShowHelp(true)}
             className="text-[9px] uppercase tracking-[0.2em] font-bold opacity-40 hover:opacity-70 hover:text-[#D4AF37] transition-all mt-4"
           >
-            Help
+            Support
           </button>
         </div>
 
