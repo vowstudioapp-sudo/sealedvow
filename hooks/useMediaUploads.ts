@@ -24,6 +24,7 @@ import {
 
 const LIMITS = {
   IMAGE_MB: 10,
+  MEMORY_IMAGE_MB: 15,
   VIDEO_MB: 10,
   MEMORY_MAX: 10,
 } as const;
@@ -168,10 +169,10 @@ export function useMediaUploads({
       const compressedFiles: File[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        validateFileSize(file, LIMITS.IMAGE_MB, 'Photo');
+        validateFileSize(file, LIMITS.MEMORY_IMAGE_MB, 'Photo');
 
         const compressed = await imageCompression(file, {
-          maxSizeMB: 0.8,
+          maxSizeMB: 1,
           maxWidthOrHeight: 1600,
           useWebWorker: true,
           preserveExif: false,
