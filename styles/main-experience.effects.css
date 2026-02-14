@@ -272,12 +272,13 @@
 .main-experience-photo {
   position: absolute;
   background: #FAFAFA;
-  padding: 0.75rem 0.75rem 2.5rem 0.75rem;
+  padding: 0.5rem 0.5rem 0 0.5rem;
   border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
   cursor: grab;
   transform-origin: center center;
   touch-action: none;
+  width: 9.5rem;
   transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   /* CSS variables for drag physics */
   transform: translate(
@@ -290,7 +291,8 @@
 
 @media (min-width: 768px) {
   .main-experience-photo {
-    padding: 1rem 1rem 3.5rem 1rem;
+    padding: 0.75rem 0.75rem 0 0.75rem;
+    width: 13rem;
   }
 }
 
@@ -305,8 +307,8 @@
 }
 
 .main-experience-photo-img {
-  width: 8rem;
-  height: 8rem;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.05);
   position: relative;
@@ -314,10 +316,27 @@
   pointer-events: none;
 }
 
+.main-experience-photo-caption {
+  height: 2.5rem;
+  padding: 0.4rem 0.15rem 0.5rem;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  font-style: italic;
+  text-align: center;
+  line-height: 1.3;
+  font-size: 0.55rem;
+  color: rgba(45, 36, 36, 0.7);
+  pointer-events: none;
+}
+
 @media (min-width: 768px) {
-  .main-experience-photo-img {
-    width: 11rem;
-    height: 11rem;
+  .main-experience-photo-caption {
+    height: 3rem;
+    padding: 0.5rem 0.25rem 0.6rem;
+    font-size: 0.65rem;
   }
 }
 

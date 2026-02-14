@@ -817,11 +817,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                   <div className="main-experience-photo-img">
                     <img src={photo.url} className="w-full h-full object-cover grayscale-[0.2]" alt="Memory" draggable="false" loading="lazy" />
                   </div>
-                  {photo.caption && (
-                    <p className="font-serif-elegant italic text-[10px] md:text-xs text-center mt-1 md:mt-2 px-1 pointer-events-none leading-tight" style={{ color: '#2D2424', opacity: 0.7, maxWidth: '100%' }}>
-                      {photo.caption}
-                    </p>
-                  )}
+                  <div className="main-experience-photo-caption font-serif-elegant">
+                    {photo.caption || ''}
+                  </div>
                 </div>
               );
             })}
