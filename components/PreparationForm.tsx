@@ -233,23 +233,24 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   };
 
   return (
-    <div className={`mx-auto ${step === 2 ? 'max-w-5xl p-4 mt-2 mb-4' : 'max-w-3xl p-4 md:p-12 mt-4 mb-32'}`}>
-      <div className={`text-center animate-fade-in ${step === 2 ? 'mb-2' : 'mb-16'}`}>
+    <div className={`mx-auto ${(step as number) === 2 ? 'max-w-5xl p-4 mt-2 mb-4' : 'max-w-3xl p-4 md:p-12 mt-4 mb-32'}`}>
+      <div className={`text-center animate-fade-in ${(step as number) === 2 ? 'mb-2' : 'mb-16'}`}>
         {step !== 2 && (
           <h2 className="text-[10px] md:text-xs uppercase tracking-[0.5em] text-luxury-gold/90 font-bold mb-4 text-center w-full">VOW STUDIO</h2>
         )}
         
-        <div className={`flex flex-col items-center justify-center space-y-4 ${step === 2 ? "" : "min-h-[100px]"}`}>
+        <div className={`flex flex-col items-center justify-center space-y-4 ${(step as number) === 2 ? "" : "min-h-[100px]"}`}>
             {step > 1 && step !== 2 && (
                 <div className="animate-fade-in text-[9px] uppercase tracking-[0.2em] text-green-400/80 font-bold mb-1 flex items-center gap-2">
                     <span>✓</span>
-                    <span>The narrative is complete</span>
+                    <span>{(step as number) === 2 ? "The foundation is complete" : "The narrative is complete"}</span>
                 </div>
             )}
 
             {step !== 2 && (
               <h1 className="text-3xl md:text-5xl font-serif-elegant italic text-[#E5D0A1] leading-tight animate-fade-in" key={step}>
                 {step === 1 && "You are shaping the foundation"}
+                {(step as number) === 2 && "You are crafting the narrative"}
                 {step === 3 && "You are preparing the ceremony"}
               </h1>
             )}
@@ -264,7 +265,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className={`relative ${step === 2 ? "space-y-0" : "space-y-12"}`}>
+      <form onSubmit={handleSubmit} className={`relative ${(step as number) === 2 ? "space-y-0" : "space-y-12"}`}>
 
         {error && (
           <div className="mx-auto max-w-md p-4 bg-[#2B0A0A]/80 border border-red-400/30 text-red-200 text-[11px] tracking-wide rounded-lg text-center backdrop-blur-sm"
@@ -367,7 +368,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
         )}
         
         {/* STEP 2: CINEMATIC PHASES */}
-        {step === 2 && (
+        {(step as number) === 2 && (
           <div className="relative">
 
             {/* ═══ Desktop Side Buttons — absolute, beside the card ═══ */}
@@ -440,7 +441,10 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           {media.isUploadingImage ? (
                             <div className="text-center p-6 space-y-3">
                               <div className="w-10 h-10 mx-auto border-2 border-luxury-ink/20 border-t-luxury-gold-dark rounded-full animate-spin" />
-                              <span className="text-[9px] uppercase tracking-[0.2em] text-luxury-ink/60 block font-bold">Uploading...</span>
+                              <span className="text-[9px] uppercase tracking-[0.2em] text-luxury-ink/60 block font-bold">{media.uploadProgress}%</span>
+                              <div className="w-16 h-1 bg-luxury-ink/10 rounded-full mx-auto overflow-hidden">
+                                <div className="h-full bg-luxury-gold-dark rounded-full transition-all duration-300" style={{ width: `${media.uploadProgress}%` }} />
+                              </div>
                             </div>
                           ) : data.userImageUrl ? (
                             <img src={data.userImageUrl} className="w-full h-full object-cover grayscale-[0.3] group-hover:grayscale-0 transition-all duration-1000" alt="Preview" />
@@ -472,7 +476,14 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                             disabled={media.isUploadingMemories || (data.memoryBoard?.length || 0) >= 10}
                             className={`px-8 py-3 border-2 border-luxury-ink/40 text-luxury-ink text-[10px] uppercase tracking-widest font-bold rounded-full hover:bg-luxury-ink/10 transition-all ${media.isUploadingMemories ? 'opacity-60 cursor-wait' : ''}`}
                           >
-                            {media.isUploadingMemories ? 'Uploading...' : 'Add Polaroids'}
+                            {media.isUploadingMemories ? (
+                              <span className="flex flex-col items-center gap-1">
+                                <span>Uploading... {media.uploadProgress}%</span>
+                                <span className="w-24 h-1 bg-luxury-ink/10 rounded-full overflow-hidden inline-block">
+                                  <span className="block h-full bg-luxury-gold-dark rounded-full transition-all duration-300" style={{ width: `${media.uploadProgress}%` }} />
+                                </span>
+                              </span>
+                            ) : 'Add Polaroids'}
                           </button>
                           <input 
                             type="file" 
@@ -1067,7 +1078,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
           </div>
         )}
 
-        <div className={`pt-8 pb-20 flex justify-between items-center border-t border-white/10 ${step === 2 ? "hidden" : ""}`}>
+        <div className={`pt-8 pb-20 flex justify-between items-center border-t border-white/10 ${(step as number) === 2 ? "hidden" : ""}`}>
            {step > 1 ? (
              <button type="button" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); back(); }} className="text-[10px] md:text-xs uppercase tracking-[0.2em] text-luxury-stone hover:text-luxury-gold transition-colors font-bold px-4 py-2">
                ← Back

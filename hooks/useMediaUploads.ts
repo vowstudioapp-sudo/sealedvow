@@ -23,7 +23,7 @@ import {
  */
 
 const LIMITS = {
-  IMAGE_MB: 5,
+  IMAGE_MB: 10,
   VIDEO_MB: 10,
   MEMORY_MAX: 10,
 } as const;
@@ -54,6 +54,7 @@ export function useMediaUploads({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [isUploadingMemories, setIsUploadingMemories] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // ---------------------------------------------------------------------------
   // HELPERS
@@ -78,11 +79,13 @@ export function useMediaUploads({
 
   const uploadCoverImage = async (file: File) => {
     setIsUploadingImage(true);
+    setUploadProgress(0);
 
     try {
       const sid = ensureSession();
       validateFileSize(file, LIMITS.IMAGE_MB, 'Image');
 
+      setUploadProgress(20);
       const compressed = await imageCompression(file, {
         maxSizeMB: 1,
         maxWidthOrHeight: 1920,
@@ -90,12 +93,15 @@ export function useMediaUploads({
         preserveExif: false,
       });
 
+      setUploadProgress(60);
       const url = await uploadUserImage(sid, compressed as File);
+      setUploadProgress(100);
       updateData({ userImageUrl: url });
     } catch (err: any) {
       onError(err.message || 'Image upload failed');
     } finally {
       setIsUploadingImage(false);
+      setUploadProgress(0);
     }
   };
 
@@ -153,13 +159,15 @@ export function useMediaUploads({
     }
 
     setIsUploadingMemories(true);
+    setUploadProgress(0);
 
     try {
       const sid = ensureSession();
 
       // Compress images: strip EXIF, resize, reduce size
       const compressedFiles: File[] = [];
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         validateFileSize(file, LIMITS.IMAGE_MB, 'Photo');
 
         const compressed = await imageCompression(file, {
@@ -170,9 +178,11 @@ export function useMediaUploads({
         });
 
         compressedFiles.push(compressed as File);
+        setUploadProgress(Math.round(((i + 1) / files.length) * 50));
       }
 
       const urls = await uploadMemoryPhotos(sid, compressedFiles, existingCount);
+      setUploadProgress(100);
 
       const newPhotos: MemoryPhoto[] = urls.map(url => ({
         url,
@@ -189,6 +199,7 @@ export function useMediaUploads({
       onError(err.message || 'Memory board upload failed');
     } finally {
       setIsUploadingMemories(false);
+      setUploadProgress(0);
     }
   };
 
@@ -217,6 +228,9 @@ export function useMediaUploads({
     uploadMemoryBoard,
     removeMemoryPhoto,
     isUploadingMemories,
+
+    // Progress
+    uploadProgress,
 
     // Limits (for UI display only)
     LIMITS,
