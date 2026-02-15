@@ -1,10 +1,24 @@
 import crypto from 'crypto';
 import { Redis } from "@upstash/redis";
+import admin from "firebase-admin";
 
 const kv = new Redis({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+    databaseURL: process.env.FIREBASE_DB_URL,
+  });
+}
+
+const adminDb = admin.database();
 
 // ============================================================================
 // /api/verify-payment.js — SERVER-SIDE AUTHORITY (HARDENED)
@@ -109,47 +123,6 @@ function validateCoupleData(data) {
   return sanitized;
 }
 
-function authUrl(path) {
-  const base = process.env.FIREBASE_DB_URL;
-  const secret = process.env.FIREBASE_DB_SECRET;
-  if (secret) {
-    return `${base}/${path}.json?auth=${secret}`;
-  }
-  return `${base}/${path}.json`;
-}
-
-async function firebaseRead(path) {
-  const res = await fetch(authUrl(path));
-  if (!res.ok) throw new Error(`Firebase read ${path}: ${res.status}`);
-  return res.json();
-}
-
-async function firebaseWrite(path, data) {
-  const res = await fetch(authUrl(path), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(`Firebase write ${path}: ${res.status}`);
-  return res.json();
-}
-
-async function firebaseAtomicUpdate(updates) {
-  const base = process.env.FIREBASE_DB_URL;
-  const secret = process.env.FIREBASE_DB_SECRET;
-  const url = secret ? `${base}/.json?auth=${secret}` : `${base}/.json`;
-
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Firebase atomic update failed: ${res.status} ${errText}`);
-  }
-  return res.json();
-}
 
 // ══════════════════════════════════════════════════════════════════════
 // MAIN HANDLER
@@ -194,9 +167,7 @@ export default async function handler(req, res) {
     tier,
     paymentMode,
     founderToken,
-  } = req.body;
-
-  const firebaseDbUrl = process.env.FIREBASE_DB_URL;
+  } = req.body || {};
 
   // ════════════════════════════════════════════════════════════
   // PATH A: FOUNDER ACCESS
@@ -211,46 +182,23 @@ export default async function handler(req, res) {
     if (!coupleData || typeof coupleData !== 'object') {
       return res.status(400).json({ verified: false, error: 'Missing session data.' });
     }
-    if (!firebaseDbUrl) {
-      return res.status(500).json({ verified: false, error: 'Server configuration error.' });
-    }
 
     try {
-      // Verify and consume the one-time token (ETag atomic)
-      const tokenUrl = authUrl(`founderTokens/${founderToken}`);
-      const tokenReadRes = await fetch(tokenUrl, {
-        method: 'GET',
-        headers: { 'X-Firebase-ETag': 'true' },
-      });
-
-      if (!tokenReadRes.ok) {
-        return res.status(400).json({ verified: false, error: 'Invalid request.' });
-      }
-
-      const tokenEtag = tokenReadRes.headers.get('etag');
-      const tokenData = await tokenReadRes.json();
+      // Verify and consume the one-time token
+      const tokenRef = adminDb.ref('founderTokens/' + founderToken);
+      const tokenSnap = await tokenRef.once('value');
+      const tokenData = tokenSnap.val();
 
       if (!tokenData || tokenData.consumed) {
         return res.status(400).json({ verified: false, error: 'Invalid request.' });
       }
 
-      // Check token expiry (5 minute window from creation)
       if (Date.now() - tokenData.createdAt > 5 * 60 * 1000) {
-        // Clean up expired token
-        await fetch(tokenUrl, { method: 'DELETE' }).catch(() => {});
+        await tokenRef.remove().catch(() => {});
         return res.status(400).json({ verified: false, error: 'Session expired. Please try again.' });
       }
 
-      // Atomic delete with ETag — prevents race condition
-      const deleteRes = await fetch(tokenUrl, {
-        method: 'DELETE',
-        headers: { 'if-match': tokenEtag },
-      });
-
-      if (!deleteRes.ok) {
-        // 412 = another request already consumed it
-        return res.status(400).json({ verified: false, error: 'Invalid request.' });
-      }
+      await tokenRef.remove();
 
       const sanitized = validateCoupleData(coupleData);
       if (!sanitized) {
@@ -265,7 +213,8 @@ export default async function handler(req, res) {
       for (let attempt = 0; attempt < 5; attempt++) {
         sessionKey = generateShortId();
         try {
-          const exists = await firebaseRead(`shared/${sessionKey}`);
+          const existsSnap = await adminDb.ref('shared/' + sessionKey).once('value');
+          const exists = existsSnap.val();
           if (!exists) break;
         } catch { break; }
         if (attempt === 4) {
@@ -299,7 +248,7 @@ export default async function handler(req, res) {
         verifiedAt: now,
       };
 
-      await firebaseAtomicUpdate(updates);
+      await adminDb.ref().update(updates);
 
       const senderSlug = slugify(sanitized.senderName || 'sender');
       const receiverSlug = slugify(sanitized.recipientName || 'receiver');
@@ -332,8 +281,8 @@ export default async function handler(req, res) {
 
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
-  if (!keySecret || !firebaseDbUrl) {
-    console.error('[Verify] Missing RAZORPAY_KEY_SECRET or FIREBASE_DB_URL');
+  if (!keySecret) {
+    console.error('[Verify] Missing RAZORPAY_KEY_SECRET');
     return res.status(500).json({ verified: false, error: 'Server configuration error.' });
   }
 
@@ -359,7 +308,8 @@ export default async function handler(req, res) {
 
     // 2. REPLAY PROTECTION
     try {
-      const existing = await firebaseRead(`payments/${razorpay_payment_id}`);
+      const existingSnap = await adminDb.ref('payments/' + razorpay_payment_id).once('value');
+      const existing = existingSnap.val();
       if (existing && existing.sessionKey) {
         const s = slugify(coupleData.senderName || 'sender');
         const r = slugify(coupleData.recipientName || 'receiver');
@@ -381,7 +331,8 @@ export default async function handler(req, res) {
     let orderTier = tier || 'standard';
 
     try {
-      const orderData = await firebaseRead(`orders/${razorpay_order_id}`);
+      const orderSnap = await adminDb.ref('orders/' + razorpay_order_id).once('value');
+      const orderData = orderSnap.val();
       if (orderData && orderData.amount) {
         orderAmount = orderData.amount;
         orderTier = orderData.tier || orderTier;
@@ -405,7 +356,8 @@ export default async function handler(req, res) {
     for (let attempt = 0; attempt < 5; attempt++) {
       sessionKey = generateShortId();
       try {
-        const exists = await firebaseRead(`shared/${sessionKey}`);
+        const existsSnap = await adminDb.ref('shared/' + sessionKey).once('value');
+        const exists = existsSnap.val();
         if (!exists) break;
       } catch {
         break;
@@ -443,7 +395,7 @@ export default async function handler(req, res) {
 
     updates[`orders/${razorpay_order_id}/status`] = 'paid';
 
-    await firebaseAtomicUpdate(updates);
+    await adminDb.ref().update(updates);
 
     // 7. RETURN SHARE URL
     const senderSlug = slugify(sanitized.senderName || 'sender');

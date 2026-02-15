@@ -1,4 +1,18 @@
 import crypto from 'crypto';
+import admin from "firebase-admin";
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+    databaseURL: process.env.FIREBASE_DB_URL,
+  });
+}
+
+const adminDb = admin.database();
 
 // ============================================================================
 // /api/admin-generate-founder-codes.js — ADMIN-ONLY FOUNDER CODE GENERATOR
@@ -18,43 +32,6 @@ function safeCompare(a, b) {
   } catch {
     return false;
   }
-}
-
-// ── FIREBASE RTDB HELPERS ──
-
-function authUrl(path) {
-  const base = process.env.FIREBASE_DB_URL;
-  const secret = process.env.FIREBASE_DB_SECRET;
-  if (secret) {
-    return `${base}/${path}.json?auth=${secret}`;
-  }
-  return `${base}/${path}.json`;
-}
-
-async function firebaseRead(path) {
-  const res = await fetch(authUrl(path));
-
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Firebase read ${path}: ${res.status}`);
-
-  return res.json();
-}
-
-async function firebaseAtomicUpdate(updates) {
-  const base = process.env.FIREBASE_DB_URL;
-  const secret = process.env.FIREBASE_DB_SECRET;
-  const url = secret ? `${base}/.json?auth=${secret}` : `${base}/.json`;
-
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Firebase atomic update failed: ${res.status} ${errText}`);
-  }
-  return res.json();
 }
 
 // ── CODE GENERATION ──
@@ -98,7 +75,8 @@ async function generateUniqueCode(namePrefix = 'FOUNDER', maxAttempts = 5) {
     const random5 = generateRandom5();
     const code = `${prefix}-${random5}`;
     
-    const existing = await firebaseRead(`founderCodes/${code}`);
+    const snap = await adminDb.ref('founderCodes/' + code).once('value');
+    const existing = snap.val();
     if (!existing) return code;
   }
   
@@ -169,13 +147,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Expiry hours must be between 1 and 720 (30 days).' });
   }
 
-  // ── CHECK FIREBASE CONFIG ──
-  const firebaseDbUrl = process.env.FIREBASE_DB_URL;
-  if (!firebaseDbUrl) {
-    console.error('[Admin] Missing FIREBASE_DB_URL');
-    return res.status(500).json({ error: 'Server configuration error.' });
-  }
-
   try {
     // ── DETERMINE CODE GENERATION STRATEGY ──
     let namePrefixes = [];
@@ -209,7 +180,7 @@ export default async function handler(req, res) {
     }
 
     // ── ATOMIC WRITE ALL CODES ──
-    await firebaseAtomicUpdate(updates);
+    await adminDb.ref().update(updates);
 
     // ── LOG SUCCESS ──
     console.log(`[Admin] Generated ${codes.length} founder code(s).`);
