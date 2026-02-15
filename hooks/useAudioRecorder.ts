@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { CoupleData } from '../types';
-import { uploadVoiceRecording } from '../services/storage';
+
+// Firebase Storage SDK removed - uploads now handled via API routes
+// This function is stubbed to prevent build errors
+const uploadVoiceRecording = async (_sessionId: string, _blob: Blob): Promise<string> => {
+  throw new Error('Voice recording uploads must be handled via API routes');
+};
 
 /**
  * useAudioRecorder

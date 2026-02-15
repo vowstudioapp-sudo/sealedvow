@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { CoupleData, MemoryPhoto } from '../types';
-import {
-  uploadUserImage,
-  uploadUserVideo,
-  uploadMemoryPhotos,
-} from '../services/storage';
+
+// Firebase Storage SDK removed - uploads now handled via API routes
+// These functions are stubbed to prevent build errors
+const uploadUserImage = async (_sessionId: string, _file: File): Promise<string> => {
+  throw new Error('Image uploads must be handled via API routes');
+};
+const uploadUserVideo = async (_sessionId: string, _file: File): Promise<string> => {
+  throw new Error('Video uploads must be handled via API routes');
+};
+const uploadMemoryPhotos = async (_sessionId: string, _files: File[], _startIndex: number): Promise<string[]> => {
+  throw new Error('Memory photo uploads must be handled via API routes');
+};
 
 /**
  * useMediaUploads

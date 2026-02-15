@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CoupleData } from '../types';
-import { slugify } from '../services/firebase';
+import { slugify } from '../utils/slugify';
 
 // ════════════════════════════════════════════════════════════════════
 // CHANGED: SharePackage no longer calls saveSession().

@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { updateSyncState, listenToSyncState } from '../services/firebase';
 
 interface Props {
   senderName: string;
@@ -15,28 +14,13 @@ interface Props {
 export const SoulmateSync: React.FC<Props> = ({ senderName, onComplete, sessionId }) => {
   const [progress, setProgress] = useState(0);
   const [isPressing, setIsPressing] = useState(false);
-  const [partnerActive, setPartnerActive] = useState(false);
   const timerRef = useRef<number | null>(null);
 
+  // Realtime functionality removed - sync state no longer supported
   useEffect(() => {
-    if (sessionId) {
-      const unsubscribe = listenToSyncState(sessionId, (syncData) => {
-        setPartnerActive(syncData.sender);
-      });
-      return () => unsubscribe();
-    }
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (!sessionId) return; // Fallback for no backend
-
     if (isPressing) {
-      updateSyncState(sessionId, 'receiver', true);
-
       timerRef.current = window.setInterval(() => {
         setProgress(prev => {
-          if (!partnerActive) return Math.min(prev + 0.5, 50); // Cap if alone
-
           if (prev >= 100) {
             clearInterval(timerRef.current!);
             setTimeout(onComplete, 800);
@@ -46,12 +30,11 @@ export const SoulmateSync: React.FC<Props> = ({ senderName, onComplete, sessionI
         });
       }, 20);
     } else {
-      updateSyncState(sessionId, 'receiver', false);
       if (timerRef.current) clearInterval(timerRef.current);
       setProgress(prev => Math.max(0, prev - 3));
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isPressing, onComplete, sessionId, partnerActive]);
+  }, [isPressing, onComplete]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] text-center px-6 select-none">
@@ -105,7 +88,7 @@ export const SoulmateSync: React.FC<Props> = ({ senderName, onComplete, sessionI
 
       <div className="mt-24 h-8">
         <p className="text-[9px] uppercase tracking-[0.3em] text-luxury-gold font-bold transition-all duration-500" style={{ opacity: isPressing ? 1 : 0.6, letterSpacing: isPressing ? '0.5em' : '0.3em' }}>
-          {progress >= 100 ? 'ACCESS GRANTED' : isPressing ? (partnerActive ? 'SYNCING HEARTS...' : 'WAITING FOR PARTNER...') : 'HOLD TO UNLOCK'}
+          {progress >= 100 ? 'ACCESS GRANTED' : isPressing ? 'SYNCING HEARTS...' : 'HOLD TO UNLOCK'}
         </p>
       </div>
     </div>

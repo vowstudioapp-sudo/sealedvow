@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CoupleData, Theme } from '../types';
-import { listenToSessionStatus } from '../services/firebase';
 
 /* ------------------------------------------------------------------ */
 /* THEME COLORS                                                        */
@@ -120,22 +119,7 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
   /* REMOTE UNLOCK                                                       */
   /* ------------------------------------------------------------------ */
 
-  useEffect(() => {
-    if (phase !== 'remote-wait' || !data.sessionId) return;
-
-    const unsubscribe = listenToSessionStatus(
-      data.sessionId,
-      (status) => {
-        if (status === 'unlocked') {
-          setPhase('accepted');
-          const t = setTimeout(acceptOnce, ACCEPT_DELAY_REMOTE);
-          return () => clearTimeout(t);
-        }
-      }
-    );
-
-    return () => unsubscribe();
-  }, [phase, data.sessionId, acceptOnce]);
+  // Realtime functionality removed - remote unlock no longer supported
 
   /* ------------------------------------------------------------------ */
   /* IGNITION RITUAL                                                     */
