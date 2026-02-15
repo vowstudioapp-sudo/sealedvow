@@ -298,12 +298,24 @@ export default async function handler(req, res) {
 
   const { action, payload } = req.body;
 
+  // ── PAYLOAD SIZE CAP (cost protection) ──
+  try {
+    const rawSize = JSON.stringify(payload || {}).length;
+
+    // 50KB maximum request payload
+    if (rawSize > 50000) {
+      return res.status(400).json({ error: "Payload too large." });
+    }
+  } catch {
+    return res.status(400).json({ error: "Invalid payload." });
+  }
+
   if (!action || !ALLOWED_ACTIONS.includes(action)) {
     return res.status(400).json({ error: 'Invalid action' });
   }
 
   if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'Server configuration error: missing API key' });
+    return res.status(500).json({ error: 'Server configuration error.' });
   }
 
   // ── PRIMARY: Gemini ──
@@ -327,6 +339,6 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(500).json({ error: 'AI generation failed', details: primaryError.message });
+    return res.status(500).json({ error: 'AI generation failed. Please try again.' });
   }
 }
