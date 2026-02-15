@@ -248,6 +248,14 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const hasVideo = !!activeVideo && data.videoSource !== 'none';
   const occasionTitle = OCCASION_TITLES[data.occasion || 'valentine'] || 'A Private Moment';
 
+  // Derive sealed date once — validated and memoized
+  const sealedDate = useMemo(() => {
+    if (!data.sealedAt && !data.createdAt) return null;
+    const raw = data.sealedAt || data.createdAt;
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? null : d;
+  }, [data.sealedAt, data.createdAt]);
+
   /* ------------------------------------------------------------------ */
   /* LETTER PARAGRAPHS (Memoized Chunking)                              */
   /* ------------------------------------------------------------------ */
@@ -1124,17 +1132,14 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               Sealed by {data.senderName}
             </p>
 
-            {(data.sealedAt || data.createdAt) && (
+            {sealedDate && (
               <p 
                 className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold"
                 style={{ color: theme.gold, opacity: 0.6, animation: 'closureReveal 1s ease-out 1s both' }}
               >
-                {(() => {
-                  const d = new Date(data.sealedAt || data.createdAt || '');
-                  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                    + ' · '
-                    + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                })()}
+                {sealedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                  + ' · '
+                  + sealedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
               </p>
             )}
           </div>
@@ -1549,12 +1554,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                   <p style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(1.2rem, 4vw, 2rem)', color: theme.text, lineHeight: 1.6 }}>
                     Sealed by {data.senderName}
                   </p>
-                  {(data.sealedAt || data.createdAt) && (
+                  {sealedDate && (
                     <p className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.6 }}>
-                      {(() => {
-                        const d = new Date(data.sealedAt || data.createdAt || '');
-                        return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                      })()}
+                      {sealedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + sealedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                     </p>
                   )}
                   <div className="h-px mx-auto my-10" style={{ backgroundColor: theme.gold, opacity: 0.15 }} />
@@ -1618,20 +1620,17 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                     >
                       Sealed by {data.senderName}
                     </p>
-                    {(data.sealedAt || data.createdAt) && (() => {
-                      const d = new Date(data.sealedAt || data.createdAt || '');
-                      return (
-                        <div style={{ color: theme.gold, opacity: 0.2 }}>
-                          <p className="text-[8px] uppercase tracking-[0.3em] mb-1">Sealed on</p>
-                          <p className="text-[10px] font-bold tracking-[0.15em]">
-                            {d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                          </p>
-                          <p className="text-[9px] tracking-[0.1em] mt-0.5">
-                            {d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} IST
-                          </p>
-                        </div>
-                      );
-                    })()}
+                    {sealedDate && (
+                      <div style={{ color: theme.gold, opacity: 0.2 }}>
+                        <p className="text-[8px] uppercase tracking-[0.3em] mb-1">Sealed on</p>
+                        <p className="text-[10px] font-bold tracking-[0.15em]">
+                          {sealedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                        <p className="text-[9px] tracking-[0.1em] mt-0.5">
+                          {sealedDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} IST
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

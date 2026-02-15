@@ -46,16 +46,10 @@ export function usePathLinkLoader(enabled: boolean): SharedLinkLoaderResult {
       // Extract opaque key from slug if needed
       // "ajmal-saniya-k8f2x9m1" → last 8 chars = "k8f2x9m1"
       const parts = pathKey.split('-');
-      const sessionKey = parts.length > 1 ? parts[parts.length - 1] : pathKey;
+      const sessionKey = parts[parts.length - 1];
 
-      // Validate session key format (8 chars, alphanumeric)
-      if (sessionKey.length !== 8 || !/^[a-z0-9]+$/.test(sessionKey)) {
-        setError({
-          code: 'VALIDATION_ERROR',
-          message: 'This link has expired or does not exist.',
-          recoverable: false,
-        });
-        setState(LoaderState.ERROR);
+      if (!sessionKey || !/^[a-z0-9]{8}$/i.test(sessionKey)) {
+        setState(LoaderState.NO_LINK);
         return;
       }
 
@@ -66,17 +60,7 @@ export function usePathLinkLoader(enabled: boolean): SharedLinkLoaderResult {
         body: JSON.stringify({ sessionKey }),
       });
 
-      if (response.status === 400) {
-        setError({
-          code: 'VALIDATION_ERROR',
-          message: 'This link has expired or does not exist.',
-          recoverable: false,
-        });
-        setState(LoaderState.ERROR);
-        return;
-      }
-
-      if (response.status === 404) {
+      if (response.status === 400 || response.status === 404) {
         setError({
           code: 'VALIDATION_ERROR',
           message: 'This link has expired or does not exist.',
@@ -87,7 +71,7 @@ export function usePathLinkLoader(enabled: boolean): SharedLinkLoaderResult {
       }
 
       if (!response.ok) {
-        throw new Error(`Failed to load session: ${response.status}`);
+        throw new Error("Failed to load session.");
       }
 
       const sessionData = await response.json();
