@@ -65,6 +65,16 @@ function getClientIP(req) {
 async function founderTransaction(code) {
   const ref = adminDb.ref('founderCodes/' + code);
 
+  // ── TEMPORARY DEBUG LOGGING ──
+  try {
+    const debugSnapshot = await ref.once('value');
+    console.log("[FounderDebug] Code:", code);
+    console.log("[FounderDebug] Exists:", debugSnapshot.exists());
+    console.log("[FounderDebug] Value:", JSON.stringify(debugSnapshot.val()));
+  } catch (e) {
+    console.error("[FounderDebug] Read error:", e.message);
+  }
+
   const result = await ref.transaction(current => {
     if (!current) return;
     if (!current.active) return;
