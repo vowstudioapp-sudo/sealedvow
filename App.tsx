@@ -1,17 +1,46 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { PreparationForm } from './components/PreparationForm.tsx';
-import { RefineStage } from './components/RefineStage.tsx';
-import { Envelope } from './components/Envelope.tsx';
-import { MainExperience } from './components/MainExperience.tsx';
-import { SharePackage } from './components/SharePackage.tsx';
-import { InteractiveQuestion } from './components/InteractiveQuestion.tsx';
-import { SoulmateSync } from './components/SoulmateSync.tsx';
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { LandingPage } from './components/LandingPage.tsx';
-import { PaymentStage } from './components/PaymentStage.tsx';
 import { Analytics } from '@vercel/analytics/react';
 
-import { MasterControl } from './components/MasterControl.tsx';
-import { PersonalIntro } from './components/PersonalIntro.tsx';
+const PreparationForm = lazy(() =>
+  import('./components/PreparationForm.tsx').then(m => ({ default: m.PreparationForm }))
+);
+
+const RefineStage = lazy(() =>
+  import('./components/RefineStage.tsx').then(m => ({ default: m.RefineStage }))
+);
+
+const Envelope = lazy(() =>
+  import('./components/Envelope.tsx').then(m => ({ default: m.Envelope }))
+);
+
+const MainExperience = lazy(() =>
+  import('./components/MainExperience.tsx').then(m => ({ default: m.MainExperience }))
+);
+
+const SharePackage = lazy(() =>
+  import('./components/SharePackage.tsx').then(m => ({ default: m.SharePackage }))
+);
+
+const InteractiveQuestion = lazy(() =>
+  import('./components/InteractiveQuestion.tsx').then(m => ({ default: m.InteractiveQuestion }))
+);
+
+const SoulmateSync = lazy(() =>
+  import('./components/SoulmateSync.tsx').then(m => ({ default: m.SoulmateSync }))
+);
+
+const PaymentStage = lazy(() =>
+  import('./components/PaymentStage.tsx').then(m => ({ default: m.PaymentStage }))
+);
+
+const MasterControl = lazy(() =>
+  import('./components/MasterControl.tsx').then(m => ({ default: m.MasterControl }))
+);
+
+const PersonalIntro = lazy(() =>
+  import('./components/PersonalIntro.tsx').then(m => ({ default: m.PersonalIntro }))
+);
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
@@ -440,166 +469,179 @@ const App: React.FC = () => {
         </>
       )}
 
-      <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${
-        isReceiverLink ? 'opacity-100' : (isBooting ? 'opacity-0' : 'opacity-100')
-      }`}>
-        
-        {stage === AppStage.LANDING && !isReceiverLink && (
-          <LandingPage onEnter={handleEnterStudio} />
-        )}
-
-        {stage === AppStage.PREPARE && (
-          <div className="animate-fade-in py-12 px-4">
-             <PreparationForm onComplete={(d) => { setData(hydrateCoupleData(d)); safeSetStage(AppStage.REFINE); }} />
-          </div>
-        )}
-
-        {stage === AppStage.REFINE && data && (
-          <RefineStage 
-            data={data} 
-            onSave={(finalLetter, enrichedData) => {
-              if (!data) return;
-              const updated: CoupleData = hydrateCoupleData({ ...data, ...enrichedData, finalLetter });
-              setData(updated);
-              setIsCreatorPreview(true);
-              safeSetStage(AppStage.ENVELOPE); 
-              writePersistedCoupleData(updated);
-            }}
-            onBack={() => safeSetStage(AppStage.PREPARE)}
-          />
-        )}
-
-        {stage === AppStage.MASTER_CONTROL && data && (
-          <MasterControl data={data} />
-        )}
-
-        {stage === AppStage.PERSONAL_INTRO && data && (
-          <PersonalIntro
-            recipientName={data.recipientName}
-            theme={data.theme}
-            isDemoMode={isDemoMode}
-            onThemeChange={isDemoMode ? (t: Theme) => setData(prev => ({ ...prev, theme: t })) : undefined}
-            onComplete={() => safeSetStage(AppStage.ENVELOPE)}
-          />
-        )}
-
-        {stage === AppStage.ENVELOPE && data && (
-          <div className="animate-fade-in flex items-center justify-center min-h-screen">
-            {isCreatorPreview && (
-               <div className="fixed top-0 left-0 w-full bg-[#1C1917] text-luxury-gold z-[100] py-3 text-center shadow-lg border-b border-luxury-gold/20">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.4em] animate-pulse">Previewing Receiver Experience</p>
-               </div>
-            )}
-            <Envelope 
-              recipientName={data.recipientName} 
-              theme={data.theme || 'obsidian'}
-              onOpen={handleEnvelopeOpen} 
-              onInteract={handleEnvelopeInteract}
+      <Suspense
+        fallback={
+          <div
+            className="min-h-screen flex items-center justify-center"
+            style={{ backgroundColor: '#0C0A09' }}
+          >
+            <div
+              className="w-8 h-8 border border-[#D4AF37]/30 rounded-full animate-spin border-t-[#D4AF37]"
             />
           </div>
-        )}
+        }
+      >
+        <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${
+          isReceiverLink ? 'opacity-100' : (isBooting ? 'opacity-0' : 'opacity-100')
+        }`}>
+          
+          {stage === AppStage.LANDING && !isReceiverLink && (
+            <LandingPage onEnter={handleEnterStudio} />
+          )}
 
-        {stage === AppStage.QUESTION && data && (
-          <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
-            <InteractiveQuestion 
-               data={data} 
-               onAccept={handleQuestionAccepted} 
-            />
-          </div>
-        )}
+          {stage === AppStage.PREPARE && (
+            <div className="animate-fade-in py-12 px-4">
+               <PreparationForm onComplete={(d) => { setData(hydrateCoupleData(d)); safeSetStage(AppStage.REFINE); }} />
+            </div>
+          )}
 
-        {stage === AppStage.SOULMATE_SYNC && data && (
-          <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
-            <SoulmateSync 
-              senderName={data.senderName} 
-              sessionId={data.sessionId}
-              onComplete={() => safeSetStage(AppStage.MAIN_EXPERIENCE)} 
-            />
-          </div>
-        )}
-
-        {stage === AppStage.MAIN_EXPERIENCE && data && (
-          <div className="animate-fade-in relative">
-            {isDemoMode && (() => {
-              const isValentine = window.location.pathname === '/demo/valentines';
-              return (
-              <>
-                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#1C1917]/90 border border-[#D4AF37]/30 px-4 py-1.5 rounded-full">
-                  <span className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/70 font-bold">Public Preview</span>
-                </div>
-                <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/95 to-transparent pt-12 pb-6 px-6 text-center">
-                  {isValentine && (
-                    <p className="text-[10px] text-[#E5D0A1]/50 italic font-serif mb-4 leading-relaxed">
-                      If you watched this and thought of someone — the silence is yours now.
-                    </p>
-                  )}
-                  <button
-                    onClick={() => { window.location.href = '/'; }}
-                    className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[10px] tracking-[0.4em] uppercase px-10 py-4 rounded-full shadow-2xl transition-all active:scale-[0.98] mb-3"
-                  >
-                    {isValentine ? 'Say It Before Midnight' : 'Create Your Own'}
-                  </button>
-                  {isValentine ? (
-                    <div className="space-y-1.5 mt-1">
-                      <p className="text-[9px] text-[#D4AF37]/40 font-bold uppercase tracking-[0.25em]">Valentine's Day ends at midnight.</p>
-                      <p className="text-[8px] text-[#E5D0A1]/25 italic">If you're still waiting for the right moment — this is it.</p>
-                      <p className="text-[7px] text-[#D4AF37]/20 uppercase tracking-[0.3em] mt-3">This is how people are choosing to say it this year.</p>
-                    </div>
-                  ) : (
-                    <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/30 font-bold">This is a demonstration experience.</p>
-                  )}
-                </div>
-              </>
-              );
-            })()}
-            <MainExperience 
+          {stage === AppStage.REFINE && data && (
+            <RefineStage 
               data={data} 
-              isPreview={isCreatorPreview}
-              isDemoMode={isDemoMode}
-              onEdit={() => {
-                safeSetStage(AppStage.REFINE);
-                setIsCreatorPreview(false);
-              }}
-              onPayment={() => {
-                safeSetStage(AppStage.PAYMENT);
-              }}
-            />
-          </div>
-        )}
-
-        {stage === AppStage.PAYMENT && data && (
-          <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
-            <PaymentStage 
-              data={data} 
-              onPaymentComplete={(result: { replyEnabled: boolean; sessionKey: string; shareSlug: string }) => {
-                updateData({ replyEnabled: result.replyEnabled, sealedAt: new Date().toISOString() });
-                setSessionKey(result.sessionKey);
-                setShareSlug(result.shareSlug);
-                safeSetStage(AppStage.SHARE);
-              }}
-              onBack={() => {
-                safeSetStage(AppStage.MAIN_EXPERIENCE); 
+              onSave={(finalLetter, enrichedData) => {
+                if (!data) return;
+                const updated: CoupleData = hydrateCoupleData({ ...data, ...enrichedData, finalLetter });
+                setData(updated);
                 setIsCreatorPreview(true);
+                safeSetStage(AppStage.ENVELOPE); 
+                writePersistedCoupleData(updated);
               }}
+              onBack={() => safeSetStage(AppStage.PREPARE)}
             />
-          </div>
-        )}
+          )}
 
-        {stage === AppStage.SHARE && data && sessionKey && shareSlug && (
-          <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
-            <SharePackage 
-              data={data} 
-              sessionKey={sessionKey}
-              shareSlug={shareSlug}
-              onPreview={() => {
-                 safeSetStage(AppStage.ENVELOPE);
-                 setIsCreatorPreview(false); 
-              }} 
-              onEdit={() => safeSetStage(AppStage.PREPARE)}
+          {stage === AppStage.MASTER_CONTROL && data && (
+            <MasterControl data={data} />
+          )}
+
+          {stage === AppStage.PERSONAL_INTRO && data && (
+            <PersonalIntro
+              recipientName={data.recipientName}
+              theme={data.theme}
+              isDemoMode={isDemoMode}
+              onThemeChange={isDemoMode ? (t: Theme) => setData(prev => ({ ...prev, theme: t })) : undefined}
+              onComplete={() => safeSetStage(AppStage.ENVELOPE)}
             />
-          </div>
-        )}
-      </main>
+          )}
+
+          {stage === AppStage.ENVELOPE && data && (
+            <div className="animate-fade-in flex items-center justify-center min-h-screen">
+              {isCreatorPreview && (
+                 <div className="fixed top-0 left-0 w-full bg-[#1C1917] text-luxury-gold z-[100] py-3 text-center shadow-lg border-b border-luxury-gold/20">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.4em] animate-pulse">Previewing Receiver Experience</p>
+                 </div>
+              )}
+              <Envelope 
+                recipientName={data.recipientName} 
+                theme={data.theme || 'obsidian'}
+                onOpen={handleEnvelopeOpen} 
+                onInteract={handleEnvelopeInteract}
+              />
+            </div>
+          )}
+
+          {stage === AppStage.QUESTION && data && (
+            <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
+              <InteractiveQuestion 
+                 data={data} 
+                 onAccept={handleQuestionAccepted} 
+              />
+            </div>
+          )}
+
+          {stage === AppStage.SOULMATE_SYNC && data && (
+            <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
+              <SoulmateSync 
+                senderName={data.senderName} 
+                sessionId={data.sessionId}
+                onComplete={() => safeSetStage(AppStage.MAIN_EXPERIENCE)} 
+              />
+            </div>
+          )}
+
+          {stage === AppStage.MAIN_EXPERIENCE && data && (
+            <div className="animate-fade-in relative">
+              {isDemoMode && (() => {
+                const isValentine = window.location.pathname === '/demo/valentines';
+                return (
+                <>
+                  <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#1C1917]/90 border border-[#D4AF37]/30 px-4 py-1.5 rounded-full">
+                    <span className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/70 font-bold">Public Preview</span>
+                  </div>
+                  <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/95 to-transparent pt-12 pb-6 px-6 text-center">
+                    {isValentine && (
+                      <p className="text-[10px] text-[#E5D0A1]/50 italic font-serif mb-4 leading-relaxed">
+                        If you watched this and thought of someone — the silence is yours now.
+                      </p>
+                    )}
+                    <button
+                      onClick={() => { window.location.href = '/'; }}
+                      className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[10px] tracking-[0.4em] uppercase px-10 py-4 rounded-full shadow-2xl transition-all active:scale-[0.98] mb-3"
+                    >
+                      {isValentine ? 'Say It Before Midnight' : 'Create Your Own'}
+                    </button>
+                    {isValentine ? (
+                      <div className="space-y-1.5 mt-1">
+                        <p className="text-[9px] text-[#D4AF37]/40 font-bold uppercase tracking-[0.25em]">Valentine's Day ends at midnight.</p>
+                        <p className="text-[8px] text-[#E5D0A1]/25 italic">If you're still waiting for the right moment — this is it.</p>
+                        <p className="text-[7px] text-[#D4AF37]/20 uppercase tracking-[0.3em] mt-3">This is how people are choosing to say it this year.</p>
+                      </div>
+                    ) : (
+                      <p className="text-[8px] uppercase tracking-[0.3em] text-[#D4AF37]/30 font-bold">This is a demonstration experience.</p>
+                    )}
+                  </div>
+                </>
+                );
+              })()}
+              <MainExperience 
+                data={data} 
+                isPreview={isCreatorPreview}
+                isDemoMode={isDemoMode}
+                onEdit={() => {
+                  safeSetStage(AppStage.REFINE);
+                  setIsCreatorPreview(false);
+                }}
+                onPayment={() => {
+                  safeSetStage(AppStage.PAYMENT);
+                }}
+              />
+            </div>
+          )}
+
+          {stage === AppStage.PAYMENT && data && (
+            <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
+              <PaymentStage 
+                data={data} 
+                onPaymentComplete={(result: { replyEnabled: boolean; sessionKey: string; shareSlug: string }) => {
+                  updateData({ replyEnabled: result.replyEnabled, sealedAt: new Date().toISOString() });
+                  setSessionKey(result.sessionKey);
+                  setShareSlug(result.shareSlug);
+                  safeSetStage(AppStage.SHARE);
+                }}
+                onBack={() => {
+                  safeSetStage(AppStage.MAIN_EXPERIENCE); 
+                  setIsCreatorPreview(true);
+                }}
+              />
+            </div>
+          )}
+
+          {stage === AppStage.SHARE && data && sessionKey && shareSlug && (
+            <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
+              <SharePackage 
+                data={data} 
+                sessionKey={sessionKey}
+                shareSlug={shareSlug}
+                onPreview={() => {
+                   safeSetStage(AppStage.ENVELOPE);
+                   setIsCreatorPreview(false); 
+                }} 
+                onEdit={() => safeSetStage(AppStage.PREPARE)}
+              />
+            </div>
+          )}
+        </main>
+      </Suspense>
 
       <style>{`
         @keyframes fade-in { 
