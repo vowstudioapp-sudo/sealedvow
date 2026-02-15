@@ -1618,15 +1618,20 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                     >
                       Sealed by {data.senderName}
                     </p>
-                    <div style={{ color: theme.gold, opacity: 0.2 }}>
-                      <p className="text-[8px] uppercase tracking-[0.3em] mb-1">Sealed on</p>
-                      <p className="text-[10px] font-bold tracking-[0.15em]">
-                        {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </p>
-                      <p className="text-[9px] tracking-[0.1em] mt-0.5">
-                        {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} IST
-                      </p>
-                    </div>
+                    {(data.sealedAt || data.createdAt) && (() => {
+                      const d = new Date(data.sealedAt || data.createdAt || '');
+                      return (
+                        <div style={{ color: theme.gold, opacity: 0.2 }}>
+                          <p className="text-[8px] uppercase tracking-[0.3em] mb-1">Sealed on</p>
+                          <p className="text-[10px] font-bold tracking-[0.15em]">
+                            {d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </p>
+                          <p className="text-[9px] tracking-[0.1em] mt-0.5">
+                            {d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} IST
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </>
               )}

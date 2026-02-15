@@ -22,6 +22,9 @@
     },
     "api/admin-generate-founder-codes.js": {
       "maxDuration": 30
+    },
+    "api/load-session.js": {
+      "maxDuration": 10
     }
   }
 }

@@ -4,6 +4,12 @@
 // ============================================================================
 
 import crypto from 'crypto';
+import { Redis } from "@upstash/redis";
+
+const kv = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 const TIER_PRICES = {
   standard: 9900,
@@ -16,21 +22,30 @@ const TIER_PRODUCTS = {
 };
 
 const ALLOWED_ORIGINS = [
-  'https://sealedvow.com',
-  'https://www.sealedvow.com',
-  'https://sealedvow.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:4173',
+  "https://www.sealedvow.com",
+  "https://sealedvow.com",
+  "https://sealedvow.vercel.app"
 ];
 
 function setCors(req, res) {
   const origin = req.headers.origin;
-  if (origin && (ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app'))) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
   }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Vary', 'Origin');
+
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Vary", "Origin");
+}
+
+function getClientIP(req) {
+  return (
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.headers["x-real-ip"] ||
+    req.socket?.remoteAddress ||
+    "unknown"
+  );
 }
 
 // ── Firebase REST transaction via ETag conditional write ──
@@ -114,6 +129,31 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // ── GLOBAL IP RATE LIMITING ──
+  const RATE_LIMIT_WINDOW = 60;
+  const MAX_REQUESTS = 5;
+
+  try {
+    const ip = getClientIP(req);
+    const key = `payment_rate:${ip}`;
+    const current = await kv.incr(key);
+
+    if (current === 1) {
+      await kv.expire(key, RATE_LIMIT_WINDOW);
+    }
+
+    if (current > MAX_REQUESTS) {
+      return res.status(429).json({
+        error: "Too many requests. Please wait a minute."
+      });
+    }
+  } catch (kvError) {
+    console.error("[PaymentRateLimit] KV unavailable:", kvError.message);
+    return res.status(503).json({
+      error: "Service temporarily unavailable. Please try again."
+    });
+  }
+
   const { tier = 'standard', founderCode } = req.body || {};
 
   // ════════════════════════════════════════════════════════════
@@ -121,6 +161,27 @@ export default async function handler(req, res) {
   // ════════════════════════════════════════════════════════════
   if (founderCode) {
     if (typeof founderCode !== 'string' || founderCode.trim().length === 0 || founderCode.trim().length > 50) {
+      // ── FOUNDER CODE FAIL LIMITER ──
+      try {
+        const ip = getClientIP(req);
+        const failKey = `founder_fail:${ip}`;
+        const failCount = await kv.incr(failKey);
+
+        if (failCount === 1) {
+          await kv.expire(failKey, 3600);
+        }
+
+        if (failCount > 10) {
+          return res.status(429).json({
+            error: "Too many invalid founder code attempts."
+          });
+        }
+      } catch (kvError) {
+        console.error("[FounderFailLimit] KV unavailable:", kvError.message);
+        return res.status(503).json({
+          error: "Service temporarily unavailable."
+        });
+      }
       return res.status(400).json({ error: 'Invalid or expired code.' });
     }
 
@@ -128,6 +189,27 @@ export default async function handler(req, res) {
     const result = await founderTransaction(normalized);
 
     if (!result.valid) {
+      // ── FOUNDER CODE FAIL LIMITER ──
+      try {
+        const ip = getClientIP(req);
+        const failKey = `founder_fail:${ip}`;
+        const failCount = await kv.incr(failKey);
+
+        if (failCount === 1) {
+          await kv.expire(failKey, 3600);
+        }
+
+        if (failCount > 10) {
+          return res.status(429).json({
+            error: "Too many invalid founder code attempts."
+          });
+        }
+      } catch (kvError) {
+        console.error("[FounderFailLimit] KV unavailable:", kvError.message);
+        return res.status(503).json({
+          error: "Service temporarily unavailable."
+        });
+      }
       // Generic error — never leak whether code exists, expired, or was used
       return res.status(400).json({ error: 'Invalid or expired code.' });
     }

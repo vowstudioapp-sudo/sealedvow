@@ -7,6 +7,13 @@
 // Validator: lib/ai/validator.js
 // ================================================================
 
+import { Redis } from "@upstash/redis";
+
+const kv = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
+
 import * as gemini from '../lib/ai/providers/geminiProvider.js';
 import * as openai from '../lib/ai/providers/openaiProvider.js';
 import { validateLetter, validateBasicText, cleanOutput, GLOBAL_FORBIDDEN } from '../lib/ai/validator.js';
@@ -27,46 +34,32 @@ const ALLOWED_ACTIONS = [
 const TEXT_ACTIONS = ['generateLoveLetter', 'generateCoupleMyth', 'generateFutureProphecy', 'generateSacredLocation'];
 
 // ===============================
-// RATE LIMITING (in-memory, per-instance)
+// DISTRIBUTED RATE LIMITING (Redis/Vercel KV)
 // ===============================
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 15;
+const RATE_LIMIT_WINDOW = 60; // seconds
+const MAX_REQUESTS = 10; // per IP per minute
 
-function isRateLimited(ip) {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now - entry.start > RATE_LIMIT_WINDOW_MS) {
-    rateLimitMap.set(ip, { start: now, count: 1 });
-    return false;
-  }
-  entry.count++;
-  return entry.count > RATE_LIMIT_MAX;
+function getClientIP(req) {
+  return (
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.headers["x-real-ip"] ||
+    req.socket?.remoteAddress ||
+    "unknown"
+  );
 }
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of rateLimitMap) {
-    if (now - entry.start > RATE_LIMIT_WINDOW_MS * 2) rateLimitMap.delete(ip);
-  }
-}, 300_000);
 
 // ===============================
 // CORS
 // ===============================
 const ALLOWED_ORIGINS = [
-  'https://sealedvow.com',
-  'https://www.sealedvow.com',
-  'https://sealedvow.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:4173',
-  'http://localhost:3000',
+  "https://www.sealedvow.com",
+  "https://sealedvow.com",
+  "https://sealedvow.vercel.app"
 ];
 
 function getAllowedOrigin(origin) {
   if (!origin) return null;
   if (ALLOWED_ORIGINS.includes(origin)) return origin;
-  if (origin.endsWith('.vercel.app')) return origin;
   return null;
 }
 
@@ -279,9 +272,29 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Rate limit
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-  if (isRateLimited(ip)) return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
+  // ── DISTRIBUTED RATE LIMITING ──
+  try {
+    const ip = getClientIP(req);
+    const key = `ai_rate:${ip}`;
+
+    const current = await kv.incr(key);
+
+    if (current === 1) {
+      await kv.expire(key, RATE_LIMIT_WINDOW);
+    }
+
+    if (current > MAX_REQUESTS) {
+      return res.status(429).json({
+        error: "Too many AI requests. Please wait a minute."
+      });
+    }
+
+  } catch (kvError) {
+    console.error("[RateLimit] KV unavailable:", kvError.message);
+    return res.status(503).json({
+      error: "Service temporarily unavailable. Please try again."
+    });
+  }
 
   const { action, payload } = req.body;
 

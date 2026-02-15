@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
-import { loadSession } from '../services/firebase';
 import { LoaderState } from './useSharedLinkLoader';
 import type { LoaderError, SharedLinkLoaderResult } from './useSharedLinkLoader';
 
 /**
  * usePathLinkLoader
  * 
- * Reads a session key from the URL pathname and fetches data from Firebase RTDB.
+ * Reads a session key from the URL pathname and fetches data via secure server proxy.
  * 
  * URL format: sealedvow.com/ajmal-saniya-k8f2x9m1
  * Extracts key: "k8f2x9m1" (last segment after final hyphen)
@@ -44,8 +43,54 @@ export function usePathLinkLoader(enabled: boolean): SharedLinkLoaderResult {
         return;
       }
 
-      // loadSession handles extracting opaque key from slug
-      const sessionData = await loadSession(pathKey);
+      // Extract opaque key from slug if needed
+      // "ajmal-saniya-k8f2x9m1" → last 8 chars = "k8f2x9m1"
+      const parts = pathKey.split('-');
+      const sessionKey = parts.length > 1 ? parts[parts.length - 1] : pathKey;
+
+      // Validate session key format (8 chars, alphanumeric)
+      if (sessionKey.length !== 8 || !/^[a-z0-9]+$/.test(sessionKey)) {
+        setError({
+          code: 'VALIDATION_ERROR',
+          message: 'This link has expired or does not exist.',
+          recoverable: false,
+        });
+        setState(LoaderState.ERROR);
+        return;
+      }
+
+      // Fetch via secure server proxy
+      const response = await fetch("/api/load-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionKey }),
+      });
+
+      if (response.status === 400) {
+        setError({
+          code: 'VALIDATION_ERROR',
+          message: 'This link has expired or does not exist.',
+          recoverable: false,
+        });
+        setState(LoaderState.ERROR);
+        return;
+      }
+
+      if (response.status === 404) {
+        setError({
+          code: 'VALIDATION_ERROR',
+          message: 'This link has expired or does not exist.',
+          recoverable: false,
+        });
+        setState(LoaderState.ERROR);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to load session: ${response.status}`);
+      }
+
+      const sessionData = await response.json();
 
       if (!sessionData) {
         setError({
