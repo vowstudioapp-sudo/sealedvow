@@ -59,6 +59,38 @@ async function firebaseRead(path) {
   return res.json();
 }
 
+function sanitizeSession(data = {}) {
+  return {
+    senderName: data.senderName,
+    recipientName: data.recipientName,
+    finalLetter: data.finalLetter,
+    myth: data.myth,
+    timeShared: data.timeShared,
+    occasion: data.occasion,
+    theme: data.theme,
+    sealedAt: data.sealedAt,
+    createdAt: data.createdAt,
+    revealMethod: data.revealMethod,
+    unlockDate: data.unlockDate,
+    userImageUrl: data.userImageUrl,
+    aiImageUrl: data.aiImageUrl,
+    video: data.video,
+    videoSource: data.videoSource,
+    audio: data.audio,
+    musicUrl: data.musicUrl,
+    musicType: data.musicType,
+    memoryBoard: data.memoryBoard,
+    sacredLocation: data.sacredLocation,
+    coupons: data.coupons,
+    hasGift: data.hasGift,
+    giftTitle: data.giftTitle,
+    giftNote: data.giftNote,
+    giftLink: data.giftLink,
+    replyEnabled: data.replyEnabled,
+    sessionId: data.sessionId,
+  };
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ══════════════════════════════════════════════════════════════════════
@@ -125,7 +157,7 @@ export default async function handler(req, res) {
     }
 
     // ── RETURN SESSION DATA ──
-    return res.status(200).json(sessionData);
+    return res.status(200).json(sanitizeSession(sessionData));
 
   } catch (error) {
     console.error("[LoadSession] Error loading session:", error.message);
