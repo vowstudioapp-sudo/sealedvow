@@ -11,9 +11,6 @@
     "api/ai.js": {
       "maxDuration": 60
     },
-    "api/gemini.js": {
-      "maxDuration": 60
-    },
     "api/create-order.js": {
       "maxDuration": 30
     },

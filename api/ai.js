@@ -296,7 +296,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const { action, payload } = req.body;
+  const { action, payload } = req.body || {};
 
   // ── PAYLOAD SIZE CAP (cost protection) ──
   try {

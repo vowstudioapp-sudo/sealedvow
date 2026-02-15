@@ -1,40 +1,36 @@
 {
-    "rules": {
-  
-      "shared": {
-        ".read": true,
-        ".write": false
-      },
-  
-      "payments": {
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "shared": {
+      ".read": false,
+      ".write": false
+    },
+    "sessions": {
+      ".read": false,
+      ".write": false
+    },
+    "payments": {
+      ".read": false,
+      ".write": false
+    },
+    "orders": {
+      ".read": false,
+      ".write": false
+    },
+    "founderCodes": {
+      ".read": false,
+      ".write": false
+    },
+    "founderTokens": {
+      ".read": false,
+      ".write": false
+    },
+    "uploads": {
+      "$sessionId": {
         ".read": false,
-        ".write": false
-      },
-  
-      "orders": {
-        ".read": false,
-        ".write": false
-      },
-  
-      "sessions": {
-        "$sessionId": {
-          "sync": {
-            ".read": true,
-            ".write": "auth != null"
-          },
-          "status": {
-            ".read": true,
-            ".write": false
-          }
-        }
-      },
-  
-      "uploads": {
-        "$sessionId": {
-          ".read": true,
-          ".write": "auth != null"
-        }
+        ".write": "auth != null"
       }
-  
     }
   }
+}

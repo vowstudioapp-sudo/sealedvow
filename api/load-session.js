@@ -6,11 +6,25 @@
 // ============================================================================
 
 import { Redis } from "@upstash/redis";
+import admin from "firebase-admin";
 
 const kv = new Redis({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+    databaseURL: process.env.FIREBASE_DB_URL,
+  });
+}
+
+const adminDb = admin.database();
 
 const ALLOWED_ORIGINS = [
   "https://www.sealedvow.com",
@@ -96,6 +110,14 @@ function sanitizeSession(data = {}) {
 // ══════════════════════════════════════════════════════════════════════
 
 export default async function handler(req, res) {
+  // ── TEMPORARY: Firebase Admin connection test ──
+  try {
+    await adminDb.ref('/').limitToFirst(1).once('value');
+    console.log("Firebase Admin connected successfully");
+  } catch (e) {
+    console.error("Firebase Admin failed:", e.message);
+  }
+
   setCors(req, res);
 
   if (req.method === "OPTIONS") return res.status(200).end();

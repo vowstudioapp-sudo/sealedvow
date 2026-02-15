@@ -172,36 +172,6 @@ function generateShortId(): string {
 }
 
 /**
- * Save full CoupleData to Firebase RTDB under an opaque key.
- * Checks for collision before writing.
- * Returns the opaque key (not a slug — slug is built in the UI layer).
- */
-export async function saveSession(data: CoupleData): Promise<string> {
-  if (!db) {
-    throw new Error('Firebase not initialized. Cannot save session.');
-  }
-
-  // Generate key with collision check (max 5 attempts)
-  let key: string = '';
-  for (let attempt = 0; attempt < 5; attempt++) {
-    key = generateShortId();
-    const existing = await get(ref(db, `shared/${key}`));
-    if (!existing.exists()) break;
-    if (attempt === 4) {
-      throw new Error('Failed to generate unique session key after 5 attempts.');
-    }
-  }
-
-  await set(ref(db, `shared/${key}`), {
-    ...data,
-    createdAt: new Date().toISOString(),
-  });
-
-  console.log(`[Session] Saved under key: ${key}`);
-  return key;
-}
-
-/**
  * Load CoupleData from Firebase RTDB by key.
  * Accepts either:
  *   - opaque key directly: "k8f2x9m1"
