@@ -591,15 +591,15 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       <div className="main-experience-atmosphere">
         <div className="main-experience-texture" />
         <div className="main-experience-vignette" />
-        
-        <div className="main-experience-nav-dots">
-          {sections.map(idx => (
-            <div 
-              key={idx} 
-              className={`main-experience-nav-dot ${activeSection === idx ? 'main-experience-nav-dot--active' : ''}`}
-            />
-          ))}
-        </div>
+      </div>
+
+      <div className="main-experience-nav-dots">
+        {sections.map(idx => (
+          <div 
+            key={idx} 
+            className={`main-experience-nav-dot ${activeSection === idx ? 'main-experience-nav-dot--active' : ''}`}
+          />
+        ))}
       </div>
 
       {/* SECTION: Hero */}
