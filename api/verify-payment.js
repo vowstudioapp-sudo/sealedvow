@@ -134,6 +134,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  if (!req.headers['content-type']?.includes('application/json')) {
+    return res.status(415).json({ error: 'Unsupported Media Type' });
+  }
+
   // ── GLOBAL IP RATE LIMITING ──
   const RATE_LIMIT_WINDOW = 60;
   const MAX_REQUESTS = 5;

@@ -112,6 +112,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!req.headers['content-type']?.includes('application/json')) {
+    return res.status(415).json({ error: 'Unsupported Media Type' });
+  }
+
   // ── ADMIN AUTHENTICATION ──
   const adminSecret = process.env.ADMIN_SECRET;
   if (!adminSecret) {

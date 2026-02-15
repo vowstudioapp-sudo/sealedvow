@@ -97,6 +97,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  if (!req.headers['content-type']?.includes('application/json')) {
+    return res.status(415).json({ error: 'Unsupported Media Type' });
+  }
+
   // ── SESSION LOAD RATE LIMITING ──
   const RATE_LIMIT_WINDOW = 60; // seconds
   const MAX_REQUESTS = 10; // per IP per minute
