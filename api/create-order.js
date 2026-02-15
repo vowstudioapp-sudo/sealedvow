@@ -76,7 +76,7 @@ async function founderTransaction(code) {
   }
 
   const result = await ref.transaction(current => {
-    if (!current) return;
+    if (current === null) return current;
     if (!current.active) return;
     if (current.used >= current.maxUses) return;
     if (current.expiresAt && Date.now() > current.expiresAt) return;
