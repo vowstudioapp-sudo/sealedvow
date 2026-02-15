@@ -5,11 +5,25 @@
 
 import crypto from 'crypto';
 import { Redis } from "@upstash/redis";
+import admin from "firebase-admin";
 
 const kv = new Redis({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+    databaseURL: process.env.FIREBASE_DB_URL,
+  });
+}
+
+const adminDb = admin.database();
 
 const TIER_PRICES = {
   standard: 9900,
@@ -48,74 +62,27 @@ function getClientIP(req) {
   );
 }
 
-// ── Firebase REST transaction via ETag conditional write ──
-// RTDB REST API supports conditional requests with ETags.
-// Read with ETag → write with If-Match → 412 if changed = retry.
-// This prevents double-redemption under concurrent requests.
-
-function buildUrl(path) {
-  const base = process.env.FIREBASE_DB_URL;
-  const secret = process.env.FIREBASE_DB_SECRET;
-  if (secret) return `${base}/${path}.json?auth=${secret}`;
-  return `${base}/${path}.json`;
-}
-
 async function founderTransaction(code) {
-  const url = buildUrl(`founderCodes/${code}`);
-  const MAX_RETRIES = 3;
+  const ref = adminDb.ref('founderCodes/' + code);
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    // 1. Read with ETag
-    const readRes = await fetch(url, {
-      method: 'GET',
-      headers: { 'X-Firebase-ETag': 'true' },
-    });
+  const result = await ref.transaction(current => {
+    if (!current) return;
+    if (!current.active) return;
+    if (current.used >= current.maxUses) return;
+    if (current.expiresAt && Date.now() > current.expiresAt) return;
 
-    if (!readRes.ok) return { valid: false };
-
-    const etag = readRes.headers.get('etag');
-    const data = await readRes.json();
-
-    // 2. Validate
-    if (!data) return { valid: false };
-    if (!data.active) return { valid: false };
-    if (data.used >= data.maxUses) return { valid: false };
-    if (data.expiresAt && Date.now() > data.expiresAt) return { valid: false };
-
-    // 3. Prepare update
-    const updated = {
-      ...data,
-      used: data.used + 1,
+    return {
+      ...current,
+      used: current.used + 1,
       redeemedAt: Date.now(),
-      active: (data.used + 1) >= data.maxUses ? false : data.active,
+      active: (current.used + 1) >= current.maxUses ? false : current.active,
     };
+  });
 
-    // 4. Conditional write with If-Match (ETag)
-    const writeRes = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'if-match': etag,
-      },
-      body: JSON.stringify(updated),
-    });
-
-    if (writeRes.ok) {
-      // Transaction succeeded
-      return { valid: true, tier: data.tier || 'reply' };
-    }
-
-    if (writeRes.status === 412) {
-      // ETag mismatch — another request modified first, retry
-      console.warn(`[FounderCode] ETag conflict on attempt ${attempt + 1}, retrying...`);
-      continue;
-    }
-
-    // Unexpected error
-    return { valid: false };
+  if (result.committed && result.snapshot.val()) {
+    return { valid: true, tier: result.snapshot.val().tier || 'reply' };
   }
 
-  // All retries exhausted — concurrent redemption won
   return { valid: false };
 }
 
@@ -220,15 +187,10 @@ export default async function handler(req, res) {
     // This prevents frontend from faking paymentMode=founder without
     // having gone through server-side code validation first.
     const tokenBytes = crypto.randomBytes(16).toString('hex');
-    const tokenUrl = buildUrl(`founderTokens/${tokenBytes}`);
-    await fetch(tokenUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tier: result.tier,
-        createdAt: Date.now(),
-        consumed: false,
-      }),
+    await adminDb.ref('founderTokens/' + tokenBytes).set({
+      tier: result.tier,
+      createdAt: Date.now(),
+      consumed: false,
     });
 
     return res.status(200).json({
@@ -243,8 +205,6 @@ export default async function handler(req, res) {
   // ════════════════════════════════════════════════════════════
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  const firebaseDbUrl = process.env.FIREBASE_DB_URL;
-  const firebaseDbSecret = process.env.FIREBASE_DB_SECRET;
 
   if (!keyId || !keySecret) {
     console.error('[Razorpay] Missing credentials');
@@ -278,26 +238,16 @@ export default async function handler(req, res) {
 
     const order = await orderResponse.json();
 
-    if (firebaseDbUrl) {
-      try {
-        const url = firebaseDbSecret
-          ? `${firebaseDbUrl}/orders/${order.id}.json?auth=${firebaseDbSecret}`
-          : `${firebaseDbUrl}/orders/${order.id}.json`;
-
-        await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount,
-            tier: validTier,
-            currency: 'INR',
-            status: 'created',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } catch (dbErr) {
-        console.error('[Razorpay] Failed to persist order:', dbErr);
-      }
+    try {
+      await adminDb.ref('orders/' + order.id).set({
+        amount,
+        tier: validTier,
+        currency: 'INR',
+        status: 'created',
+        createdAt: new Date().toISOString(),
+      });
+    } catch (dbErr) {
+      console.error('[Razorpay] Failed to persist order:', dbErr);
     }
 
     return res.status(200).json({

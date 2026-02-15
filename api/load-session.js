@@ -53,26 +53,6 @@ function getClientIP(req) {
   );
 }
 
-// ── FIREBASE RTDB HELPERS ──
-
-function authUrl(path) {
-  const base = process.env.FIREBASE_DB_URL;
-  const secret = process.env.FIREBASE_DB_SECRET;
-  if (secret) {
-    return `${base}/${path}.json?auth=${secret}`;
-  }
-  return `${base}/${path}.json`;
-}
-
-async function firebaseRead(path) {
-  const res = await fetch(authUrl(path));
-
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Firebase read ${path}: ${res.status}`);
-
-  return res.json();
-}
-
 function sanitizeSession(data = {}) {
   return {
     senderName: data.senderName,
@@ -110,14 +90,6 @@ function sanitizeSession(data = {}) {
 // ══════════════════════════════════════════════════════════════════════
 
 export default async function handler(req, res) {
-  // ── TEMPORARY: Firebase Admin connection test ──
-  try {
-    await adminDb.ref('/').limitToFirst(1).once('value');
-    console.log("Firebase Admin connected successfully");
-  } catch (e) {
-    console.error("Firebase Admin failed:", e.message);
-  }
-
   setCors(req, res);
 
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -172,7 +144,11 @@ export default async function handler(req, res) {
 
   try {
     // ── READ FROM FIREBASE ──
-    const sessionData = await firebaseRead(`shared/${sessionKey}`);
+    const snapshot = await adminDb
+      .ref(`shared/${sessionKey}`)
+      .once('value');
+
+    const sessionData = snapshot.val();
 
     if (!sessionData) {
       return res.status(404).json({ error: "Session not found." });
