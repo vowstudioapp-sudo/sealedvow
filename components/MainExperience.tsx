@@ -58,6 +58,14 @@ function getYouTubeEmbedId(url: string): string | null {
   return null;
 }
 
+function getSessionKeyFromPath(): string | null {
+  const cleaned = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
+  if (!cleaned) return null;
+  const parts = cleaned.split('-');
+  const key = parts[parts.length - 1] || '';
+  return /^[a-z0-9]{8}$/i.test(key) ? key.toLowerCase() : null;
+}
+
 /* ------------------------------------------------------------------ */
 /* CONSTANTS                                                           */
 /* ------------------------------------------------------------------ */
@@ -113,6 +121,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const [replyText, setReplyText] = useState('');
   const [replySealed, setReplySealed] = useState(false);
   const [replySending, setReplySending] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [showExitWhisper, setShowExitWhisper] = useState(false);
   const [showExitOverlay, setShowExitOverlay] = useState(false);
   const [locationUnlocked, setLocationUnlocked] = useState(false);
@@ -1257,6 +1266,11 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           >
             {replyText.length}/500
           </p>
+          {replyError && (
+            <p className="mt-3 w-full max-w-md text-[10px] text-[#ffb4b4] text-center tracking-wide">
+              {replyError}
+            </p>
+          )}
 
           <div 
             className="mt-8 flex flex-col items-center gap-4"
@@ -1266,11 +1280,30 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               onClick={async () => {
                 if (!replyText.trim() || replySending) return;
                 setReplySending(true);
+                setReplyError(null);
                 try {
-                  // TODO: Store reply in Firebase under sessions/{sessionId}/reply
-                  await new Promise(r => setTimeout(r, 1200));
+                  const sessionKey = getSessionKeyFromPath();
+                  if (!sessionKey) {
+                    throw new Error('Reply is only available on a valid shared link.');
+                  }
+
+                  const response = await fetch('/api/save-reply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      sessionKey,
+                      replyText: replyText.trim(),
+                    }),
+                  });
+
+                  if (!response.ok) {
+                    const errBody = await response.json().catch(() => ({}));
+                    throw new Error(errBody.error || 'Failed to seal your reply.');
+                  }
+
                   setReplySealed(true);
-                } catch {
+                } catch (err: any) {
+                  setReplyError(err?.message || 'Failed to seal your reply.');
                   setReplySending(false);
                 }
               }}

@@ -30,16 +30,21 @@ export function sanitizeString(input: string): string {
 function isValidUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+
+    const isExactOrSubdomainOf = (baseHost: string): boolean =>
+      host === baseHost || host.endsWith(`.${baseHost}`);
+
     return (
       parsed.protocol === 'https:' &&
       (
-        parsed.hostname.includes('firebasestorage.googleapis.com') ||
-        parsed.hostname.includes('storage.googleapis.com') ||
-        parsed.hostname.includes('googleapis.com') ||
-        parsed.hostname.includes('archive.org') ||
-        parsed.hostname.includes('youtube.com') ||
-        parsed.hostname.includes('youtu.be') ||
-        parsed.hostname.includes('google.com')
+        isExactOrSubdomainOf('firebasestorage.googleapis.com') ||
+        isExactOrSubdomainOf('storage.googleapis.com') ||
+        isExactOrSubdomainOf('googleapis.com') ||
+        isExactOrSubdomainOf('archive.org') ||
+        isExactOrSubdomainOf('youtube.com') ||
+        isExactOrSubdomainOf('youtu.be') ||
+        isExactOrSubdomainOf('google.com')
       )
     );
   } catch {

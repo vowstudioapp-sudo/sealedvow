@@ -187,22 +187,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ verified: false, error: 'Missing session data.' });
     }
 
+    let claimMarker = 0;
     try {
-      // Verify and consume the one-time token
+      // Verify and atomically claim the one-time token.
+      // This blocks parallel reuse and allows rollback on transient failures.
       const tokenRef = adminDb.ref('founderTokens/' + founderToken);
-      const tokenSnap = await tokenRef.once('value');
-      const tokenData = tokenSnap.val();
+      const claimResult = await tokenRef.transaction(current => {
+        if (!current || current.consumed) return;
+        if (!current.createdAt || Date.now() - current.createdAt > 5 * 60 * 1000) return;
 
-      if (!tokenData || tokenData.consumed) {
+        claimMarker = Date.now();
+        return {
+          ...current,
+          consumed: true,
+          consumedAt: claimMarker,
+        };
+      });
+
+      const tokenData = claimResult.snapshot.val();
+      if (!claimResult.committed || !tokenData || !tokenData.consumed) {
         return res.status(400).json({ verified: false, error: 'Invalid request.' });
       }
-
-      if (Date.now() - tokenData.createdAt > 5 * 60 * 1000) {
-        await tokenRef.remove().catch(() => {});
-        return res.status(400).json({ verified: false, error: 'Session expired. Please try again.' });
-      }
-
-      await tokenRef.remove();
 
       const sanitized = validateCoupleData(coupleData);
       if (!sanitized) {
@@ -253,6 +258,7 @@ export default async function handler(req, res) {
       };
 
       await adminDb.ref().update(updates);
+      await tokenRef.remove().catch(() => {});
 
       const senderSlug = slugify(sanitized.senderName || 'sender');
       const receiverSlug = slugify(sanitized.recipientName || 'receiver');
@@ -268,6 +274,20 @@ export default async function handler(req, res) {
         paymentId: founderId,
       });
     } catch (error) {
+      // Best effort rollback so transient write failures do not permanently burn founder access.
+      try {
+        const tokenRef = adminDb.ref('founderTokens/' + founderToken);
+        await tokenRef.transaction(current => {
+          if (!current || !current.consumed) return current;
+          if (current.consumedAt && current.consumedAt !== claimMarker) return current;
+          return {
+            ...current,
+            consumed: false,
+            consumedAt: null,
+          };
+        });
+      } catch {}
+
       console.error('[Verify] Founder error:', error);
       return res.status(500).json({ verified: false, error: 'Session creation failed.' });
     }

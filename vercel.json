@@ -22,6 +22,9 @@
     },
     "api/load-session.js": {
       "maxDuration": 10
+    },
+    "api/save-reply.js": {
+      "maxDuration": 10
     }
   }
 }
