@@ -1,25 +1,3 @@
-import crypto from 'crypto';
-import { Redis } from "@upstash/redis";
-import admin from "firebase-admin";
-
-const kv = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-    databaseURL: process.env.FIREBASE_DB_URL,
-  });
-}
-
-const adminDb = admin.database();
-
 // ============================================================================
 // /api/verify-payment.js — SERVER-SIDE AUTHORITY (HARDENED)
 //
@@ -31,37 +9,13 @@ const adminDb = admin.database();
 // to prevent frontend-only bypass. Token is consumed on use.
 // ============================================================================
 
+import crypto from 'crypto';
+import { adminDb, guardPost, rateLimit } from './lib/middleware.js';
+
 const TIER_PRICES = {
   standard: 9900,
   reply: 14900,
 };
-
-const ALLOWED_ORIGINS = [
-  "https://www.sealedvow.com",
-  "https://sealedvow.com",
-  "https://sealedvow.vercel.app"
-];
-
-function setCors(req, res) {
-  const origin = req.headers.origin;
-
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Vary", "Origin");
-}
-
-function getClientIP(req) {
-  return (
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.headers["x-real-ip"] ||
-    req.socket?.remoteAddress ||
-    "unknown"
-  );
-}
 
 function generateShortId() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -129,37 +83,18 @@ function validateCoupleData(data) {
 // ══════════════════════════════════════════════════════════════════════
 
 export default async function handler(req, res) {
-  setCors(req, res);
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  if (!req.headers['content-type']?.includes('application/json')) {
-    return res.status(415).json({ error: 'Unsupported Media Type' });
-  }
+  if (guardPost(req, res)) return;
 
   // ── GLOBAL IP RATE LIMITING ──
-  const RATE_LIMIT_WINDOW = 60;
-  const MAX_REQUESTS = 5;
+  const { limited } = await rateLimit(req, {
+    keyPrefix: 'payment_rate',
+    windowSeconds: 60,
+    max: 5,
+  });
 
-  try {
-    const ip = getClientIP(req);
-    const key = `payment_rate:${ip}`;
-    const current = await kv.incr(key);
-
-    if (current === 1) {
-      await kv.expire(key, RATE_LIMIT_WINDOW);
-    }
-
-    if (current > MAX_REQUESTS) {
-      return res.status(429).json({
-        error: "Too many requests. Please wait a minute."
-      });
-    }
-  } catch (kvError) {
-    console.error("[PaymentRateLimit] KV unavailable:", kvError.message);
-    return res.status(503).json({
-      error: "Service temporarily unavailable. Please try again."
+  if (limited) {
+    return res.status(429).json({
+      error: "Too many requests. Please wait a minute."
     });
   }
 
@@ -168,16 +103,12 @@ export default async function handler(req, res) {
     razorpay_payment_id,
     razorpay_signature,
     coupleData,
-    tier,
     paymentMode,
     founderToken,
   } = req.body || {};
 
   // ════════════════════════════════════════════════════════════
   // PATH A: FOUNDER ACCESS
-  // Requires founderToken that was stored in Firebase by create-order.
-  // Token is single-use: read once, delete immediately.
-  // This prevents frontend from faking paymentMode=founder.
   // ════════════════════════════════════════════════════════════
   if (paymentMode === 'founder') {
     if (!founderToken || typeof founderToken !== 'string') {
@@ -187,10 +118,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ verified: false, error: 'Missing session data.' });
     }
 
+    // claimMarker tracks the exact timestamp we wrote during the transaction.
+    // The rollback block (catch) uses it to verify ownership: if another
+    // request consumed the token between our failure and our rollback attempt,
+    // claimMarker mismatch prevents us from un-consuming someone else's claim.
     let claimMarker = 0;
     try {
-      // Verify and atomically claim the one-time token.
-      // This blocks parallel reuse and allows rollback on transient failures.
       const tokenRef = adminDb.ref('founderTokens/' + founderToken);
       const claimResult = await tokenRef.transaction(current => {
         if (!current || current.consumed) return;
@@ -274,7 +207,7 @@ export default async function handler(req, res) {
         paymentId: founderId,
       });
     } catch (error) {
-      // Best effort rollback so transient write failures do not permanently burn founder access.
+      // Best effort rollback
       try {
         const tokenRef = adminDb.ref('founderTokens/' + founderToken);
         await tokenRef.transaction(current => {
@@ -350,24 +283,42 @@ export default async function handler(req, res) {
       console.warn('[Verify] Replay check failed, proceeding:', e.message);
     }
 
-    // 3. RESOLVE AMOUNT FROM ORDER
-    let orderAmount = null;
-    let orderTier = tier || 'standard';
+    // 3. RESOLVE TIER & AMOUNT FROM SERVER-SIDE ORDER RECORD
+    //    NEVER trust client-provided tier. The order record in Firebase
+    //    (written by create-order.js) is the single source of truth.
+    let orderAmount, orderTier;
 
     try {
       const orderSnap = await adminDb.ref('orders/' + razorpay_order_id).once('value');
       const orderData = orderSnap.val();
-      if (orderData && orderData.amount) {
-        orderAmount = orderData.amount;
-        orderTier = orderData.tier || orderTier;
+
+      if (!orderData || !orderData.amount || !orderData.tier) {
+        console.error(`[Verify] Order record missing or incomplete: ${razorpay_order_id}`);
+        return res.status(500).json({
+          verified: false,
+          error: 'Unable to verify order. Please contact support.',
+        });
       }
-    } catch {
-      console.warn('[Verify] Order lookup failed, using tier fallback');
+
+      if (!TIER_PRICES[orderData.tier]) {
+        console.error(`[Verify] Unknown tier "${orderData.tier}" in order: ${razorpay_order_id}`);
+        return res.status(500).json({
+          verified: false,
+          error: 'Unable to verify order. Please contact support.',
+        });
+      }
+
+      orderAmount = orderData.amount;
+      orderTier = orderData.tier;
+    } catch (orderErr) {
+      console.error(`[Verify] Order lookup failed for ${razorpay_order_id}:`, orderErr.message);
+      return res.status(500).json({
+        verified: false,
+        error: 'Payment verification temporarily unavailable. Please retry.',
+      });
     }
 
-    const validTier = TIER_PRICES[orderTier] ? orderTier : 'standard';
-    if (!orderAmount) orderAmount = TIER_PRICES[validTier];
-    const replyEnabled = validTier === 'reply';
+    const replyEnabled = orderTier === 'reply';
 
     // 4. VALIDATE COUPLE DATA
     const sanitized = validateCoupleData(coupleData);
@@ -404,14 +355,14 @@ export default async function handler(req, res) {
       createdAt: sanitized.createdAt || now,
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
-      tier: validTier,
+      tier: orderTier,
     };
 
     updates[`payments/${razorpay_payment_id}`] = {
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
       amount: orderAmount,
-      tier: validTier,
+      tier: orderTier,
       replyEnabled,
       sessionKey,
       verifiedAt: now,
@@ -426,7 +377,7 @@ export default async function handler(req, res) {
     const receiverSlug = slugify(sanitized.recipientName || 'receiver');
     const shareSlug = `${senderSlug}-${receiverSlug}-${sessionKey}`;
 
-    console.log(`[Verify] ✓ ${sessionKey} | ${razorpay_payment_id} | ${validTier}`);
+    console.log(`[Verify] ✓ ${sessionKey} | ${razorpay_payment_id} | ${orderTier}`);
 
     return res.status(200).json({
       verified: true,

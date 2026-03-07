@@ -4,26 +4,7 @@
 // ============================================================================
 
 import crypto from 'crypto';
-import { Redis } from "@upstash/redis";
-import admin from "firebase-admin";
-
-const kv = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-});
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-    databaseURL: process.env.FIREBASE_DB_URL,
-  });
-}
-
-const adminDb = admin.database();
+import { adminDb, kv, guardPost, getClientIP, rateLimit } from './lib/middleware.js';
 
 const TIER_PRICES = {
   standard: 9900,
@@ -34,33 +15,6 @@ const TIER_PRODUCTS = {
   standard: 'sealedvow_standard',
   reply: 'sealedvow_reply',
 };
-
-const ALLOWED_ORIGINS = [
-  "https://www.sealedvow.com",
-  "https://sealedvow.com",
-  "https://sealedvow.vercel.app"
-];
-
-function setCors(req, res) {
-  const origin = req.headers.origin;
-
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Vary", "Origin");
-}
-
-function getClientIP(req) {
-  return (
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.headers["x-real-ip"] ||
-    req.socket?.remoteAddress ||
-    "unknown"
-  );
-}
 
 async function founderTransaction(code) {
   const ref = adminDb.ref('founderCodes/' + code);
@@ -86,72 +40,58 @@ async function founderTransaction(code) {
   return { valid: false };
 }
 
+// ── FOUNDER CODE FAIL LIMITER ──
+async function trackFounderFail(req) {
+  try {
+    const ip = getClientIP(req);
+    const failKey = `founder_fail:${ip}`;
+    const failCount = await kv.incr(failKey);
+
+    if (failCount === 1) {
+      await kv.expire(failKey, 3600);
+    }
+
+    return failCount > 10;
+  } catch (kvError) {
+    console.error("[FounderFailLimit] KV unavailable:", kvError.message);
+    // On Redis failure, don't block — degrade gracefully
+    return false;
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ══════════════════════════════════════════════════════════════════════
 
 export default async function handler(req, res) {
-  setCors(req, res);
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  if (!req.headers['content-type']?.includes('application/json')) {
-    return res.status(415).json({ error: 'Unsupported Media Type' });
-  }
+  if (guardPost(req, res)) return;
 
   // ── GLOBAL IP RATE LIMITING ──
-  const RATE_LIMIT_WINDOW = 60;
-  const MAX_REQUESTS = 5;
+  const { limited } = await rateLimit(req, {
+    keyPrefix: 'payment_rate',
+    windowSeconds: 60,
+    max: 5,
+  });
 
-  try {
-    const ip = getClientIP(req);
-    const key = `payment_rate:${ip}`;
-    const current = await kv.incr(key);
-
-    if (current === 1) {
-      await kv.expire(key, RATE_LIMIT_WINDOW);
-    }
-
-    if (current > MAX_REQUESTS) {
-      return res.status(429).json({
-        error: "Too many requests. Please wait a minute."
-      });
-    }
-  } catch (kvError) {
-    console.error("[PaymentRateLimit] KV unavailable:", kvError.message);
-    return res.status(503).json({
-      error: "Service temporarily unavailable. Please try again."
+  if (limited) {
+    return res.status(429).json({
+      error: "Too many requests. Please wait a minute."
     });
   }
 
-  const { tier = 'standard', founderCode } = req.body || {};
+  let { tier = 'standard', founderCode } = req.body || {};
+
+  // Input hygiene: ensure tier is always a string before validation
+  if (typeof tier !== 'string') tier = 'standard';
 
   // ════════════════════════════════════════════════════════════
   // PATH A: FOUNDER CODE
   // ════════════════════════════════════════════════════════════
   if (founderCode) {
     if (typeof founderCode !== 'string' || founderCode.trim().length === 0 || founderCode.trim().length > 50) {
-      // ── FOUNDER CODE FAIL LIMITER ──
-      try {
-        const ip = getClientIP(req);
-        const failKey = `founder_fail:${ip}`;
-        const failCount = await kv.incr(failKey);
-
-        if (failCount === 1) {
-          await kv.expire(failKey, 3600);
-        }
-
-        if (failCount > 10) {
-          return res.status(429).json({
-            error: "Too many invalid founder code attempts."
-          });
-        }
-      } catch (kvError) {
-        console.error("[FounderFailLimit] KV unavailable:", kvError.message);
-        return res.status(503).json({
-          error: "Service temporarily unavailable."
-        });
+      const blocked = await trackFounderFail(req);
+      if (blocked) {
+        return res.status(429).json({ error: "Too many invalid founder code attempts." });
       }
       return res.status(400).json({ error: 'Invalid or expired code.' });
     }
@@ -160,36 +100,16 @@ export default async function handler(req, res) {
     const result = await founderTransaction(normalized);
 
     if (!result.valid) {
-      // ── FOUNDER CODE FAIL LIMITER ──
-      try {
-        const ip = getClientIP(req);
-        const failKey = `founder_fail:${ip}`;
-        const failCount = await kv.incr(failKey);
-
-        if (failCount === 1) {
-          await kv.expire(failKey, 3600);
-        }
-
-        if (failCount > 10) {
-          return res.status(429).json({
-            error: "Too many invalid founder code attempts."
-          });
-        }
-      } catch (kvError) {
-        console.error("[FounderFailLimit] KV unavailable:", kvError.message);
-        return res.status(503).json({
-          error: "Service temporarily unavailable."
-        });
+      const blocked = await trackFounderFail(req);
+      if (blocked) {
+        return res.status(429).json({ error: "Too many invalid founder code attempts." });
       }
-      // Generic error — never leak whether code exists, expired, or was used
       return res.status(400).json({ error: 'Invalid or expired code.' });
     }
 
     console.log(`[FounderCode] ✓ ${normalized} redeemed`);
 
     // Generate a one-time token for verify-payment to consume.
-    // This prevents frontend from faking paymentMode=founder without
-    // having gone through server-side code validation first.
     const tokenBytes = crypto.randomBytes(16).toString('hex');
     await adminDb.ref('founderTokens/' + tokenBytes).set({
       tier: result.tier,
@@ -243,16 +163,24 @@ export default async function handler(req, res) {
     const order = await orderResponse.json();
 
     try {
-      await adminDb.ref('orders/' + order.id).set({
-        amount,
-        tier: validTier,
-        currency: 'INR',
-        status: 'created',
-        createdAt: new Date().toISOString(),
-      });
-    } catch (dbErr) {
-      console.error('[Razorpay] Failed to persist order:', dbErr);
-    }
+      // Persist order record BEFORE returning orderId to client.
+      // verify-payment.js hard-depends on this record existing with amount + tier.
+      // If this write fails, returning the orderId would create an unverifiable payment.
+      try {
+        await adminDb.ref('orders/' + order.id).set({
+          amount,
+          tier: validTier,
+          currency: 'INR',
+          status: 'created',
+          createdAt: new Date().toISOString(),
+        });
+      } catch (dbErr) {
+        console.error('[Razorpay] CRITICAL: Failed to persist order record:', dbErr);
+        // Order exists in Razorpay but not in our DB.
+        // Do NOT return orderId — client cannot complete verification without it.
+        // User has not been charged yet (order created ≠ payment captured).
+        return res.status(500).json({ error: 'Order setup failed. Please retry.' });
+      }
 
     return res.status(200).json({
       orderId: order.id,
