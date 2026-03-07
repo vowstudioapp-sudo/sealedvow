@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { LandingPage } from './components/LandingPage.tsx';
 import { Analytics } from '@vercel/analytics/react';
+import { getRouteType, isEidiRoute, isReceiverLinkType } from './utils/routing';
 
 const PreparationForm = lazy(() =>
   import('./components/PreparationForm.tsx').then(m => ({ default: m.PreparationForm }))
@@ -41,6 +42,14 @@ const MasterControl = lazy(() =>
 const PersonalIntro = lazy(() =>
   import('./components/PersonalIntro.tsx').then(m => ({ default: m.PersonalIntro }))
 );
+const EidiCreatePage = lazy(() =>
+  import('./pages/eidi/create.tsx').then(m => ({ default: m.EidiCreatePage }))
+);
+
+const EidiReceiverPage = lazy(() =>
+  import('./pages/eidi/[id].tsx').then(m => ({ default: m.EidiReceiverPage }))
+);
+
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
@@ -293,12 +302,13 @@ const App: React.FC = () => {
   }, []);
   const isDemoMode = !!demoData;
 
-  // Detect receiver link (path has slug)
-  const isReceiverLink = useMemo(() => {
-    if (isDemoMode) return true;
-    const path = window.location.pathname;
-    return path.length > 1 && !path.startsWith('/api') && !path.startsWith('/demo');
-  }, [isDemoMode]);
+  // Route detection — logic lives in utils/routing.ts
+  const routeType      = getRouteType();
+  const isEidiCreate   = routeType === 'EIDI_CREATE';
+  const isEidiReceiver = routeType === 'EIDI_RECEIVER';
+
+  // Derived from central route type — no manual path matching
+  const isReceiverLink = isReceiverLinkType(routeType);
 
   useEffect(() => {
     // Skip boot animation entirely for receiver links
@@ -393,6 +403,21 @@ const App: React.FC = () => {
     };
   }, [stage, data]);
 
+  // ── EIDI EARLY RETURNS — isolated from main stage engine ──────────
+  const eidiLoadingFallback = (
+    <div style={{ minHeight: '100vh', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ fontSize: 32, animation: 'spin 2s linear infinite' }}>🌙</div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
+  if (isEidiCreate) {
+    return <Suspense fallback={eidiLoadingFallback}><EidiCreatePage /></Suspense>;
+  }
+  if (isEidiReceiver) {
+    return <Suspense fallback={eidiLoadingFallback}><EidiReceiverPage /></Suspense>;
+  }
+
   const handleEnterStudio = () => {
     safeSetStage(AppStage.PREPARE);
   };
@@ -458,7 +483,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden transition-colors duration-1000" style={{ backgroundColor: '#0C0A09' }}>
-      {isBooting && !isReceiverLink && bootScreen}
+      {!isEidiRoute(routeType) && isBooting && !isReceiverLink && bootScreen}
 
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")' }}></div>
       
