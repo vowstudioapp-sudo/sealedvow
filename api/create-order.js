@@ -162,8 +162,7 @@ export default async function handler(req, res) {
 
     const order = await orderResponse.json();
 
-    try {
-      // Persist order record BEFORE returning orderId to client.
+    // Persist order record BEFORE returning orderId to client.
       // verify-payment.js hard-depends on this record existing with amount + tier.
       // If this write fails, returning the orderId would create an unverifiable payment.
       try {

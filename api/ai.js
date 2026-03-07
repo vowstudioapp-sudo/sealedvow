@@ -294,10 +294,9 @@ export default async function handler(req, res) {
     }
 
   } catch (kvError) {
-    console.error("[RateLimit] KV unavailable:", kvError.message);
-    return res.status(503).json({
-      error: "Service temporarily unavailable. Please try again."
-    });
+    // ⚠️ INTENTIONAL SOFT-FAIL — matches middleware.js pattern.
+    // If Redis is unavailable, degrade rate limiting but never block AI generation.
+    console.warn("[RateLimit] KV unavailable (ai_rate):", kvError.message);
   }
 
   const { action, payload } = req.body || {};
