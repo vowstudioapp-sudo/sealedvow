@@ -2,31 +2,59 @@ import { useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { CoupleData, MemoryPhoto } from '../types';
 
-// Firebase Storage SDK removed - uploads now handled via API routes
-// These functions are stubbed to prevent build errors
-const uploadUserImage = async (_sessionId: string, _file: File): Promise<string> => {
-  throw new Error('Image uploads must be handled via API routes');
-};
-const uploadUserVideo = async (_sessionId: string, _file: File): Promise<string> => {
-  throw new Error('Video uploads must be handled via API routes');
-};
-const uploadMemoryPhotos = async (_sessionId: string, _files: File[], _startIndex: number): Promise<string[]> => {
-  throw new Error('Memory photo uploads must be handled via API routes');
-};
+// ── API Upload Helper ──
+// Converts File to base64 data URI and POSTs to /api/upload-media.
+// Returns the public URL of the uploaded file.
+
+async function fileToDataUri(file: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadToApi(
+  sessionId: string,
+  file: File | Blob,
+  type: 'cover' | 'memory' | 'video' | 'audio',
+  index?: number
+): Promise<string> {
+  const dataUri = await fileToDataUri(file);
+
+  const response = await fetch('/api/upload-media', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId,
+      file: dataUri,
+      type,
+      ...(index !== undefined && { index }),
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || 'Upload failed');
+  }
+
+  const result = await response.json();
+  return result.url;
+}
 
 /**
  * useMediaUploads
  *
- * Handles all Firebase Storage uploads:
+ * Handles all media uploads via /api/upload-media:
  * - Cover image
  * - User video
  * - Memory board photos
  *
  * Rules:
- * - NO base64
- * - NO FileReader
- * - NO UI logic
- * - Atomic uploads (all-or-nothing)
+ * - Uploads go through server-side API (not direct to Firebase)
+ * - Client compresses images before upload
+ * - Atomic uploads (all-or-nothing for memory board)
  */
 
 const LIMITS = {
@@ -102,7 +130,7 @@ export function useMediaUploads({
       });
 
       setUploadProgress(60);
-      const url = await uploadUserImage(sid, compressed as File);
+      const url = await uploadToApi(sid, compressed, 'cover');
       setUploadProgress(100);
       updateData({ userImageUrl: url });
     } catch (err: any) {
@@ -128,7 +156,7 @@ export function useMediaUploads({
       const sid = ensureSession();
       validateFileSize(file, LIMITS.VIDEO_MB, 'Video');
 
-      const url = await uploadUserVideo(sid, file);
+      const url = await uploadToApi(sid, file, 'video');
       updateData({ video: { url, source: 'user' } });
     } catch (err: any) {
       onError(err.message || 'Video upload failed');
@@ -189,8 +217,13 @@ export function useMediaUploads({
         setUploadProgress(Math.round(((i + 1) / files.length) * 50));
       }
 
-      const urls = await uploadMemoryPhotos(sid, compressedFiles, existingCount);
-      setUploadProgress(100);
+      // Upload each compressed file
+      const urls: string[] = [];
+      for (let i = 0; i < compressedFiles.length; i++) {
+        const url = await uploadToApi(sid, compressedFiles[i], 'memory', existingCount + i);
+        urls.push(url);
+        setUploadProgress(50 + Math.round(((i + 1) / compressedFiles.length) * 50));
+      }
 
       const newPhotos: MemoryPhoto[] = urls.map(url => ({
         url,

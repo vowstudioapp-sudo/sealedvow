@@ -1,11 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { CoupleData } from '../types';
 
-// Firebase Storage SDK removed - uploads now handled via API routes
-// This function is stubbed to prevent build errors
-const uploadVoiceRecording = async (_sessionId: string, _blob: Blob): Promise<string> => {
-  throw new Error('Voice recording uploads must be handled via API routes');
-};
+// Upload voice recording via /api/upload-media
+async function uploadVoiceRecording(sessionId: string, blob: Blob): Promise<string> {
+  const dataUri = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read audio'));
+    reader.readAsDataURL(blob);
+  });
+
+  const response = await fetch('/api/upload-media', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId,
+      file: dataUri,
+      type: 'audio',
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || 'Voice upload failed');
+  }
+
+  const result = await response.json();
+  return result.url;
+}
 
 /**
  * useAudioRecorder
@@ -14,10 +36,10 @@ const uploadVoiceRecording = async (_sessionId: string, _blob: Blob): Promise<st
  * - Handle microphone access
  * - Record voice safely
  * - Track recording duration
- * - Upload audio blob to Firebase Storage
+ * - Upload audio via /api/upload-media
  *
  * Rules:
- * - NO base64
+ * - NO direct Firebase access
  * - NO UI logic
  * - FULL cleanup on unmount
  */

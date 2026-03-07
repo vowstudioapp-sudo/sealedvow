@@ -25,6 +25,9 @@
     },
     "api/save-reply.js": {
       "maxDuration": 10
+    },
+    "api/upload-media.js": {
+      "maxDuration": 30
     }
   }
 }
