@@ -7,6 +7,7 @@
 // Validator: lib/ai/validator.js
 // ================================================================
 
+import crypto from "crypto";
 import { Redis } from "@upstash/redis";
 
 const kv = new Redis({
@@ -64,6 +65,16 @@ function getAllowedOrigin(origin) {
   return null;
 }
 
+// ── AI TIMEOUT WRAPPER ──
+async function withTimeout(promise, ms = 8000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI timeout after ' + ms + 'ms')), ms)
+    )
+  ]);
+}
+
 // ===============================
 // ACTION HANDLERS
 // ===============================
@@ -76,6 +87,35 @@ async function handleLoveLetter(payload) {
   }
   if (!prompt) throw new Error('Missing prompt or coupleData for letter generation');
 
+  // ── PROMPT HASH FOR CACHE + DEDUP ──
+  const promptHash = crypto
+    .createHash("sha256")
+    .update(prompt)
+    .digest("hex");
+
+  const cacheKey = `ai_result:${promptHash}`;
+  const lockKey = `ai_lock:${promptHash}`;
+
+  // Check cache first
+  const cached = await kv.get(cacheKey);
+  if (cached) {
+    console.log("[AI Cache] returning cached result");
+    return typeof cached === "string" ? JSON.parse(cached) : cached;
+  }
+
+  // Acquire generation lock
+  const lock = await kv.set(lockKey, "1", { nx: true, ex: 30 });
+
+  // If another request is generating the same prompt
+  if (!lock) {
+    await new Promise(r => setTimeout(r, 500));
+    const cachedRetry = await kv.get(cacheKey);
+    if (cachedRetry) {
+      console.log("[AI Cache] reused concurrent result");
+      return typeof cachedRetry === "string" ? JSON.parse(cachedRetry) : cachedRetry;
+    }
+  }
+
   // ── GENERATE → VALIDATE → RETRY LOOP (Gemini) ──
   const generate = async (attempt = 1) => {
     let fullPrompt = prompt;
@@ -83,7 +123,9 @@ async function handleLoveLetter(payload) {
     if (attempt === 3) fullPrompt += '\n\nFINAL ATTEMPT. Write like a normal person texting. Ultra simple. Short sentences. No fancy words.';
 
     const temp = Math.max(0.5, 0.75 - (attempt - 1) * 0.12);
-    const raw = await gemini.generateText(fullPrompt, { temperature: temp });
+    const raw = await withTimeout(
+      gemini.generateText(fullPrompt, { temperature: temp })
+    );
     const text = cleanOutput(raw);
     const check = validateLetter(text, enforcement);
 
@@ -102,9 +144,11 @@ async function handleLoveLetter(payload) {
   if (check.violations.length > 0 && text.length > 0) {
     try {
       const simplified = cleanOutput(
-        await gemini.generateText(
-          `Rewrite this letter more simply. Break long sentences into shorter ones. Remove decorative language. Keep specific details.\n\n${text}`,
-          { temperature: 0.4 }
+        await withTimeout(
+          gemini.generateText(
+            `Rewrite this letter more simply. Break long sentences into shorter ones. Remove decorative language. Keep specific details.\n\n${text}`,
+            { temperature: 0.4 }
+          )
         )
       );
       const simplifiedCheck = validateLetter(simplified, enforcement);
@@ -117,7 +161,19 @@ async function handleLoveLetter(payload) {
     }
   }
 
-  return { text: text || null };
+  const result = { text: text || null };
+
+  try {
+    await kv.set(cacheKey, result, { ex: 3600 });
+  } catch (e) {
+    console.warn("[AI Cache] failed to store result:", e.message);
+  }
+
+  try {
+    await kv.del(lockKey);
+  } catch {}
+
+  return result;
 }
 
 async function handleCoupleMyth(payload) {
