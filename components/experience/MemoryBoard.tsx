@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MemoryPhoto } from '../types';
+import { MemoryPhoto } from '../../types';
 
 interface InteractivePhoto extends MemoryPhoto {
   dragX: number;

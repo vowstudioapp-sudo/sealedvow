@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { useAudioNarration } from '../hooks/useAudioNarration';
+import { useAudioNarration } from '../../hooks/useAudioNarration';
 
 const MAX_PARAGRAPH_CHARS = 180;
 
