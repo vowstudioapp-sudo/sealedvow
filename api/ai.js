@@ -89,14 +89,17 @@ async function handleLoveLetter(payload) {
 
     console.log(`[Letter] Gemini attempt ${attempt}: ${check.stats.wordCount} words, ${check.stats.paragraphCount}p, avg ${check.stats.avgSentenceLength}w/s, violations: ${check.violations.join(', ') || 'none'}`);
 
-    if (!check.valid && attempt < 3) return generate(attempt + 1);
+    if (!check.valid && attempt < 3) {
+      console.log(`[Letter] Retry triggered attempt ${attempt + 1} — violations: ${check.violations.join(', ')}`);
+      return generate(attempt + 1);
+    }
     return { text, check };
   };
 
   let { text, check } = await generate();
 
   // ── SIMPLIFIER PASS ──
-  if (check.stats.avgSentenceLength > 16 && text.length > 0) {
+  if (check.violations.length > 0 && text.length > 0) {
     try {
       const simplified = cleanOutput(
         await gemini.generateText(
@@ -105,7 +108,7 @@ async function handleLoveLetter(payload) {
         )
       );
       const simplifiedCheck = validateLetter(simplified, enforcement);
-      if (simplifiedCheck.stats.avgSentenceLength < check.stats.avgSentenceLength && !simplifiedCheck.violations.some(v => v.startsWith('FORBIDDEN'))) {
+      if (check.violations.length > 0 && simplifiedCheck.violations.length === 0) {
         text = simplified;
         console.log(`[Letter] Simplifier improved: avg ${check.stats.avgSentenceLength} → ${simplifiedCheck.stats.avgSentenceLength} w/s`);
       }
@@ -127,7 +130,14 @@ async function handleCoupleMyth(payload) {
 async function handleFutureProphecy(payload) {
   const prompt = payload.prompt || buildProphecyPrompt();
   const raw = await gemini.generateText(prompt, { jsonMode: true });
-  const items = JSON.parse(raw || '[]');
+  let items = [];
+
+  try {
+    items = JSON.parse(raw || '[]');
+  } catch {
+    items = [];
+  }
+
   return { items: Array.isArray(items) ? items : [] };
 }
 
@@ -292,10 +302,16 @@ export default async function handler(req, res) {
     return res.status(415).json({ error: 'Unsupported Media Type' });
   }
 
+  const { action, payload } = req.body || {};
+
+  if (!action || !ALLOWED_ACTIONS.includes(action)) {
+    return res.status(400).json({ error: 'Invalid action' });
+  }
+
   // ── DISTRIBUTED RATE LIMITING ──
   try {
     const ip = getClientIP(req);
-    const key = `ai_rate:${ip}`;
+    const key = `ai_rate:${action}:${ip || 'anon'}`;
 
     const current = await kv.incr(key);
 
@@ -315,8 +331,6 @@ export default async function handler(req, res) {
     console.warn("[RateLimit] KV unavailable (ai_rate):", kvError.message);
   }
 
-  const { action, payload } = req.body || {};
-
   // ── PAYLOAD SIZE CAP (cost protection) ──
   try {
     const rawSize = JSON.stringify(payload || {}).length;
@@ -327,10 +341,6 @@ export default async function handler(req, res) {
     }
   } catch {
     return res.status(400).json({ error: "Invalid payload." });
-  }
-
-  if (!action || !ALLOWED_ACTIONS.includes(action)) {
-    return res.status(400).json({ error: 'Invalid action' });
   }
 
   if (!process.env.GEMINI_API_KEY) {
