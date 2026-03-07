@@ -87,7 +87,10 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Session not found." });
     }
 
-    return res.status(200).json(sanitizeSession(sessionData));
+    return res
+      .status(200)
+      .setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600')
+      .json(sanitizeSession(sessionData));
 
   } catch (error) {
     console.error("[LoadSession] Error loading session:", error.message);

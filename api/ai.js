@@ -17,6 +17,7 @@ const kv = new Redis({
 import * as gemini from '../lib/ai/providers/geminiProvider.js';
 import * as openai from '../lib/ai/providers/openaiProvider.js';
 import { validateLetter, validateBasicText, cleanOutput, GLOBAL_FORBIDDEN } from '../lib/ai/validator.js';
+import { buildLetterPrompt, buildMythPrompt, buildProphecyPrompt } from './lib/prompt-templates.js';
 
 // ===============================
 // ALLOWED ACTIONS
@@ -68,7 +69,12 @@ function getAllowedOrigin(origin) {
 // ===============================
 
 async function handleLoveLetter(payload) {
-  const { prompt, enforcement } = payload;
+  // Build prompt server-side from coupleData if not pre-built
+  let { prompt, enforcement } = payload;
+  if (!prompt && payload.coupleData) {
+    ({ prompt, enforcement } = buildLetterPrompt(payload.coupleData));
+  }
+  if (!prompt) throw new Error('Missing prompt or coupleData for letter generation');
 
   // ── GENERATE → VALIDATE → RETRY LOOP (Gemini) ──
   const generate = async (attempt = 1) => {
@@ -112,12 +118,15 @@ async function handleLoveLetter(payload) {
 }
 
 async function handleCoupleMyth(payload) {
-  const raw = await gemini.generateText(payload.prompt, { temperature: 0.8 });
+  const prompt = payload.prompt || (payload.coupleData ? buildMythPrompt(payload.coupleData) : null);
+  if (!prompt) throw new Error('Missing prompt or coupleData for myth generation');
+  const raw = await gemini.generateText(prompt, { temperature: 0.8 });
   return { text: raw || null };
 }
 
 async function handleFutureProphecy(payload) {
-  const raw = await gemini.generateText(payload.prompt, { jsonMode: true });
+  const prompt = payload.prompt || buildProphecyPrompt();
+  const raw = await gemini.generateText(prompt, { jsonMode: true });
   const items = JSON.parse(raw || '[]');
   return { items: Array.isArray(items) ? items : [] };
 }
@@ -181,7 +190,11 @@ async function handleAudioLetter(payload) {
 // ===============================
 
 async function fallbackLoveLetter(payload) {
-  const { prompt, enforcement } = payload;
+  let { prompt, enforcement } = payload;
+  if (!prompt && payload.coupleData) {
+    ({ prompt, enforcement } = buildLetterPrompt(payload.coupleData));
+  }
+  if (!prompt) return null;
   const raw = await openai.generateText(prompt, { temperature: 0.7, maxTokens: 400 });
   if (!raw) return null;
 
@@ -197,15 +210,18 @@ async function fallbackLoveLetter(payload) {
 }
 
 async function fallbackCoupleMyth(payload) {
-  const raw = await openai.generateText(payload.prompt, { temperature: 0.8, maxTokens: 100 });
+  const prompt = payload.prompt || (payload.coupleData ? buildMythPrompt(payload.coupleData) : null);
+  if (!prompt) return null;
+  const raw = await openai.generateText(prompt, { temperature: 0.8, maxTokens: 100 });
   if (!raw) return null;
   const text = cleanOutput(raw);
   return validateBasicText(text) ? { text } : null;
 }
 
 async function fallbackFutureProphecy(payload) {
+  const basePrompt = payload.prompt || buildProphecyPrompt();
   const raw = await openai.generateText(
-    payload.prompt + '\n\nRespond ONLY with a valid JSON array of strings. No markdown.',
+    basePrompt + '\n\nRespond ONLY with a valid JSON array of strings. No markdown.',
     { temperature: 0.8, maxTokens: 200 }
   );
   if (!raw) return null;
