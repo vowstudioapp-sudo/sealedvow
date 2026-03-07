@@ -126,7 +126,11 @@ export default async function handler(req, res) {
     try {
       const tokenRef = adminDb.ref('founderTokens/' + founderToken);
       const claimResult = await tokenRef.transaction(current => {
-        if (!current || current.consumed) return;
+        // Serverless (Vercel) has no local cache — first call may receive null.
+        // Returning null triggers Firebase to retry with real server data.
+        // Returning undefined (bare return) would ABORT the transaction.
+        if (current === null) return null;
+        if (current.consumed) return;
         if (!current.createdAt || Date.now() - current.createdAt > 5 * 60 * 1000) return;
 
         claimMarker = Date.now();
