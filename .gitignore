@@ -34,3 +34,18 @@ dist-ssr
 .env*.local
 
 *.backup
+# Local analysis files
+*_ANALYSIS.md
+*_REVIEW.md
+
+# Codebase exports
+*.zip
+**/.DS_Store
+*.tar
+*.gz
+*.7z
+*.rar
+# OS temp files
+Thumbs.db
+*.tmp
+*.temp
