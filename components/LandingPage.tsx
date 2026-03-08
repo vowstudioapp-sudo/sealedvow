@@ -1,50 +1,70 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PrivacyModal } from './PrivacyModal';
 import { TermsModal } from './TermsModal';
 import { HelpModal } from './HelpModal';
-import { EidCountdown } from './EidCountdown';
-import { getActiveFestival } from '../config/festivals';
-import { FEATURES } from '../config/features';
 
 interface Props {
   onEnter: () => void;
 }
 
 export const LandingPage: React.FC<Props> = ({ onEnter }) => {
-  const [isVisible,    setIsVisible]    = useState(false);
-  const [isEntering,   setIsEntering]   = useState(false);
-  const [progress,     setProgress]     = useState(0);
-  const [showPrivacy,  setShowPrivacy]  = useState(false);
-  const [showTerms,    setShowTerms]    = useState(false);
-  const [showHelp,     setShowHelp]     = useState(false);
-  const [bannerDismissed, setBannerDismissed] = useState(() => {
-    try { return localStorage.getItem('eid_banner_dismissed_2026') === '1'; }
-    catch { return false; }
-  });
+  const [isVisible,   setIsVisible]   = useState(false);
+  const [isEntering,  setIsEntering]  = useState(false);
+  const [progress,    setProgress]    = useState(0);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms,   setShowTerms]   = useState(false);
+  const [showHelp,    setShowHelp]    = useState(false);
+  const [showLogin,   setShowLogin]   = useState(false);
+  const [emailInput,  setEmailInput]  = useState('');
+  const [pastHero,    setPastHero]    = useState(false);
 
-  const intervalRef = useRef<number | null>(null);
+  const intervalRef  = useRef<number | null>(null);
+  const heroRef      = useRef<HTMLElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const railTrackRef = useRef<HTMLDivElement | null>(null);
 
-  // Active festival — memoised, changes only if festival config changes
-  const festival = useMemo(() => getActiveFestival(), []);
-  const showEid  = FEATURES.eidiEnabled && !!festival;
-
-  // Eid start timestamp for countdown
-  const eidStartAt = useMemo(() => {
-    if (!festival) return null;
-    return new Date(festival.start + 'T00:00:00').getTime();
-  }, [festival]);
-
-  /* ------------------------------------------------
-     Entrance Reveal
-     ------------------------------------------------ */
+  /* ── Entrance reveal ── */
   useEffect(() => {
     const t = setTimeout(() => setIsVisible(true), 100);
     return () => clearTimeout(t);
   }, []);
 
-  /* ------------------------------------------------
-     Cinematic Deterministic Progress
-     ------------------------------------------------ */
+  /* ── Past-hero detection — shows Begin in navbar ── */
+  useEffect(() => {
+    const handleScroll = () => {
+      const hero = heroRef.current;
+      if (!hero) return;
+      setPastHero(hero.getBoundingClientRect().bottom <= 60);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('scroll', handleScroll, { passive: true });
+    const container = containerRef.current;
+    if (container) container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll);
+      if (container) container.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  /* ── Scroll fade-in ── */
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            io.unobserve(e.target);
+          }
+        });
+      },
+      { threshold: 0.14 }
+    );
+    document.querySelectorAll('.lp-fade').forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, [isVisible]);
+
+  /* ── Cinematic progress ── */
   useEffect(() => {
     if (!isEntering) return;
     let current = 0;
@@ -62,208 +82,390 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isEntering, onEnter]);
 
+  /* ── ESC to close modal ── */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowLogin(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  /* ── Lock scroll when modal open ── */
+  useEffect(() => {
+    document.body.style.overflow = showLogin ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [showLogin]);
+
+  /* ── 3D card tilt + cursor light ── */
+  useEffect(() => {
+    const cards = document.querySelectorAll<HTMLElement>('.lp-card');
+    const MAX_TILT = 6;
+
+    const handleMove = (card: HTMLElement, e: MouseEvent) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotateX = Math.max(-MAX_TILT, Math.min(MAX_TILT, -(y - centerY) / 18));
+      const rotateY = Math.max(-MAX_TILT, Math.min(MAX_TILT, (x - centerX) / 18));
+      card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-12px) scale(1.03)`;
+      card.style.setProperty('--x', `${x}px`);
+      card.style.setProperty('--y', `${y}px`);
+    };
+
+    const handleLeave = (card: HTMLElement) => {
+      card.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0) scale(1)';
+    };
+
+    const listeners: Array<{ card: HTMLElement; move: (e: MouseEvent) => void; leave: () => void }> = [];
+    cards.forEach(card => {
+      const move = (e: MouseEvent) => handleMove(card, e);
+      const leave = () => handleLeave(card);
+      card.addEventListener('mousemove', move);
+      card.addEventListener('mouseleave', leave);
+      listeners.push({ card, move, leave });
+    });
+
+    return () => {
+      listeners.forEach(({ card, move, leave }) => {
+        card.removeEventListener('mousemove', move);
+        card.removeEventListener('mouseleave', leave);
+      });
+    };
+  }, [isVisible]);
+
+  /* ── Drag scroll for card rail ── */
+  useEffect(() => {
+    const track = railTrackRef.current;
+    if (!track) return;
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    const onDown = (e: MouseEvent) => { isDown = true; startX = e.pageX - track.offsetLeft; scrollLeft = track.scrollLeft; };
+    const onLeave = () => { isDown = false; };
+    const onUp = () => { isDown = false; };
+    const onMove = (e: MouseEvent) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - track.offsetLeft; track.scrollLeft = scrollLeft - (x - startX) * 1.2; };
+
+    track.addEventListener('mousedown', onDown);
+    track.addEventListener('mouseleave', onLeave);
+    track.addEventListener('mouseup', onUp);
+    track.addEventListener('mousemove', onMove);
+    return () => {
+      track.removeEventListener('mousedown', onDown);
+      track.removeEventListener('mouseleave', onLeave);
+      track.removeEventListener('mouseup', onUp);
+      track.removeEventListener('mousemove', onMove);
+    };
+  }, [isVisible]);
+
   const handleEnter = () => { if (isEntering) return; setIsEntering(true); };
 
-  const handleDismissBanner = () => {
-    setBannerDismissed(true);
-    try { localStorage.setItem('eid_banner_dismissed_2026', '1'); } catch {}
+  const handleSendLoginLink = () => {
+    if (!emailInput || !emailInput.includes('@')) return;
+    console.log('Send magic link to:', emailInput);
   };
 
   return (
-    <div className="landing min-h-screen bg-[#050505] text-[#D4AF37] relative overflow-hidden flex flex-col">
+    <div className={`landing-v2 ${isVisible ? 'opacity-100' : 'opacity-0'}`} ref={containerRef} style={{ transition: 'opacity 1s ease' }}>
 
-      {/* Modals */}
+      {/* ── Modals ── */}
       <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
       <TermsModal   isOpen={showTerms}   onClose={() => setShowTerms(false)} />
       <HelpModal    isOpen={showHelp}    onClose={() => setShowHelp(false)} />
 
-      {/* ── EID TOUCHPOINT 1 — Dismissable top banner ── */}
-      {showEid && !bannerDismissed && (
-        <div style={{
-          width: '100%',
-          background: 'rgba(27,67,50,0.95)',
-          borderBottom: '1px solid rgba(212,175,55,0.25)',
-          padding: '10px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 12,
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          fontFamily: 'Georgia, serif',
-        }}>
-          <span style={{ fontSize: 13 }}>🌙</span>
-          <p style={{ fontSize: 10, letterSpacing: '0.3em', textTransform: 'uppercase', color: '#F7E6A7', fontWeight: 'bold', margin: 0 }}>
-            Eid Special — Send a Sealed Eidi
-          </p>
-          <a
-            href="/eidi/create"
-            style={{ fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#D4AF37', fontWeight: 'bold', textDecoration: 'none', border: '1px solid rgba(212,175,55,0.4)', borderRadius: 100, padding: '4px 12px', marginLeft: 4 }}
-          >
-            Send →
-          </a>
-          <button
-            onClick={handleDismissBanner}
-            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(212,175,55,0.4)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
+      {/* ══════════════════════════════════════
+          NAV
+      ══════════════════════════════════════ */}
+      <nav className={`lp-nav ${pastHero ? 'lp-nav--past-hero' : ''}`}>
+        <div className="lp-nav__left">
+          <div className="lp-nav__logo">V</div>
+          <span className="lp-nav__brand">Sealed Vow</span>
         </div>
-      )}
-
-      {/* Cinematic Background */}
-      <div className="landing-background">
-        <div className="landing-glow landing-glow--wine" />
-        <div className="landing-glow landing-glow--gold" />
-        <div className="landing-texture" />
-      </div>
-
-      {/* Main Content */}
-      <div className={`flex-grow flex flex-col items-center justify-center text-center px-6 transition-all duration-[1500ms] ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-      }`}>
-
-        {/* Monogram */}
-        <div className="mb-6 md:mb-12 relative w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-          <div className="monogram-ring monogram-ring--outer" />
-          <div className="monogram-ring monogram-ring--inner" />
-          <span className="font-serif-elegant italic text-4xl md:text-5xl relative z-10 pt-2">V</span>
-          <div className="monogram-glow monogram-glow--mobile-dim" />
+        <div className="lp-nav__right">
+          <button className="lp-nav__begin" onClick={handleEnter}>Begin</button>
+          <button className="lp-nav__signin" onClick={() => setShowLogin(true)}>Sign In</button>
         </div>
+      </nav>
 
-        {/* Branding */}
-        <p className="text-[10px] uppercase tracking-[0.8em] font-bold mb-4 md:mb-8 animate-fade-in">VOW</p>
-
-        {/* Hero — NEVER TOUCHED */}
-        <h1 className="text-[2.6rem] md:text-8xl font-serif-elegant italic mb-4 md:mb-6 leading-[1.1] text-transparent bg-clip-text bg-gradient-to-b from-[#D4AF37] via-[#F7E6A7] to-[#8B5E3C]">
-          Silence the noise.<br />
-          Speak to the soul.
-        </h1>
-
-        {/* Subline */}
-        <p className="hidden md:block text-[#F7E6A7] text-base md:text-lg font-serif-elegant italic mb-6 max-w-lg mx-auto">
-          "A private letter, created by you, for one person."
-        </p>
-
-        {/* Whisper */}
-        <p className="hidden md:block text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold opacity-80 mb-12 animate-fade-in">
-          Designed for moments that deserve ceremony
-        </p>
-
-        <div className="hidden md:block w-16 h-px bg-[#D4AF37]/60 mb-16" />
-
-        {/* ── EID TOUCHPOINT 2 — Dual CTA ── */}
-        <div className="flex flex-col items-center min-h-[80px] md:min-h-[100px] justify-center space-y-4 md:space-y-6 mt-2 md:mt-0">
+      {/* ══════════════════════════════════════
+          HERO
+      ══════════════════════════════════════ */}
+      <section className="lp-hero" ref={heroRef}>
+        <div className="lp-hero__center">
+          <div className="lp-v-ring"><span>V</span></div>
+          <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
+          <div className="lp-hero__rule" />
           {!isEntering ? (
-            <>
-              <button onClick={handleEnter} className="landing-enter-button">
-                <span className="relative z-10">Enter Studio</span>
-                <div className="landing-enter-fill" />
-              </button>
-
-              <p className="hidden md:block text-[#AAA] text-[10px] uppercase tracking-[0.2em] font-bold opacity-0 animate-fade-in delay-2000">
-                Takes less than 5 minutes
-              </p>
-              <p className="md:hidden text-[#9A8F7E] text-[10px] uppercase tracking-[0.15em] font-bold animate-fade-in">
-                Private. Takes less than 5 minutes.
-              </p>
-            </>
+            <button className="lp-btn-begin" onClick={handleEnter}>Begin</button>
           ) : (
-            <div className="w-64 flex flex-col items-center space-y-4 animate-fade-in">
-              <div className="landing-progress-track">
-                <div className="landing-progress-bar" style={{ width: `${progress}%` }} />
+            <div className="lp-progress-wrap">
+              <div className="lp-progress-track">
+                <div className="lp-progress-bar" style={{ width: `${progress}%` }} />
               </div>
-              <div className="flex justify-between w-full text-[10px] uppercase tracking-[0.2em] font-mono font-bold opacity-80">
-                <span className="animate-pulse">Initializing Studio</span>
+              <div className="lp-progress-label">
+                <span style={{ animation: 'none' }}>Initializing Studio</span>
                 <span>{Math.floor(progress)}%</span>
               </div>
             </div>
           )}
         </div>
+        <div className="lp-hero__bottom">
+          <div className="lp-scroll-signal">
+            <span>Scroll</span>
+            <div className="lp-scroll-line" />
+          </div>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
+          DEMO CARDS — directly after hero
+      ══════════════════════════════════════ */}
+      <section className="lp-demo-cards">
+        <div className="lp-demo-cards__heading lp-fade">
+          <p className="lp-demo-cards__title">Preview the experience</p>
+          <p className="lp-demo-cards__sub">See how your letter arrives</p>
+        </div>
+
+        <div className="lp-rail lp-fade">
+          <div className="lp-rail__mask">
+            <div className="lp-rail__track" ref={railTrackRef}>
+
+              {/* Eid */}
+              <a className="lp-card lp-card--eid" href="/demo/eid">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
+                    <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
+                    <circle cx="36" cy="10" r="2.5"/>
+                    <path d="M36 6v-2M36 16v-2M40 10h2M32 10h-2M39 7l1-1M33 13l-1 1M39 13l1 1M33 7l-1-1"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Eid</span>
+                <span className="lp-card__desc">Open a sealed eidi</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              {/* Birthday */}
+              <a className="lp-card lp-card--birthday" href="/demo/birthday">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="8" y="22" width="32" height="18" rx="3"/><rect x="12" y="16" width="24" height="6" rx="2"/>
+                    <line x1="24" y1="16" x2="24" y2="40"/><path d="M24 10c0-3 2-5 0-7"/>
+                    <circle cx="24" cy="13" r="1.5" fill="rgba(242,232,213,0.35)" stroke="none"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Birthday</span>
+                <span className="lp-card__desc">Someone left you this</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              {/* Proposal */}
+              <a className="lp-card lp-card--proposal" href="/demo/proposal">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="24" cy="22" r="10"/><ellipse cx="24" cy="22" rx="5" ry="10"/>
+                    <circle cx="24" cy="10" r="3.5"/><circle cx="24" cy="10" r="1.5" fill="rgba(242,232,213,0.3)" stroke="none"/>
+                    <path d="M20 40h8"/><path d="M22 34h4v6h-4z"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Proposal</span>
+                <span className="lp-card__desc">A letter is waiting</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              {/* Anniversary */}
+              <a className="lp-card lp-card--anniversary" href="/demo/anniversary">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
+                    <line x1="8" y1="40" x2="20" y2="30"/><line x1="40" y1="40" x2="28" y2="30"/>
+                    <circle cx="24" cy="12" r="4"/><path d="M20 12c0-4 4-8 4-8s4 4 4 8"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Anniversary</span>
+                <span className="lp-card__desc">Sealed just for you</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              {/* Apology */}
+              <a className="lp-card lp-card--apology" href="/demo/apology">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 28c-4 0-8-3-8-8s4-8 8-8c2 0 4 1 5 2"/>
+                    <path d="M32 28c4 0 8-3 8-8s-4-8-8-8c-2 0-4 1-5 2"/>
+                    <path d="M20 14c2-2 5-2 8 0"/>
+                    <path d="M14 30l-2 10 6-4 6 4-2-10"/><path d="M26 30l-2 10 6-4 6 4-2-10"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Apology</span>
+                <span className="lp-card__desc">Read what they wrote</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              {/* Farewell */}
+              <a className="lp-card lp-card--farewell" href="/demo/farewell">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 36c2-6 6-10 14-10s12 4 14 10"/><circle cx="24" cy="16" r="8"/>
+                    <path d="M34 14l6-6"/><path d="M38 14l2-2"/><path d="M36 8l4 0"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Farewell</span>
+                <span className="lp-card__desc">One last thing to say</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
+          SECTION 2 — PROBLEM
+      ══════════════════════════════════════ */}
+      <section className="lp-section">
+        <p className="lp-section__num lp-fade">02</p>
+        <div className="lp-fade">
+          <p className="lp-s2__headline">Some things shouldn't<br />disappear in a chat history.</p>
+          <p className="lp-s2__sub">Write them properly.</p>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
+          SECTION 3 — THE MAGIC
+      ══════════════════════════════════════ */}
+      <section className="lp-section lp-section--s3">
+        <p className="lp-section__num lp-fade">03</p>
+        <div className="lp-s3__block lp-fade">
+          <span className="lp-s3__connector">A letter written</span>
+          <span className="lp-s3__statement">for one person.</span>
+          <span className="lp-s3__connector">Sealed until</span>
+          <span className="lp-s3__statement">they open it.</span>
+          <div className="lp-s3__rule" />
+          <span className="lp-s3__connector">Gone from</span>
+          <span className="lp-s3__statement">everywhere else.</span>
+          <p className="lp-s3__close">Only the person you choose<br />can ever read it.</p>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
+          SECTION 4 — PRIVACY
+      ══════════════════════════════════════ */}
+      <section className="lp-section lp-section--s4">
+        <p className="lp-section__num lp-fade">04</p>
+        <div className="lp-fade">
+          <p className="lp-s4__main">Private by design.</p>
+          <div className="lp-s4__list">
+            <p className="lp-s4__item">Nothing you write is public.</p>
+            <p className="lp-s4__item">Nothing is indexed.</p>
+            <p className="lp-s4__item">Nothing can be discovered.</p>
+          </div>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
+          SECTION 5 — FINAL CTA
+      ══════════════════════════════════════ */}
+      <section className="lp-section lp-section--s5">
+        <p className="lp-section__num lp-fade">05</p>
+        <div className="lp-fade">
+          <p className="lp-s5__headline">When the moment deserves<br />more than a message.</p>
+          <p className="lp-s5__sub">One letter. One person. Forever sealed.</p>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
+          FOOTER
+      ══════════════════════════════════════ */}
+      <footer className="lp-footer">
+        <div className="lp-footer__columns">
+          <div className="lp-footer__col">
+            <p className="lp-footer__col-heading">SEALED VOW</p>
+            <ul>
+              <li><a href="#">About Us</a></li>
+              <li><a href="#">How It Works</a></li>
+              <li><a href="#">Contact</a></li>
+            </ul>
+          </div>
+          <div className="lp-footer__col">
+            <p className="lp-footer__col-heading">Policy</p>
+            <ul>
+              <li><button onClick={() => setShowPrivacy(true)}>Privacy Policy</button></li>
+              <li><button onClick={() => setShowTerms(true)}>Terms of Use</button></li>
+            </ul>
+          </div>
+          <div className="lp-footer__col">
+            <p className="lp-footer__col-heading">Need Help?</p>
+            <ul>
+              <li><button onClick={() => setShowHelp(true)}>Contact Us</button></li>
+              <li><a href="#">FAQs</a></li>
+            </ul>
+          </div>
+          <div className="lp-footer__col">
+            <p className="lp-footer__col-heading">Stay in the loop</p>
+            <p className="lp-footer__subscribe-text">Thoughtful updates on new features and quiet moments.</p>
+            <div className="lp-footer__subscribe-form">
+              <input className="lp-footer__subscribe-input" type="email" placeholder="Enter email address" />
+              <button className="lp-footer__subscribe-btn">→</button>
+            </div>
+          </div>
+        </div>
+        <div className="lp-footer__bottom">
+          <div className="lp-footer__socials">
+            <a href="#" className="lp-footer__social-link" aria-label="Instagram">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+            </a>
+            <a href="#" className="lp-footer__social-link" aria-label="X / Twitter">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.261 5.634 5.903-5.634Zm-1.161 17.52h1.833L7.084 4.126H5.117Z"/></svg>
+            </a>
+            <a href="#" className="lp-footer__social-link" aria-label="LinkedIn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
+            </a>
+          </div>
+          <p className="lp-footer__copy">© 2026 SEALED VOW. All rights reserved.</p>
+          <p className="lp-footer__tagline">Private by design. Nothing public. Ever.</p>
+        </div>
+      </footer>
+
+
+      {/* ══════════════════════════════════════
+          LOGIN MODAL
+      ══════════════════════════════════════ */}
+      <div
+        className={`lp-modal-backdrop ${showLogin ? 'open' : ''}`}
+        onClick={(e) => { if (e.target === e.currentTarget) setShowLogin(false); }}
+      >
+        <div className="lp-modal">
+          <button className="lp-modal__close" onClick={() => setShowLogin(false)}>✕</button>
+          <h2 className="lp-modal__title">Sign in</h2>
+          <p className="lp-modal__sub">Save your letters<br />and view them later.</p>
+          <div className="lp-modal__rule" />
+          <button className="lp-btn-google" onClick={() => { window.location.href = '/auth/google'; }}>
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+              <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z"/>
+            </svg>
+            Continue with Google
+          </button>
+          <button className="lp-btn-guest" onClick={() => { setShowLogin(false); onEnter(); }}>Continue as Guest</button>
+          <div className="lp-modal__or"><span>or</span></div>
+          <input className="lp-modal__input" type="email" placeholder="your@email.com" value={emailInput} onChange={e => setEmailInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendLoginLink()} />
+          <button className="lp-btn-email-send" onClick={handleSendLoginLink}>Send login link</button>
+          <p className="lp-modal__guest-note">Guest letters are not saved after the session ends.</p>
+        </div>
       </div>
 
-      {/* ── EID TOUCHPOINT 3 — Eid section below hero ── */}
-      {showEid && (
-        <section style={{
-          width: '100%',
-          maxWidth: 480,
-          margin: '0 auto',
-          padding: '48px 24px',
-          textAlign: 'center',
-          fontFamily: 'Georgia, serif',
-          borderTop: '1px solid rgba(212,175,55,0.1)',
-        }}>
-          <style>{`
-            @keyframes moonGlow {
-              0%,100% { text-shadow: 0 0 20px rgba(212,175,55,0.3); }
-              50% { text-shadow: 0 0 40px rgba(212,175,55,0.7); }
-            }
-          `}</style>
-
-          <div style={{ fontSize: 40, animation: 'moonGlow 3s ease-in-out infinite', marginBottom: 16 }}>🌙</div>
-
-          <p style={{ fontSize: 9, letterSpacing: '0.5em', textTransform: 'uppercase', color: 'rgba(212,175,55,0.5)', fontWeight: 'bold', marginBottom: 8 }}>
-            {festival?.name ?? 'Eid ul-Fitr 2026'}
-          </p>
-          <p style={{ fontSize: 18, fontStyle: 'italic', color: '#F7E6A7', marginBottom: 32, lineHeight: 1.5 }}>
-            Send a sealed Eidi.<br />Let them scratch to reveal.
-          </p>
-
-          {/* 3-step explainer */}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 32 }}>
-            {[
-              { step: '1', text: 'Write a blessing' },
-              { step: '2', text: 'Add Eidi amount' },
-              { step: '3', text: 'They scratch to reveal' },
-            ].map((s, i) => (
-              <div key={i} style={{ background: 'rgba(27,67,50,0.4)', border: '1px solid rgba(212,175,55,0.15)', borderRadius: 10, padding: '12px 14px', minWidth: 100, textAlign: 'center' }}>
-                <p style={{ fontSize: 18, fontWeight: 'bold', color: '#D4AF37', marginBottom: 4 }}>{s.step}</p>
-                <p style={{ fontSize: 10, color: 'rgba(247,230,167,0.6)', letterSpacing: '0.05em' }}>{s.text}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Countdown */}
-          {eidStartAt && eidStartAt > Date.now() && (
-            <div style={{ marginBottom: 28 }}>
-              <EidCountdown unlockAt={eidStartAt} variant="landing" />
-            </div>
-          )}
-
-          <a
-            href="/eidi/create"
-            style={{ display: 'inline-block', padding: '14px 36px', background: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.35)', borderRadius: 100, fontSize: 11, fontWeight: 'bold', letterSpacing: '0.3em', textTransform: 'uppercase', textDecoration: 'none', fontFamily: 'Georgia, serif' }}
-          >
-            Send Eidi 🌙
-          </a>
-        </section>
-      )}
-
-      {/* Footer */}
-      <footer className={`w-full py-6 flex flex-col items-center transition-opacity duration-[2000ms] ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="w-[240px] h-px bg-[#D4AF37]/30" />
-        <div className="py-6 flex flex-col items-center space-y-4">
-          <p className="text-[10px] uppercase tracking-[0.25em] font-bold opacity-80">VOW — A private expression studio</p>
-          <div className="flex flex-col items-center gap-1 opacity-70">
-            <p className="text-[10px] uppercase tracking-[0.2em] font-bold">Private by design.</p>
-            <p className="text-[10px] uppercase tracking-[0.2em] font-bold">Nothing public. Ever.</p>
-          </div>
-          <div className="flex flex-col items-center gap-2 pt-3 opacity-60">
-            <div className="flex gap-4 text-[10px] uppercase tracking-[0.2em] font-bold">
-              <button onClick={() => setShowPrivacy(true)} className="hover:text-[#D4AF37]">Privacy Protocol</button>
-              <span>·</span>
-              <button onClick={() => setShowTerms(true)} className="hover:text-[#D4AF37]">Terms</button>
-            </div>
-            <p className="text-[10px] tracking-widest font-bold">© 2026</p>
-          </div>
-          <button onClick={() => setShowHelp(true)} className="text-[9px] uppercase tracking-[0.2em] font-bold opacity-60 hover:opacity-70 hover:text-[#D4AF37] transition-all mt-4">
-            Support
-          </button>
-        </div>
-        <div className="w-[240px] h-px bg-[#D4AF37]/30" />
-      </footer>
     </div>
   );
 };
