@@ -78,12 +78,12 @@ const THEME_STYLES: Record<Theme, {
 };
 
 const OCCASION_TITLES: Record<Occasion, string> = {
-  valentine: "A Valentine's Dedication",
   anniversary: "A Celebration of Time",
   apology: "A Message of Reconciliation",
   'just-because': "A Spontaneous Thought",
   'long-distance': "Across the Distance",
-  'thank-you': "With Gratitude"
+  'thank-you': "With Gratitude",
+  eid: "A Blessed Gift",
 };
 
 /* ------------------------------------------------------------------ */
@@ -219,7 +219,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const theme = THEME_STYLES[data.theme || 'obsidian'];
   const activeVideo = data.video?.url;
   const hasVideo = !!activeVideo && data.videoSource !== 'none';
-  const occasionTitle = OCCASION_TITLES[data.occasion || 'valentine'] || 'A Private Moment';
+  const occasionTitle = OCCASION_TITLES[data.occasion || 'anniversary'] || 'A Private Moment';
 
   // Derive sealed date once — validated and memoized
   const sealedDate = useMemo(() => {
@@ -683,67 +683,49 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       )}
 
       {/* DEMO: Final Conversion Screen — the only CTA in the entire demo */}
-      {isDemoMode && !isPreview && (() => {
-        const isValentine = data.occasion === 'valentine';
-        return (
-          <section className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-8 relative" style={{ backgroundColor: '#0C0A09' }}>
-            <div className="text-center max-w-md mx-auto">
+      {isDemoMode && !isPreview && (
+        <section className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-8 relative" style={{ backgroundColor: '#0C0A09' }}>
+          <div className="text-center max-w-md mx-auto">
 
-              {isValentine && (
-                <div className="mb-16" style={{ animation: 'closureReveal 1.2s ease-out 0.2s both' }}>
-                  <p className="text-[13px] text-[#E5D0A1]/60 italic leading-relaxed mb-3" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
-                    She didn't speak for a few seconds.
-                  </p>
-                  <p className="text-[13px] text-[#E5D0A1]/60 italic leading-relaxed" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
-                    Then softly,<br/>
-                    "You actually made this for me?"
-                  </p>
-                </div>
-              )}
-
-              <div className="w-px h-12 bg-gradient-to-b from-transparent via-[#D4AF37]/20 to-transparent mx-auto mb-10" style={{ animation: 'closureReveal 0.8s ease-out 1s both' }} />
-
-              <div style={{ animation: 'closureReveal 0.8s ease-out 1.2s both' }}>
-                <p className="text-[11px] italic font-serif-elegant mb-10 leading-relaxed" style={{ color: '#E5D0A1', opacity: 0.6 }}>
-                  If this reminded you of someone — don't scroll away.
-                </p>
-              </div>
-
-              {isValentine ? (
-                <div style={{ animation: 'closureReveal 1s ease-out 1.6s both' }}>
-                  <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/60 font-bold mb-2">Valentine's Day ends at midnight.</p>
-                  <p className="text-[9px] text-[#E5D0A1]/50 italic mb-10">Moments delayed become regrets.</p>
-                </div>
-              ) : (
-                <div style={{ animation: 'closureReveal 1s ease-out 1.6s both' }}>
-                  <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/60 font-bold mb-2">Love should not be assumed.</p>
-                  <p className="text-[9px] text-[#E5D0A1]/50 italic mb-10">It should be expressed.</p>
-                </div>
-              )}
-
-              <div style={{ animation: 'closureReveal 0.8s ease-out 2.2s both' }}>
-                <button
-                  onClick={() => { window.location.href = '/'; }}
-                  className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[11px] tracking-[0.4em] uppercase px-14 py-5 rounded-full shadow-2xl transition-all duration-300 active:scale-[0.98]"
-                >
-                  {isValentine ? 'Seal Yours Before Midnight' : 'Create Your Own'}
-                </button>
-              </div>
-
-              <div className="mt-8" style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}>
-                <p className="text-[7px] uppercase tracking-[0.3em] text-[#D4AF37]/50">This is how people are choosing to say it this year.</p>
-              </div>
-
-              {isValentine && (
-                <div className="mt-6" style={{ animation: 'closureReveal 0.8s ease-out 3.6s both' }}>
-                  <p className="text-[9px] text-[#E5D0A1]/50 italic">Tomorrow, someone will wish they had sent this.</p>
-                </div>
-              )}
-
+            <div className="mb-16" style={{ animation: 'closureReveal 1.2s ease-out 0.2s both' }}>
+              <p className="text-[13px] text-[#E5D0A1]/60 italic leading-relaxed mb-3" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
+                They didn't speak for a few seconds.
+              </p>
+              <p className="text-[13px] text-[#E5D0A1]/60 italic leading-relaxed" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
+                Then softly,<br/>
+                "You actually made this for me?"
+              </p>
             </div>
-          </section>
-        );
-      })()}
+
+            <div className="w-px h-12 bg-gradient-to-b from-transparent via-[#D4AF37]/20 to-transparent mx-auto mb-10" style={{ animation: 'closureReveal 0.8s ease-out 1s both' }} />
+
+            <div style={{ animation: 'closureReveal 0.8s ease-out 1.2s both' }}>
+              <p className="text-[11px] italic font-serif-elegant mb-10 leading-relaxed" style={{ color: '#E5D0A1', opacity: 0.6 }}>
+                If this reminded you of someone — don't scroll away.
+              </p>
+            </div>
+
+            <div style={{ animation: 'closureReveal 1s ease-out 1.6s both' }}>
+              <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/60 font-bold mb-2">Love should not be assumed.</p>
+              <p className="text-[9px] text-[#E5D0A1]/50 italic mb-10">It should be expressed.</p>
+            </div>
+
+            <div style={{ animation: 'closureReveal 0.8s ease-out 2.2s both' }}>
+              <button
+                onClick={() => { window.location.href = '/'; }}
+                className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[11px] tracking-[0.4em] uppercase px-14 py-5 rounded-full shadow-2xl transition-all duration-300 active:scale-[0.98]"
+              >
+                Create Your Own
+              </button>
+            </div>
+
+            <div className="mt-8" style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}>
+              <p className="text-[7px] uppercase tracking-[0.3em] text-[#D4AF37]/50">This is how people are choosing to say it this year.</p>
+            </div>
+
+          </div>
+        </section>
+      )}
 
       </>)}
 
@@ -932,15 +914,8 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                         boxShadow: '0 10px 30px rgba(114,47,55,0.4)',
                       }}
                     >
-                      {data.occasion === 'valentine' ? 'Seal Yours Before Midnight' : 'Create Your Own'}
+                      Create Your Own
                     </a>
-                    {data.occasion === 'valentine' && (
-                      <div className="mt-6 space-y-2">
-                        <p className="text-[9px] uppercase tracking-[0.25em] font-bold" style={{ color: theme.gold, opacity: 0.6 }}>Valentine's Day ends at midnight.</p>
-                        <p className="text-[8px] italic" style={{ color: theme.text, opacity: 0.5 }}>Moments delayed become regrets.</p>
-                        <p className="text-[7px] uppercase tracking-[0.3em] mt-3" style={{ color: theme.gold, opacity: 0.5 }}>This is how people are choosing to say it this year.</p>
-                      </div>
-                    )}
                   </div>
                 </>
               ) : (

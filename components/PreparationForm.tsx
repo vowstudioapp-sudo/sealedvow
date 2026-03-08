@@ -5,18 +5,30 @@ import { useMediaUploads } from '../hooks/useMediaUploads';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useDictation } from '../hooks/useDictation';
 import { CoupleData, Occasion, GiftType, Theme, Coupon, RevealMethod } from '../types.ts';
+import { getActiveFestival, FestivalType } from '../config/festivals';
 
 interface Props {
   onComplete: (data: CoupleData) => void;
 }
 
-const OCCASIONS: { id: Occasion; label: string; icon: string; defaultTone: string }[] = [
-  { id: 'valentine', label: 'Valentine\'s', icon: '❤️', defaultTone: 'Deeply romantic, grateful, and present.' },
-  { id: 'anniversary', label: 'Anniversary', icon: '🥂', defaultTone: 'Nostalgic, proud, and enduring.' },
-  { id: 'just-because', label: 'Just Because', icon: '✨', defaultTone: 'Playful, spontaneous, and affectionate.' },
-  { id: 'apology', label: 'I\'m Sorry', icon: '🕯️', defaultTone: 'Humble, sincere, and stripped back.' },
-  { id: 'long-distance', label: 'Missing You', icon: '✈️', defaultTone: 'Longing, hopeful, and digitally intimate.' },
-  { id: 'thank-you', label: 'A Thank You', icon: '🙏', defaultTone: 'Appreciative, specific, and admiring.' },
+// FestivalOccasion aliases FestivalType — single source of truth, no duplication
+type FestivalOccasion = FestivalType;
+
+// CORE OCCASIONS — always visible, 365 days a year
+const CORE_OCCASIONS: { id: Occasion; label: string; icon: string; defaultTone: string; hint: string }[] = [
+  { id: 'anniversary',   label: 'Anniversary',  icon: '🥂',  hint: 'Celebrate your journey',  defaultTone: 'Nostalgic, proud, and enduring.' },
+  { id: 'just-because',  label: 'Just Because', icon: '✨',  hint: 'No reason needed',         defaultTone: 'Playful, spontaneous, and affectionate.' },
+  { id: 'apology',       label: 'I\'m Sorry',   icon: '🕯️', hint: 'Make things right',        defaultTone: 'Humble, sincere, and stripped back.' },
+  { id: 'long-distance', label: 'Missing You',  icon: '✈️',  hint: 'Across any distance',      defaultTone: 'Longing, hopeful, and digitally intimate.' },
+  { id: 'thank-you',     label: 'A Thank You',  icon: '🙏',  hint: 'Say it properly',          defaultTone: 'Appreciative, specific, and admiring.' },
+];
+
+// FESTIVAL OCCASIONS — shown only when a festival is active
+// Uses FestivalOccasion (= FestivalType) — seasonal events, not emotional intents
+// Selecting one redirects to its own product flow — never stored in data.occasion
+const FESTIVAL_OCCASIONS: { id: FestivalOccasion; label: string; icon: string; route: string }[] = [
+  { id: 'eid', label: 'Eid Special', icon: '🌙', route: '/eidi/create' },
+  // { id: 'diwali', label: 'Diwali Special', icon: '🪔', route: '/festivals/diwali' },
 ];
 
 const THEMES: { id: Theme; label: string; color: string; desc: string }[] = [
@@ -78,7 +90,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   });
   const [writingMode, setWritingMode] = useState<'self' | 'assisted'>('assisted');
   
-  const [showAllOccasions, setShowAllOccasions] = useState(false);
   const [showLocationFields, setShowLocationFields] = useState(false);
   const [activePhoto, setActivePhoto] = useState<number | null>(null);
   const [phase, setPhase] = useState(1);
@@ -140,12 +151,21 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
     return () => { document.body.style.overflow = ''; };
   }, [activePhoto]);
 
-  const handleOccasionChange = (occ: Occasion) => {
-      const occasionConfig = OCCASIONS.find(o => o.id === occ);
-      updateData(prev => ({
-          occasion: occ,
-          relationshipIntent: occasionConfig ? occasionConfig.defaultTone : prev.relationshipIntent
-      }));
+  const handleOccasionChange = (occ: Occasion | FestivalOccasion) => {
+    const festivalOcc = FESTIVAL_OCCASIONS.find(o => o.id === occ);
+    if (festivalOcc) {
+      // Visually select the button before navigating — prevents double-click confusion
+      updateData(prev => ({ ...prev, occasion: occ as Occasion }));
+      setTimeout(() => {
+        window.location.assign(festivalOcc.route);
+      }, 150);
+      return;
+    }
+    const occasionConfig = CORE_OCCASIONS.find(o => o.id === occ);
+    updateData(prev => ({
+      occasion: occ as Occasion,
+      relationshipIntent: occasionConfig ? occasionConfig.defaultTone : prev.relationshipIntent,
+    }));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -308,48 +328,70 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                   </div>
                 </div>
 
-                <div className="text-center border-b border-luxury-ink/20 pb-12">
-                  <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 mb-8 block">Select Occasion</label>
-                  <div className="flex flex-wrap justify-center gap-3 transition-all duration-500 ease-in-out">
-                    {OCCASIONS.slice(0, 3).map(occ => (
-                      <button
-                        key={occ.id}
-                        type="button"
-                        onClick={() => handleOccasionChange(occ.id)}
-                        className={`px-5 py-3 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center space-x-2 border ${
-                          data.occasion === occ.id ? 'bg-luxury-ink text-white border-luxury-ink shadow-lg transform scale-105' : 'bg-transparent text-luxury-ink/80 border-luxury-ink/40 hover:border-luxury-ink/70 hover:text-luxury-ink'
-                        }`}
-                      >
-                        <span>{occ.icon}</span>
-                        <span>{occ.label}</span>
-                      </button>
-                    ))}
+                <div className="border-b border-luxury-ink/20 pb-12">
+                  <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 mb-8 block text-center">
+                    Select Occasion
+                  </label>
 
-                    {showAllOccasions && OCCASIONS.slice(3).map(occ => (
-                      <button
-                        key={occ.id}
-                        type="button"
-                        onClick={() => handleOccasionChange(occ.id)}
-                        className={`px-5 py-3 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center space-x-2 border animate-fade-in ${
-                          data.occasion === occ.id ? 'bg-luxury-ink text-white border-luxury-ink shadow-lg transform scale-105' : 'bg-transparent text-luxury-ink/80 border-luxury-ink/40 hover:border-luxury-ink/70 hover:text-luxury-ink'
-                        }`}
-                      >
-                        <span>{occ.icon}</span>
-                        <span>{occ.label}</span>
-                      </button>
-                    ))}
-
-                    {!showAllOccasions && (
+                  {/* MOMENTS — core occasions, always visible */}
+                  <div className="mb-6">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-luxury-ink/30 mb-4 text-center">Moments</p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {CORE_OCCASIONS.map(occ => (
                         <button
-                            type="button"
-                            onClick={() => setShowAllOccasions(true)}
-                            className="px-5 py-3 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center space-x-2 border bg-luxury-paper/50 text-luxury-ink/50 border-luxury-ink/10 hover:border-luxury-ink/40 hover:text-luxury-ink hover:bg-white/50"
+                          key={occ.id}
+                          type="button"
+                          onClick={() => handleOccasionChange(occ.id)}
+                          className={`px-5 py-3 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center space-x-2 border ${
+                            data.occasion === occ.id
+                              ? 'bg-luxury-ink text-white border-luxury-ink shadow-lg transform scale-105'
+                              : 'bg-transparent text-luxury-ink/80 border-luxury-ink/40 hover:border-luxury-ink/70 hover:text-luxury-ink'
+                          }`}
                         >
-                            <span className="text-xs">+</span>
-                            <span>More</span>
+                          <div className="flex flex-col items-center leading-snug">
+                            <span className="flex items-center gap-2">
+                              <span className="text-[14px] tracking-normal">{occ.icon}</span>
+                              <span>{occ.label}</span>
+                            </span>
+                            <span className="text-[8px] tracking-normal normal-case opacity-60 mt-0.5">
+                              {occ.hint}
+                            </span>
+                          </div>
                         </button>
-                    )}
+                      ))}
+                    </div>
                   </div>
+
+                  {/* FESTIVALS — only renders when a festival is active */}
+                  {(() => {
+                    const activeFestival = getActiveFestival();
+                    const visible = activeFestival
+                      ? FESTIVAL_OCCASIONS.filter(o => o.id === activeFestival.type)
+                      : [];
+                    if (visible.length === 0) return null;
+                    return (
+                      <div>
+                        <div className="flex items-center justify-center gap-3 mb-4">
+                          <div className="h-px w-12 bg-luxury-ink/20" />
+                          <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-luxury-ink/30">Festivals</p>
+                          <div className="h-px w-12 bg-luxury-ink/20" />
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          {visible.map(occ => (
+                            <button
+                              key={occ.id}
+                              type="button"
+                              onClick={() => handleOccasionChange(occ.id)}
+                              className="px-5 py-3 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center space-x-2 border border-[#D4AF37]/50 text-[#8B6914] bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 hover:border-[#D4AF37]"
+                            >
+                              <span className="text-[14px] tracking-normal">{occ.icon}</span>
+                              <span>{occ.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">

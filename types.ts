@@ -35,12 +35,12 @@ export enum LetterStatus {
 // ============================================================================
 
 export type Occasion =
-  | 'valentine'
   | 'anniversary'
   | 'apology'
   | 'just-because'
   | 'long-distance'
-  | 'thank-you';
+  | 'thank-you'
+  | 'eid';
 
 export type Theme =
   | 'obsidian'

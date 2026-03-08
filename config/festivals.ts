@@ -5,6 +5,8 @@
 // when today falls within its dateRange.
 // ─────────────────────────────────────────────
 
+export type FestivalType = 'eid' | 'diwali' | 'christmas' | 'ramadan';
+
 export type FestivalParticles = 'stars' | 'diyas' | 'snowflakes';
 export type FestivalReveal    = 'scratch' | 'diya-light' | 'ribbon-unwrap';
 
@@ -34,6 +36,7 @@ export interface FestivalVisual {
 export interface Festival {
   id:     string;
   name:   string;
+  type:   FestivalType;
   start:  string;   // 'YYYY-MM-DD'
   end:    string;   // 'YYYY-MM-DD'
   route:  string;
@@ -64,6 +67,7 @@ export const FESTIVALS: Festival[] = [
   {
     id:    'eid-ul-fitr-2026',
     name:  'Eid ul-Fitr 2026',
+    type:  'eid',
     start: '2026-03-07',
     end:   '2026-03-31',
     route: '/eidi/create',

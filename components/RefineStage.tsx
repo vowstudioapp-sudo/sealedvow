@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
-import { generateLoveLetter, generateCoupleMyth, generateValentineImage, generateCinematicVideo, generateSacredLocation, generateFutureProphecy } from '../services/geminiService';
+import { generateLoveLetter, generateCoupleMyth, generateCoupleImage, generateCinematicVideo, generateSacredLocation, generateFutureProphecy } from '../services/geminiService';
 
 interface Props {
   data: CoupleData;
@@ -106,7 +106,7 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
       if (!data.userImageUrl) {
           setPackageStatus("Painting a memory...");
           try {
-             const res = await generateValentineImage(`A quiet, private moment of two people, candid and intimate photography.`);
+             const res = await generateCoupleImage(`A quiet, private moment of two people, candid and intimate photography.`);
              if (res) enrichedData.aiImageUrl = await compressBase64(res);
           } catch (e) { console.warn("Image failed", e); }
       }

@@ -99,7 +99,7 @@ export const CoupleDataSchema = z.object({
   senderName: z.string().min(1).max(SECURITY_LIMITS.MAX_NAME_LENGTH).transform(sanitizeString),
 
   theme: z.enum(['obsidian', 'velvet', 'crimson', 'midnight', 'evergreen', 'pearl']),
-  occasion: z.enum(['valentine', 'anniversary', 'apology', 'just-because', 'long-distance', 'thank-you']),
+  occasion: z.enum(['anniversary', 'apology', 'just-because', 'long-distance', 'thank-you', 'eid']),
 
   sessionId: z.string().uuid().optional(),
 

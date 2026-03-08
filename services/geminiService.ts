@@ -44,14 +44,14 @@ export const generateLoveLetter = async (data: CoupleData): Promise<string> => {
     return result.text;
   } catch (error) {
     const fallbacks: Record<Occasion, string> = {
-      valentine: "I keep thinking about you today. Not for any big reason. Just because you're you, and that's enough.",
       anniversary: "Another year. I'd choose this again. Every part of it.",
       'just-because': "No reason for this. Just wanted you to know I was thinking about you.",
       apology: "I messed up. I know that. I'm not going to make excuses. I just want to do better.",
       'long-distance': "It's quiet here without you. I keep reaching for my phone just to hear your voice.",
       'thank-you': "I don't say this enough. But thank you. For everything you do that I forget to notice.",
+      eid: "Eid Mubarak. May this day bring you peace, joy, and the warmth of those you love.",
     };
-    return fallbacks[data.occasion] || fallbacks.valentine;
+    return fallbacks[data.occasion] || fallbacks.anniversary;
   }
 };
 
@@ -81,7 +81,7 @@ export const generateFutureProphecy = async (data: CoupleData): Promise<string[]
   }
 };
 
-export const generateValentineImage = async (visualPrompt: string): Promise<string | null> => {
+export const generateCoupleImage = async (visualPrompt: string): Promise<string | null> => {
   try {
     const result = await callAPI('generateValentineImage', {
       prompt: visualPrompt + " Natural, intimate, unposed photography. Candid moment, soft natural light, warm film grain. No studio lighting."

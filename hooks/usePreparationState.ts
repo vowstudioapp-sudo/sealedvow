@@ -22,7 +22,7 @@ export function usePreparationState(initialCoupons: Coupon[] = []) {
     relationshipIntent: 'Deeply romantic, grateful, and present.',
     sharedMoment: '',
 
-    occasion: 'valentine',
+    occasion: 'anniversary',
     writingMode: 'assisted',
     finalLetter: '',
     senderRawThoughts: '',
