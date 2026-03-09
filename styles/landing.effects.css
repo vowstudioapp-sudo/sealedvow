@@ -344,18 +344,23 @@
   overflow: hidden;
 }
 
-/* Soft ambient glow */
-.lp-demo-cards::before {
-  content: '';
+/* Parallax glow layer — moves subtly with cursor */
+.lp-demo-cards__glow {
   position: absolute;
-  top: 40%;
+  top: 50%;
   left: 50%;
+  width: 140%;
+  height: 140%;
   transform: translate(-50%, -50%);
-  width: 700px;
-  height: 500px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(231,217,183,0.025) 0%, transparent 70%);
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(120,160,255,0.1),
+    rgba(100,140,220,0.04) 40%,
+    transparent 60%
+  );
   pointer-events: none;
+  z-index: 0;
+  transition: transform 0.6s ease-out;
 }
 
 /* Heading */
@@ -393,20 +398,38 @@
 .lp-rail__track {
   display: flex;
   gap: 22px;
-  padding: 20px 48px 24px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  cursor: grab;
+  padding: 20px 0 24px;
+  width: max-content;
   perspective: 1200px;
+  animation: lp-railScroll 60s linear infinite;
 }
-.lp-rail__track::-webkit-scrollbar { display: none; }
-.lp-rail__track:active { cursor: grabbing; }
 
-/* Edge fade masks */
+/* Pause on hover anywhere in the rail */
+.lp-rail:hover .lp-rail__track {
+  animation-play-state: paused;
+}
+
+@keyframes lp-railScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Sibling dimming — when any card is hovered, dim the others */
+.lp-rail__track:hover .lp-card {
+  opacity: 0.5;
+  transition: opacity 0.4s ease, transform 0.35s ease, border-color 0.4s ease, background 0.4s ease;
+}
+
+.lp-rail__track:hover .lp-card:hover {
+  opacity: 1;
+}
+
+.lp-rail__track::-webkit-scrollbar { display: none; }
+
+/* Rail mask overflow hidden for infinite loop */
 .lp-rail__mask {
   position: relative;
+  overflow: hidden;
 }
 .lp-rail__mask::before,
 .lp-rail__mask::after {
@@ -427,20 +450,11 @@
   background: linear-gradient(to left, #0c1320, transparent);
 }
 
-/* Spacers */
-.lp-rail__track::before,
-.lp-rail__track::after {
-  content: '';
-  flex-shrink: 0;
-  width: 20px;
-}
-
 /* ── Card ── */
 .lp-card {
   --x: 50%;
   --y: 50%;
   flex-shrink: 0;
-  scroll-snap-align: center;
   width: 260px;
   height: 320px;
   background: #111a28;
@@ -500,7 +514,7 @@
 
 /* ── Per-card color themes — spotlight from top ── */
 
-/* Eid — emerald */
+/* Eid — emerald #4CAF78 */
 .lp-card--eid::before {
   background: radial-gradient(circle at 50% 0%, rgba(76,175,120,0.2), rgba(76,175,120,0.06) 45%, transparent 70%);
 }
@@ -508,57 +522,57 @@
   background: #0e1a1a;
   border-color: rgba(76,175,120,0.25);
 }
-.lp-card--eid:hover .lp-card__icon svg { stroke: rgba(120,210,160,0.85); }
+.lp-card--eid:hover .lp-card__icon svg { stroke: rgba(100,195,140,0.85); }
 
-/* Birthday — amber */
-.lp-card--birthday::before {
-  background: radial-gradient(circle at 50% 0%, rgba(230,180,80,0.2), rgba(230,180,80,0.06) 45%, transparent 70%);
-}
-.lp-card--birthday:hover {
-  background: #151a18;
-  border-color: rgba(230,180,80,0.25);
-}
-.lp-card--birthday:hover .lp-card__icon svg { stroke: rgba(240,200,110,0.85); }
-
-/* Proposal — rose */
-.lp-card--proposal::before {
-  background: radial-gradient(circle at 50% 0%, rgba(210,130,150,0.2), rgba(210,130,150,0.06) 45%, transparent 70%);
-}
-.lp-card--proposal:hover {
-  background: #16141e;
-  border-color: rgba(210,130,150,0.25);
-}
-.lp-card--proposal:hover .lp-card__icon svg { stroke: rgba(230,160,175,0.85); }
-
-/* Anniversary — crimson */
+/* Anniversary — crimson #C8645A */
 .lp-card--anniversary::before {
   background: radial-gradient(circle at 50% 0%, rgba(200,100,90,0.2), rgba(200,100,90,0.06) 45%, transparent 70%);
 }
 .lp-card--anniversary:hover {
-  background: #16131a;
+  background: #1a1214;
   border-color: rgba(200,100,90,0.25);
 }
-.lp-card--anniversary:hover .lp-card__icon svg { stroke: rgba(225,135,125,0.85); }
+.lp-card--anniversary:hover .lp-card__icon svg { stroke: rgba(220,130,120,0.85); }
 
-/* Apology — blue */
+/* Birthday — amber #E6B450 */
+.lp-card--birthday::before {
+  background: radial-gradient(circle at 50% 0%, rgba(230,180,80,0.2), rgba(230,180,80,0.06) 45%, transparent 70%);
+}
+.lp-card--birthday:hover {
+  background: #1a1810;
+  border-color: rgba(230,180,80,0.25);
+}
+.lp-card--birthday:hover .lp-card__icon svg { stroke: rgba(240,200,110,0.85); }
+
+/* Just Because — violet #8C7AE6 */
+.lp-card--justbecause::before {
+  background: radial-gradient(circle at 50% 0%, rgba(140,122,230,0.2), rgba(140,122,230,0.06) 45%, transparent 70%);
+}
+.lp-card--justbecause:hover {
+  background: #141220;
+  border-color: rgba(140,122,230,0.25);
+}
+.lp-card--justbecause:hover .lp-card__icon svg { stroke: rgba(170,155,240,0.85); }
+
+/* Thank You — soft pink #C9849A */
+.lp-card--thankyou::before {
+  background: radial-gradient(circle at 50% 0%, rgba(201,132,154,0.2), rgba(201,132,154,0.06) 45%, transparent 70%);
+}
+.lp-card--thankyou:hover {
+  background: #1a1218;
+  border-color: rgba(201,132,154,0.25);
+}
+.lp-card--thankyou:hover .lp-card__icon svg { stroke: rgba(225,165,182,0.85); }
+
+/* Apology — off-white #E8E4EC */
 .lp-card--apology::before {
-  background: radial-gradient(circle at 50% 0%, rgba(120,160,210,0.2), rgba(120,160,210,0.06) 45%, transparent 70%);
+  background: radial-gradient(circle at 50% 0%, rgba(232,228,236,0.22), rgba(232,228,236,0.07) 45%, transparent 70%);
 }
 .lp-card--apology:hover {
-  background: #0f1520;
-  border-color: rgba(120,160,210,0.25);
+  background: #171720;
+  border-color: rgba(232,228,236,0.3);
 }
-.lp-card--apology:hover .lp-card__icon svg { stroke: rgba(150,185,230,0.85); }
-
-/* Farewell — lavender */
-.lp-card--farewell::before {
-  background: radial-gradient(circle at 50% 0%, rgba(170,140,200,0.2), rgba(170,140,200,0.06) 45%, transparent 70%);
-}
-.lp-card--farewell:hover {
-  background: #141220;
-  border-color: rgba(170,140,200,0.25);
-}
-.lp-card--farewell:hover .lp-card__icon svg { stroke: rgba(195,170,225,0.85); }
+.lp-card--apology:hover .lp-card__icon svg { stroke: rgba(240,238,245,0.9); }
 
 /* Icon */
 .lp-card__icon {
@@ -1364,8 +1378,9 @@
   .lp-demo-cards { padding: 80px 0 120px; }
 
   .lp-rail__track {
-    padding: 20px 24px 20px;
+    padding: 20px 0 20px;
     gap: 16px;
+    animation-duration: 40s;
   }
 
   .lp-card {

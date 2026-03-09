@@ -21,7 +21,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const intervalRef  = useRef<number | null>(null);
   const heroRef      = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const railTrackRef = useRef<HTMLDivElement | null>(null);
+  const demoRef      = useRef<HTMLElement | null>(null);
+  const glowRef      = useRef<HTMLDivElement | null>(null);
 
   /* ── Entrance reveal ── */
   useEffect(() => {
@@ -136,28 +137,32 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     };
   }, [isVisible]);
 
-  /* ── Drag scroll for card rail ── */
+  /* ── Parallax glow behind cards ── */
   useEffect(() => {
-    const track = railTrackRef.current;
-    if (!track) return;
-    let isDown = false;
-    let startX = 0;
-    let scrollLeft = 0;
+    const section = demoRef.current;
+    const glow = glowRef.current;
+    if (!section || !glow) return;
 
-    const onDown = (e: MouseEvent) => { isDown = true; startX = e.pageX - track.offsetLeft; scrollLeft = track.scrollLeft; };
-    const onLeave = () => { isDown = false; };
-    const onUp = () => { isDown = false; };
-    const onMove = (e: MouseEvent) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - track.offsetLeft; track.scrollLeft = scrollLeft - (x - startX) * 1.2; };
+    const MAX_MOVE = 15;
 
-    track.addEventListener('mousedown', onDown);
-    track.addEventListener('mouseleave', onLeave);
-    track.addEventListener('mouseup', onUp);
-    track.addEventListener('mousemove', onMove);
+    const handleMove = (e: MouseEvent) => {
+      const rect = section.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;  // -0.5 to 0.5
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      const moveX = x * MAX_MOVE * 2;
+      const moveY = y * MAX_MOVE * 2;
+      glow.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+    };
+
+    const handleLeave = () => {
+      glow.style.transform = 'translate(-50%, -50%)';
+    };
+
+    section.addEventListener('mousemove', handleMove);
+    section.addEventListener('mouseleave', handleLeave);
     return () => {
-      track.removeEventListener('mousedown', onDown);
-      track.removeEventListener('mouseleave', onLeave);
-      track.removeEventListener('mouseup', onUp);
-      track.removeEventListener('mousemove', onMove);
+      section.removeEventListener('mousemove', handleMove);
+      section.removeEventListener('mouseleave', handleLeave);
     };
   }, [isVisible]);
 
@@ -224,7 +229,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       {/* ══════════════════════════════════════
           DEMO CARDS — directly after hero
       ══════════════════════════════════════ */}
-      <section className="lp-demo-cards">
+      <section className="lp-demo-cards" ref={demoRef}>
+        <div className="lp-demo-cards__glow" ref={glowRef} />
         <div className="lp-demo-cards__heading lp-fade">
           <p className="lp-demo-cards__title">Preview the experience</p>
           <p className="lp-demo-cards__sub">See how your letter arrives</p>
@@ -232,20 +238,20 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
         <div className="lp-rail lp-fade">
           <div className="lp-rail__mask">
-            <div className="lp-rail__track" ref={railTrackRef}>
+            <div className="lp-rail__track">
 
-              {/* Eid */}
-              <a className="lp-card lp-card--eid" href="/demo/eid">
+              {/* ── Card set 1 ── */}
+              {/* Anniversary */}
+              <a className="lp-card lp-card--anniversary" href="/demo/anniversary">
                 <div className="lp-card__icon">
                   <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
-                    <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
-                    <circle cx="36" cy="10" r="2.5"/>
-                    <path d="M36 6v-2M36 16v-2M40 10h2M32 10h-2M39 7l1-1M33 13l-1 1M39 13l1 1M33 7l-1-1"/>
+                    <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
+                    <line x1="8" y1="40" x2="20" y2="30"/><line x1="40" y1="40" x2="28" y2="30"/>
+                    <circle cx="24" cy="12" r="4"/><path d="M20 12c0-4 4-8 4-8s4 4 4 8"/>
                   </svg>
                 </div>
-                <span className="lp-card__title">Eid</span>
-                <span className="lp-card__desc">Open a sealed eidi</span>
+                <span className="lp-card__title">Anniversary</span>
+                <span className="lp-card__desc">Sealed just for you</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
@@ -263,31 +269,45 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              {/* Proposal */}
-              <a className="lp-card lp-card--proposal" href="/demo/proposal">
+              {/* Thank You */}
+              <a className="lp-card lp-card--thankyou" href="/demo/thankyou">
                 <div className="lp-card__icon">
                   <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="24" cy="22" r="10"/><ellipse cx="24" cy="22" rx="5" ry="10"/>
-                    <circle cx="24" cy="10" r="3.5"/><circle cx="24" cy="10" r="1.5" fill="rgba(242,232,213,0.3)" stroke="none"/>
-                    <path d="M20 40h8"/><path d="M22 34h4v6h-4z"/>
+                    <path d="M24 42c-8-6-16-12-16-22a10 10 0 0 1 16-8 10 10 0 0 1 16 8c0 10-8 16-16 22z"/>
+                    <path d="M20 22l3 3 6-6"/>
                   </svg>
                 </div>
-                <span className="lp-card__title">Proposal</span>
-                <span className="lp-card__desc">A letter is waiting</span>
+                <span className="lp-card__title">Thank You</span>
+                <span className="lp-card__desc">Words they deserve</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              {/* Anniversary */}
-              <a className="lp-card lp-card--anniversary" href="/demo/anniversary">
+              {/* Eid */}
+              <a className="lp-card lp-card--eid" href="/demo/eid">
                 <div className="lp-card__icon">
                   <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
-                    <line x1="8" y1="40" x2="20" y2="30"/><line x1="40" y1="40" x2="28" y2="30"/>
-                    <circle cx="24" cy="12" r="4"/><path d="M20 12c0-4 4-8 4-8s4 4 4 8"/>
+                    <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
+                    <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
+                    <circle cx="36" cy="10" r="2.5"/>
+                    <path d="M36 6v-2M36 16v-2M40 10h2M32 10h-2M39 7l1-1M33 13l-1 1M39 13l1 1M33 7l-1-1"/>
                   </svg>
                 </div>
-                <span className="lp-card__title">Anniversary</span>
-                <span className="lp-card__desc">Sealed just for you</span>
+                <span className="lp-card__title">Eid</span>
+                <span className="lp-card__desc">Open a sealed eidi</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              {/* Just Because */}
+              <a className="lp-card lp-card--justbecause" href="/demo/justbecause">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M24 8v32"/><path d="M16 16c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
+                    <circle cx="24" cy="24" r="14"/>
+                    <path d="M14 24h20"/><path d="M18 18l12 12"/><path d="M30 18l-12 12"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Just Because</span>
+                <span className="lp-card__desc">No reason needed</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
@@ -306,16 +326,83 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              {/* Farewell */}
-              <a className="lp-card lp-card--farewell" href="/demo/farewell">
+              {/* ── Card set 2 (duplicate for seamless loop) ── */}
+              <a className="lp-card lp-card--anniversary" href="/demo/anniversary" aria-hidden="true">
                 <div className="lp-card__icon">
                   <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10 36c2-6 6-10 14-10s12 4 14 10"/><circle cx="24" cy="16" r="8"/>
-                    <path d="M34 14l6-6"/><path d="M38 14l2-2"/><path d="M36 8l4 0"/>
+                    <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
+                    <line x1="8" y1="40" x2="20" y2="30"/><line x1="40" y1="40" x2="28" y2="30"/>
+                    <circle cx="24" cy="12" r="4"/><path d="M20 12c0-4 4-8 4-8s4 4 4 8"/>
                   </svg>
                 </div>
-                <span className="lp-card__title">Farewell</span>
-                <span className="lp-card__desc">One last thing to say</span>
+                <span className="lp-card__title">Anniversary</span>
+                <span className="lp-card__desc">Sealed just for you</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              <a className="lp-card lp-card--birthday" href="/demo/birthday" aria-hidden="true">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="8" y="22" width="32" height="18" rx="3"/><rect x="12" y="16" width="24" height="6" rx="2"/>
+                    <line x1="24" y1="16" x2="24" y2="40"/><path d="M24 10c0-3 2-5 0-7"/>
+                    <circle cx="24" cy="13" r="1.5" fill="rgba(242,232,213,0.35)" stroke="none"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Birthday</span>
+                <span className="lp-card__desc">Someone left you this</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              <a className="lp-card lp-card--thankyou" href="/demo/thankyou" aria-hidden="true">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M24 42c-8-6-16-12-16-22a10 10 0 0 1 16-8 10 10 0 0 1 16 8c0 10-8 16-16 22z"/>
+                    <path d="M20 22l3 3 6-6"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Thank You</span>
+                <span className="lp-card__desc">Words they deserve</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              <a className="lp-card lp-card--eid" href="/demo/eid" aria-hidden="true">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
+                    <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
+                    <circle cx="36" cy="10" r="2.5"/>
+                    <path d="M36 6v-2M36 16v-2M40 10h2M32 10h-2M39 7l1-1M33 13l-1 1M39 13l1 1M33 7l-1-1"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Eid</span>
+                <span className="lp-card__desc">Open a sealed eidi</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              <a className="lp-card lp-card--justbecause" href="/demo/justbecause" aria-hidden="true">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M24 8v32"/><path d="M16 16c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
+                    <circle cx="24" cy="24" r="14"/>
+                    <path d="M14 24h20"/><path d="M18 18l12 12"/><path d="M30 18l-12 12"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Just Because</span>
+                <span className="lp-card__desc">No reason needed</span>
+                <span className="lp-card__hint">Preview →</span>
+              </a>
+
+              <a className="lp-card lp-card--apology" href="/demo/apology" aria-hidden="true">
+                <div className="lp-card__icon">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 28c-4 0-8-3-8-8s4-8 8-8c2 0 4 1 5 2"/>
+                    <path d="M32 28c4 0 8-3 8-8s-4-8-8-8c-2 0-4 1-5 2"/>
+                    <path d="M20 14c2-2 5-2 8 0"/>
+                    <path d="M14 30l-2 10 6-4 6 4-2-10"/><path d="M26 30l-2 10 6-4 6 4-2-10"/>
+                  </svg>
+                </div>
+                <span className="lp-card__title">Apology</span>
+                <span className="lp-card__desc">Read what they wrote</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 

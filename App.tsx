@@ -50,6 +50,13 @@ const EidiReceiverPage = lazy(() =>
   import('./pages/eidi/[id].tsx').then(m => ({ default: m.EidiReceiverPage }))
 );
 
+
+const EidOrbitSelector = lazy(() =>
+  import('./components/EidOrbitSelector.tsx').then(m => ({ default: m.EidOrbitSelector }))
+)
+const EidExperience = lazy(() =>
+  import('./components/EidExperience.tsx').then(m => ({ default: m.EidExperience }))
+);
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
@@ -293,11 +300,12 @@ const App: React.FC = () => {
     }
   }, [linkState, sharedData, linkError]);
 
-  // Detect demo mode (/demo/slug)
+  // Detect demo mode (/demo/slug or /demo/eid/child-parent)
   const demoData = useMemo(() => {
     const path = window.location.pathname;
-    const match = path.match(/^\/demo\/([a-z]+)$/);
-    if (match) return getDemoData(match[1]);
+    const match = path.match(/^\/demo\/([a-z]+(?:\/[a-z-]+)?)$/);
+    const slug = match ? match[1].replace('/', '-') : null;
+    if (slug) return getDemoData(slug);
     return null;
   }, []);
   const isDemoMode = !!demoData;
@@ -413,6 +421,13 @@ const App: React.FC = () => {
 
   if (isEidiCreate) {
     return <Suspense fallback={eidiLoadingFallback}><EidiCreatePage /></Suspense>;
+  }
+  if (routeType === 'EID_SELECTOR') {
+    return <Suspense fallback={eidiLoadingFallback}><EidOrbitSelector /></Suspense>;
+  }
+  // /demo/eid/child-parent, /demo/eid/sibling, etc → dedicated Eid 8-screen experience
+  if (/^\/demo\/eid\/.+/.test(window.location.pathname)) {
+    return <Suspense fallback={eidiLoadingFallback}><EidExperience /></Suspense>;
   }
   if (isEidiReceiver) {
     return <Suspense fallback={eidiLoadingFallback}><EidiReceiverPage /></Suspense>;

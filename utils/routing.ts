@@ -7,6 +7,7 @@
 export type RouteType =
   | 'EIDI_CREATE'
   | 'EIDI_RECEIVER'
+  | 'EID_SELECTOR'
   | 'DEMO'
   | 'API'
   | 'RECEIVER'
@@ -17,6 +18,7 @@ export function getRouteType(): RouteType {
 
   if (path === '/eidi/create')                   return 'EIDI_CREATE';
   if (/^\/eidi\/[A-Z0-9]{6}$/i.test(path))      return 'EIDI_RECEIVER';
+  if (path === '/demo/eid')                      return 'EID_SELECTOR';
   if (path.startsWith('/demo'))                  return 'DEMO';
   if (path.startsWith('/api'))                   return 'API';
   if (path.length > 1)                           return 'RECEIVER';
