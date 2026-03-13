@@ -14,8 +14,8 @@ const OUTER_NODES = [
   { key: 'relative-family', title: 'Relative → Family', desc: 'Eidi for the kids',        primary: false, glow: 1.05 },
 ];
 
-const INNER_RADIUS = 125;  // SVG units (viewBox 500×500, center 250)
-const OUTER_RADIUS = 182;
+const INNER_RADIUS = 140;  // SVG units (viewBox 500×500, center 250)
+const OUTER_RADIUS = 210;
 const INNER_STEP   = 360 / INNER_NODES.length;
 const OUTER_STEP   = 360 / OUTER_NODES.length;
 const ELLIPSE_X    = 1.12; // horizontal stretch for elliptical feel
@@ -80,8 +80,8 @@ export const EidOrbitSelector: React.FC = () => {
       const worldDeg = angle + i * step;
       const worldRad = worldDeg * (Math.PI / 180);
       const depth    = Math.sin(worldRad); // -1 (back) to +1 (front)
-      const opacity  = 0.45 + 0.55 * (depth + 1) / 2;
-      const sc       = (0.85 + 0.15 * (depth + 1) / 2) * glowArr[i];
+      const opacity  = 0.35 + 0.65 * (depth + 1) / 2;
+      const sc       = (0.78 + 0.30 * (depth + 1) / 2) * glowArr[i];
       dot.style.opacity   = String(opacity.toFixed(3));
       dot.style.transform = `scale(${sc.toFixed(3)})`;
     });
@@ -328,10 +328,9 @@ export const EidOrbitSelector: React.FC = () => {
       <div className="eid-orbit-header">
         <p className="eid-orbit-eyebrow">✦ &nbsp; Eid ul-Fitr &nbsp; ✦</p>
         <h1 className="eid-orbit-title">Eid Mubarak</h1>
-        <p className="eid-orbit-subtitle">
-          Send Eid wishes. Add Eidi if you want.<br />
-          <span className="eid-orbit-subtitle__hint">Preview how your message will appear.</span>
-        </p>
+    <p className="eid-orbit-subtitle">
+      Who are you sending this to?
+    </p>
       </div>
 
       <div className="eid-orbit-interactive" onMouseLeave={handleStageLeave} onMouseEnter={handleStageEnter}>
@@ -346,21 +345,17 @@ export const EidOrbitSelector: React.FC = () => {
         >
           {/* Static SVG rings + connectors */}
           <svg className="eid-orbit-ring" viewBox="0 0 500 500">
-            {/* Outer ring */}
+            {/* Outer ring - very subtle guide */}
             <ellipse cx="250" cy="250" rx={OUTER_RADIUS * ELLIPSE_X} ry={OUTER_RADIUS}
-              fill="none" stroke="rgba(201,168,76,0.18)" strokeWidth="1.2"/>
-            <ellipse cx="250" cy="250" rx={OUTER_RADIUS * ELLIPSE_X} ry={OUTER_RADIUS}
-              fill="none" stroke="rgba(201,168,76,0.05)" strokeWidth="7"/>
+              fill="none" stroke="rgba(201,168,76,0.05)" strokeWidth="1"/>
             {/* Inner ring */}
             <ellipse cx="250" cy="250" rx={INNER_RADIUS * ELLIPSE_X} ry={INNER_RADIUS}
-              fill="none" stroke="rgba(201,168,76,0.22)" strokeWidth="1"/>
-            {/* Connectors */}
+              fill="none" stroke="rgba(201,168,76,0.08)" strokeWidth="1"/>
+            {/* Invisible connector refs - keep animation working */}
             <line ref={innerConnRef} x1="250" y1="250" x2="250" y2="250"
-              stroke="rgba(201,168,76,0)" strokeWidth="1"
-              style={{ transition: 'stroke 0.3s ease' }}/>
+              stroke="transparent" strokeWidth="0" opacity="0" />
             <line ref={outerConnRef} x1="250" y1="250" x2="250" y2="250"
-              stroke="rgba(201,168,76,0)" strokeWidth="1"
-              style={{ transition: 'stroke 0.3s ease' }}/>
+              stroke="transparent" strokeWidth="0" opacity="0" />
           </svg>
 
           {/* Moon — fixed, never moves */}
