@@ -1,136 +1,113 @@
+/* ================================================================
+   INTRO SCREEN
+================================================================ */
+
 .eid-intro{
-  position:fixed;
-  inset:0;
+  position:relative;
+  width:100vw;
+  height:100vh;
   display:flex;
-  flex-direction:column;
   align-items:center;
   justify-content:center;
-  min-height:100vh;
-  background:linear-gradient(to bottom,#1a3a2e,#0d1f1a);
-  animation:fadeIn 1s ease;
+  
+  background:
+  radial-gradient(circle at 50% 40%, rgba(201,168,76,.18) 0%, rgba(201,168,76,.06) 25%, transparent 45%),
+  radial-gradient(circle at 50% 50%, rgba(20,70,50,.45) 0%, rgba(10,35,25,.7) 60%, rgba(3,12,8,1) 100%),
+  linear-gradient(to bottom,#0f3c2d,#051610);
+  
+  overflow:hidden;
+  z-index:100;
 }
+
+.eid-intro::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:radial-gradient(ellipse at 50% 40%,transparent 0%,transparent 30%,rgba(0,0,0,.35) 100%);
+  pointer-events:none;
+}
+
+.eid-intro-layer{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10;
+}
+
+/* ================================================================
+   INTRO TYPOGRAPHY
+================================================================ */
 
 .eid-name{
   font-family:"Cormorant Garamond",serif;
-  font-size:clamp(2.8rem,8vw,4rem);
+  font-size:clamp(3rem,8vw,4.2rem);
   font-weight:300;
-  color:#c9a84c;
-  letter-spacing:0.05em;
+  color:#f0d080;
+  letter-spacing:.05em;
   text-align:center;
-  transition:opacity 0.7s ease, transform 0.7s ease;
-}
-
-.eid-name.visible{
-  opacity:1;
-  transform:translateY(0);
-}
-
-.eid-name.hidden{
-  opacity:0;
-  transform:translateY(-16px);
 }
 
 .eid-greeting{
-  opacity:0;
-  transform:translateY(20px);
-  transition:opacity 0.8s ease, transform 0.8s ease;
   display:flex;
   flex-direction:column;
   align-items:center;
+  gap:18px;
   text-align:center;
-}
-
-.eid-greeting.visible{
-  opacity:1;
-  transform:translateY(0);
-}
-
-.eid-greeting.hidden{
-  opacity:0;
-  transform:translateY(-16px);
 }
 
 .eid-greeting-text{
   font-family:"Cormorant Garamond",serif;
-  font-size:clamp(2.2rem,6vw,3.2rem);
-  font-weight:300;
-  color:#e8c97a;
-  letter-spacing:0.06em;
-  margin-top:24px;
-  text-shadow:0 0 20px rgba(201,168,76,0.4);
+  font-size:clamp(2.4rem,6vw,3.4rem);
+  font-weight:400;
+  color:#f0d080;
+  letter-spacing:.06em;
+
+  text-shadow:
+  0 0 12px rgba(201,168,76,.35),
+  0 0 40px rgba(201,168,76,.2);
+}
+
+.arabic{
+  font-family:"Amiri","Georgia",serif;
+  font-size:clamp(2.8rem,6vw,3.6rem);
+  font-weight:500;
+  color:#f0d080;
+  letter-spacing:.05em;
+  direction:rtl;
+
+  text-shadow:
+  0 0 10px rgba(201,168,76,.35),
+  0 0 30px rgba(201,168,76,.25);
+}
+
+.eid-year{
+  font-size:.8rem;
+  letter-spacing:.25em;
+  color:rgba(201,168,76,.65);
+  margin-top:4px;
 }
 
 .eid-sender-reveal{
-  opacity:0;
-  transform:translateY(18px);
-  transition:opacity 0.8s ease, transform 0.8s ease;
   text-align:center;
   padding:0 30px;
 }
 
-.eid-sender-reveal.visible{
-  opacity:1;
-  transform:translateY(0);
-}
-
-.eid-sender-reveal.hidden{
-  opacity:0;
-  transform:translateY(-16px);
-}
-
 .eid-sender-text{
   font-family:"Cormorant Garamond",serif;
-  font-size:clamp(1.4rem,5vw,2rem);
+  font-size:clamp(1.6rem,5vw,2.2rem);
   font-weight:300;
-  color:#c9a84c;
-  letter-spacing:0.04em;
-  line-height:1.5;
+  color:#f0d080;
+  letter-spacing:.04em;
+
+  text-shadow:
+  0 0 12px rgba(201,168,76,.25);
 }
 
-@keyframes fadeUp{
-  from{
-    opacity:0;
-    transform:translateY(8px);
-  }
-  to{
-    opacity:1;
-    transform:translateY(0);
-  }
-}
-
-@keyframes fadeIn{
-  from{opacity:0;}
-  to{opacity:1;}
-}
-
-@keyframes letterReveal{
-  from{
-    opacity:0;
-    transform:translateY(4px);
-  }
-  to{
-    opacity:1;
-    transform:translateY(0);
-  }
-}
-
-.eid-envelope{
-  position:relative;
-  width:320px;
-  margin:auto;
-  animation:envelopeRise 1s ease;
-}
-
-.eid-envelope-body{
-  background:linear-gradient(#214f3c,#16372a);
-  border-radius:12px;
-  padding:70px 20px 40px;
-  border:1px solid rgba(201,168,76,.25);
-  box-shadow:
-    0 30px 80px rgba(0,0,0,.45),
-    inset 0 1px 0 rgba(255,255,255,.08);
-  text-align:center;
-}
+/* ================================================================
+   ENVELOPE - WITH 3D PERSPECTIVE
+================================================================ */
 
 .eid-envelope-container{
   display:flex;
@@ -139,78 +116,434 @@
   gap:28px;
 }
 
-.eid-envelope-message{
-  font-family:"Cormorant Garamond",serif;
-  font-size:1.1rem;
-  font-weight:300;
-  color:rgba(201,168,76,0.9);
-  letter-spacing:0.03em;
-  margin-bottom:16px;
-  text-align:center;
+.eid-envelope{
+  position:relative;
+  width:420px;
+  height:290px;
+  animation:envelopeRise 1s ease;
+  filter:drop-shadow(0 40px 80px rgba(0,0,0,.65));
+  
+  /* 3D perspective for realistic flap opening */
+  perspective:900px;
+  
+  /* FIXED: Clip card inside envelope */
+  overflow:hidden;
+  
+  /* Envelope above card - card slides under envelope edge */
+  z-index:2;
 }
 
-.eid-envelope-recipient{
-  font-family:"Cormorant Garamond",serif;
-  font-size:1.5rem;
-  font-weight:400;
-  color:#c9a84c;
-  letter-spacing:0.05em;
-  text-align:center;
-}
+/* envelope base (z-index: 1) */
 
-.eid-envelope-flap{
+.eid-envelope-body{
   position:absolute;
-  top:0;
+  inset:0;
+  z-index:1;
+  
+  background:
+  linear-gradient(135deg,transparent 49.3%,rgba(0,0,0,.35) 50%,transparent 50.7%),
+  linear-gradient(225deg,transparent 49.3%,rgba(0,0,0,.35) 50%,transparent 50.7%),
+  linear-gradient(#e8dcc8,#d5c9b3);
+  
+  border-radius:6px;
+  
+  box-shadow:
+  inset 0 3px 8px rgba(0,0,0,.2),
+  inset 0 -4px 10px rgba(0,0,0,.18),
+  inset 3px 0 8px rgba(0,0,0,.12),
+  inset -3px 0 8px rgba(0,0,0,.12);
+}
+
+/* Pocket shadow - dark interior where card lives */
+.eid-envelope-body::before{
+  content:"";
+  position:absolute;
   left:0;
   right:0;
-  height:110px;
+  bottom:0;
+  height:70px;
+  
   background:linear-gradient(
-    to bottom,
-    rgba(255,255,255,.12),
-    rgba(0,0,0,.08)
+  to top,
+  rgba(0,0,0,.35),
+  transparent
   );
-  clip-path:polygon(0 0,50% 85%,100% 0);
+  
+  z-index:2;
+  pointer-events:none;
+  border-radius:0 0 6px 6px;
 }
 
-.eid-wax-seal{
+/* paper aging */
+
+.eid-envelope-body::after{
+  content:"";
   position:absolute;
-  top:70px;
+  inset:0;
+  border-radius:6px;
+  
+  background:
+  radial-gradient(circle at 18% 22%, rgba(101,67,33,.12), transparent 10%),
+  radial-gradient(circle at 85% 28%, rgba(101,67,33,.1), transparent 12%),
+  radial-gradient(circle at 75% 80%, rgba(101,67,33,.14), transparent 14%),
+  radial-gradient(circle at 12% 78%, rgba(101,67,33,.11), transparent 11%),
+  radial-gradient(ellipse at center,transparent 60%,rgba(101,67,33,.08) 100%),
+  url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.1'/%3E%3C/svg%3E");
+  
+  opacity:.5;
+  mix-blend-mode:multiply;
+}
+
+/* BOTTOM FLAPS (z-index: 2) */
+
+.eid-envelope-flap-bottom-left{
+  position:absolute;
+  bottom:0;
+  left:0;
+  width:50%;
+  height:50%;
+  z-index:2;
+  background:linear-gradient(to top right,#cbbfaa,#d5c9b3);
+  clip-path:polygon(0 100%,100% 100%,100% 0);
+}
+
+.eid-envelope-flap-bottom-left::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  clip-path:polygon(0 100%,100% 100%,100% 0);
+  background:linear-gradient(to top right, rgba(0,0,0,.35) 0%, rgba(0,0,0,.15) 50%, transparent 100%);
+}
+
+.eid-envelope-flap-bottom-right{
+  position:absolute;
+  bottom:0;
+  right:0;
+  width:50%;
+  height:50%;
+  z-index:2;
+  background:linear-gradient(to top left,#cbbfaa,#d5c9b3);
+  clip-path:polygon(100% 100%,0 100%,0 0);
+}
+
+.eid-envelope-flap-bottom-right::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  clip-path:polygon(100% 100%,0 100%,0 0);
+  background:linear-gradient(to top left, rgba(0,0,0,.35) 0%, rgba(0,0,0,.15) 50%, transparent 100%);
+}
+
+/* ================================================================
+   LETTER CARD - HIDDEN INSIDE ENVELOPE (z-index: 3)
+================================================================ */
+
+.eid-letter-card{
+  position:absolute;
   left:50%;
+  bottom:0;  /* Changed from -200px - card starts INSIDE envelope pocket */
+  
+  /* Only horizontal centering initially */
   transform:translateX(-50%);
-  width:48px;
-  height:48px;
-  border-radius:50%;
-  background:radial-gradient(circle at 30% 30%,#f5d76e,#c9a84c);
+  
+  width:320px;
+  height:200px;
+  
+  background:#fffdf5;
+  border-radius:8px;
+  
   box-shadow:
-    0 8px 20px rgba(0,0,0,.45),
-    inset 0 2px 2px rgba(255,255,255,.35),
-    inset 0 -4px 8px rgba(0,0,0,.35);
+  0 20px 50px rgba(0,0,0,.35);
+  
+  /* Smooth slide with pause (cinematic) */
+  transition:transform .9s cubic-bezier(.22,.8,.25,1);
+  
+  z-index:1;  /* FIXED: Below all envelope parts - same as body */
+  
   display:flex;
   align-items:center;
   justify-content:center;
+  
+  font-family:"Cormorant Garamond",serif;
 }
 
-.eid-wax-seal:active{
-  transform:translateX(-50%) scale(.92);
+/* Card slides UP when envelope opens */
+.eid-envelope.open .eid-letter-card{
+  transform:translateX(-50%) translateY(-140px);  /* Slides up 140px */
+  transition-delay:.35s;
+  z-index:7;  /* Comes to front when sliding out - above seal */
+}
+
+/* TOP FLAPS - LIFT WITH 3D ROTATION (z-index: 5) */
+
+.eid-envelope-flap-top-left{
+  position:absolute;
+  top:0;
+  left:0;
+  width:50%;
+  height:50%;
+  z-index:5;
+  background:linear-gradient(to bottom right,#f5ebe0,#e8dcc8);
+  clip-path:polygon(0 0,100% 0,100% 100%);
+  filter:drop-shadow(2px 2px 4px rgba(0,0,0,.15));
+  
+  transform-origin:top center;
+  transition:transform .8s ease;
+  
+  /* Paper thickness edge */
+  border-top:1px solid rgba(0,0,0,.12);
+}
+
+/* 3D lift when opened */
+.eid-envelope.open .eid-envelope-flap-top-left{
+  transform:rotateX(135deg);
+}
+
+.eid-envelope-flap-top-left::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  clip-path:polygon(0 0,100% 0,100% 100%);
+  background:linear-gradient(to bottom right, rgba(255,255,255,.25) 0%, rgba(255,255,255,.08) 50%, transparent 100%);
+}
+
+/* Fold-tension lighting - bright ridge + shadow fade */
+.eid-envelope-flap-top-left::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  
+  background:
+  linear-gradient(
+  to bottom,
+  rgba(255,255,255,.35) 0px,
+  rgba(255,255,255,.18) 2px,
+  transparent 8px
+  );
+  
+  opacity:.8;
+}
+
+.eid-envelope-flap-top-right{
+  position:absolute;
+  top:0;
+  right:0;
+  width:50%;
+  height:50%;
+  z-index:5;
+  background:linear-gradient(to bottom left,#f5ebe0,#e8dcc8);
+  clip-path:polygon(0 0,100% 0,0 100%);
+  filter:drop-shadow(-2px 2px 4px rgba(0,0,0,.15));
+  
+  transform-origin:top center;
+  transition:transform .8s ease;
+  
+  /* Paper thickness edge */
+  border-top:1px solid rgba(0,0,0,.12);
+}
+
+/* 3D lift when opened */
+.eid-envelope.open .eid-envelope-flap-top-right{
+  transform:rotateX(135deg);
+}
+
+.eid-envelope-flap-top-right::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  clip-path:polygon(0 0,100% 0,0 100%);
+  background:linear-gradient(to bottom left, rgba(255,255,255,.25) 0%, rgba(255,255,255,.08) 50%, transparent 100%);
+}
+
+/* Fold-tension lighting - bright ridge + shadow fade */
+.eid-envelope-flap-top-right::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  
+  background:
+  linear-gradient(
+  to bottom,
+  rgba(255,255,255,.35) 0px,
+  rgba(255,255,255,.18) 2px,
+  transparent 8px
+  );
+  
+  opacity:.8;
+}
+
+/* ================================================================
+   WAX SEAL - WITH CRACK EFFECT (z-index: 6)
+================================================================ */
+
+.eid-wax-seal{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+
+  width:82px;
+  height:78px;
+
+  border-radius:
+  46% 54% 50% 60%
+  / 55% 45% 58% 42%;
+
+  background:
+  radial-gradient(circle at 35% 30%,
+  #8a1f1f 0%,
+  #7a1a1a 25%,
+  #651515 55%,
+  #4b0f0f 80%,
+  #3a0b0b 100%);
+
+  box-shadow:
+  0 18px 40px rgba(0,0,0,.65),
+  -4px -1px 0 3px #7a1a1a,
+  3px -2px 0 3px #6b1414,
+  4px 2px 0 3px #5e1111,
+  -3px 3px 0 3px #6a1414,
+  2px 4px 0 3px #701818,
+  inset 0 6px 12px rgba(255,255,255,.18),
+  inset 0 -10px 20px rgba(0,0,0,.55);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  font-size:2rem;
+  cursor:pointer;
+
+  z-index:6;
+
+  transition:transform .2s ease, filter .2s ease, opacity .6s ease, box-shadow .2s ease;
+}
+
+/* CRACK PATTERN - appears when breaking starts */
+.eid-wax-seal::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  
+  background:
+  url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 20 L55 40 L48 55 L60 70' stroke='rgba(0,0,0,.45)' stroke-width='2' fill='none'/%3E%3Cpath d='M30 45 L45 50 L40 65' stroke='rgba(0,0,0,.4)' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  
+  opacity:0;
+  transition:opacity .25s ease;
+  
+  pointer-events:none;
+}
+
+/* Cracks visible when breaking */
+.eid-wax-seal.breaking::before{
+  opacity:.7;
+}
+
+/* Pressure feedback while holding */
+.eid-wax-seal.holding{
+  transform:translate(-50%,-50%) scale(.92);
+  
+  box-shadow:
+  0 10px 25px rgba(0,0,0,.6),
+  -4px -1px 0 3px #7a1a1a,
+  3px -2px 0 3px #6b1414,
+  4px 2px 0 3px #5e1111,
+  -3px 3px 0 3px #6a1414,
+  2px 4px 0 3px #701818,
+  inset 0 6px 14px rgba(0,0,0,.4);
+}
+
+/* SEAL BREAKING ANIMATION - Wax snap + collapse */
+.eid-wax-seal.breaking{
+  animation:sealBreak 0.7s cubic-bezier(.2,.8,.3,1) forwards;
+}
+
+/* organic wax drops */
+.eid-wax-seal::after{
+  content:"";
+  position:absolute;
+
+  width:14px;
+  height:10px;
+
+  background:#7a1a1a;
+
+  border-radius:
+  60% 40% 55% 45%
+  / 50% 60% 40% 50%;
+
+  bottom:-8px;
+  right:-12px;
+
+  box-shadow:
+  10px 6px 0 0 #6b1414,
+  -12px 4px 0 0 #701818;
+
+  transform:rotate(-12deg);
+}
+
+/* SEAL BREAKING ANIMATION - Wax snap + collapse */
+@keyframes sealBreak{
+  0%{
+    transform:translate(-50%,-50%) scale(1);
+    filter:brightness(1);
+  }
+  
+  20%{
+    transform:translate(-50%,-50%) scale(.92);
+  }
+  
+  35%{
+    transform:translate(-50%,-50%) scale(1.08) rotate(4deg);
+    filter:brightness(1.2);
+  }
+  
+  55%{
+    transform:translate(-50%,-50%) scale(.95) rotate(-3deg);
+  }
+  
+  75%{
+    transform:translate(-50%,-50%) scale(.6) rotate(-180deg);
+    opacity:.5;
+  }
+  
+  100%{
+    transform:translate(-50%,-50%) scale(.2) rotate(-360deg);
+    opacity:0;
+    filter:blur(3px);
+  }
+}
+
+/* ================================================================
+   TEXT BELOW ENVELOPE
+================================================================ */
+
+.eid-seal-message{
+  font-family:"Cormorant Garamond",serif;
+  font-size:1.1rem;
+  font-weight:400;
+  color:rgba(255,255,255,.8);
+  letter-spacing:.02em;
+  text-align:center;
+  margin-top:8px;
 }
 
 .eid-seal-instruction{
-  font-size:0.75rem;
-  letter-spacing:0.25em;
-  text-transform:uppercase;
-  color:rgba(255,255,255,0.45);
-  margin-top:24px;
+  font-family:"Cormorant Garamond",serif;
+  font-size:.85rem;
+  font-weight:300;
+  font-style:italic;
+  color:rgba(255,255,255,.5);
+  letter-spacing:.02em;
   text-align:center;
+  margin-top:4px;
+  transition:color .2s ease;
 }
 
-.eid-hold-instruction{
-  font-size:0.65rem;
-  letter-spacing:0.2em;
-  text-transform:uppercase;
-  color:rgba(255,255,255,0.25);
-  margin-top:8px;
-  text-align:center;
-}
+/* animation */
 
 @keyframes envelopeRise{
   from{

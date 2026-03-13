@@ -8,15 +8,18 @@ import { EID_DEMOS, type EidDemo } from '../data/eidDemoData.ts';
 function Stars() {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      {Array.from({ length: 120 }, (_, i) => {
-        const sz = 0.8 + Math.random() * 2;
+      {Array.from({ length: 45 }, (_, i) => {
+        const sz = Math.random() < 0.75 ? 1 : 2.2;
+        const brightness = Math.random() < 0.8
+          ? 'rgba(255,255,255,0.8)'
+          : 'rgba(255,255,255,1)';
         return (
           <div
             key={i}
             style={{
               position: 'absolute',
               borderRadius: '50%',
-              background: 'white',
+              background: brightness,
               width: sz,
               height: sz,
               top: `${Math.random() * 100}%`,
@@ -126,36 +129,77 @@ function BtnNext({ children, onClick, style }: { children: React.ReactNode; onCl
    SCREEN 2 — ENVELOPE
 ───────────────────────────────────────────────────────────── */
 function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
+  const [holding, setHolding] = useState(false);
+  const [breaking, setBreaking] = useState(false);
+  const holdTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const breakSeal = () => {
+    setBreaking(true);
+    
+    // Vibration feedback (mobile)
+    if (navigator.vibrate) {
+      navigator.vibrate(20);
+    }
+    
+    // Wait for animation to complete (0.7s) then go to next screen
+    setTimeout(() => {
+      onNext();
+    }, 700);
+  };
+
   return (
     <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #072018 100%)' }}>
-        <div className="eid-envelope-container">
-        <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.7)' }}>
-          {d.envFrom}
-        </div>
-
-        {/* Envelope */}
+      <div className="eid-envelope-container">
+        {/* Complete Envelope - Clean State */}
         <div className="eid-envelope">
-          <div className="eid-envelope-flap"></div>
+          {/* Base body */}
+          <div className="eid-envelope-body"></div>
 
-          <div className="eid-envelope-body">
-            <div className="eid-envelope-message">
-              I have sealed an Eidi for you
-            </div>
-            <div className="eid-envelope-recipient">
-              {d.recipient}
-            </div>
-          </div>
+          {/* Bottom flaps */}
+          <div className="eid-envelope-flap-bottom-left"></div>
+          <div className="eid-envelope-flap-bottom-right"></div>
 
-          <div className="eid-wax-seal" onClick={onNext}>
+          {/* Top flaps */}
+          <div className="eid-envelope-flap-top-left"></div>
+          <div className="eid-envelope-flap-top-right"></div>
+
+          {/* Wax seal - HOLD TO BREAK */}
+          <div
+            className={`eid-wax-seal ${holding ? 'holding' : ''} ${breaking ? 'breaking' : ''}`}
+            onMouseDown={() => {
+              setHolding(true);
+              holdTimer.current = setTimeout(() => {
+                breakSeal();
+              }, 2200);
+            }}
+            onMouseUp={() => {
+              setHolding(false);
+              if (holdTimer.current) clearTimeout(holdTimer.current);
+            }}
+            onMouseLeave={() => {
+              setHolding(false);
+              if (holdTimer.current) clearTimeout(holdTimer.current);
+            }}
+            onTouchStart={() => {
+              setHolding(true);
+              holdTimer.current = setTimeout(() => {
+                breakSeal();
+              }, 2200);
+            }}
+            onTouchEnd={() => {
+              setHolding(false);
+              if (holdTimer.current) clearTimeout(holdTimer.current);
+            }}
+          >
             🌙
           </div>
         </div>
 
-        <div className="eid-seal-instruction">
-          ✦ Break the seal ✦
+        <div className="eid-seal-message">
+          I have sealed the message for you this Eid
         </div>
-        <div className="eid-hold-instruction">
-          Tap and hold the seal
+        <div className="eid-seal-instruction">
+          {holding ? 'Keep holding...' : '(Press and hold to break the seal)'}
         </div>
       </div>
     </Screen>
@@ -493,30 +537,6 @@ function HomeBtn() {
   );
 }
 
-function TypingName({ name }: { name: string }) {
-  const [visible, setVisible] = useState('');
-
-  useEffect(() => {
-    let i = 0;
-
-    const interval = setInterval(() => {
-      i += 1;
-      setVisible(name.slice(0, i));
-
-      if (i === name.length) clearInterval(interval);
-    }, 70);
-
-    return () => clearInterval(interval);
-  }, [name]);
-
-  return (
-    <span>
-      {visible}
-      {visible.length === name.length && '...'}
-    </span>
-  );
-}
-
 /* ─────────────────────────────────────────────────────────────
 ───────────────────────────────────────────────────────────── */
 const STYLES = `
@@ -566,8 +586,16 @@ export function EidExperience() {
   const [screen, setScreen] = useState(0);
   const TOTAL = 8;
   const [introStage, setIntroStage] = useState(0);
+  const [showName, setShowName] = useState(false);
 
   const go = (n: number) => setScreen(n);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowName(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (introStage > 2) return;
@@ -594,38 +622,37 @@ export function EidExperience() {
 
   const Moon = () => (
     <svg
-      width="140"
-      height="140"
+      width="150"
+      height="150"
       viewBox="0 0 120 120"
-      preserveAspectRatio="xMidYMid meet"
       style={{
-        overflow: 'visible',
-        filter: 'drop-shadow(0 0 40px rgba(240,208,128,0.6))'
+        overflow: "visible",
+        filter: "drop-shadow(0 0 40px rgba(240,208,128,0.8)) drop-shadow(0 0 80px rgba(201,168,76,0.35))",
+        transform: "rotate(-15deg)"
       }}
     >
       <defs>
-        <radialGradient id="mg">
-          <stop offset="0%" stopColor="#f5d76e" />
-          <stop offset="100%" stopColor="#c9a84c" />
+        <radialGradient id="moonGold">
+          <stop offset="0%" stopColor="#f5d76e"/>
+          <stop offset="100%" stopColor="#c9a84c"/>
         </radialGradient>
 
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-          <feMerge>
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
+        <mask id="crescentMask">
+          <rect width="120" height="120" fill="white"/>
+          <circle cx="72" cy="60" r="52" fill="black"/>
+        </mask>
       </defs>
 
-      <path
-        d="M70 12 A58 58 0 1 1 69.9 12 A38 38 0 1 0 70.1 12 Z"
-        fill="url(#mg)"
-        filter="url(#glow)"
-        opacity="0.95"
+      <circle
+        cx="60"
+        cy="60"
+        r="52"
+        fill="#ffd86b"
+        mask="url(#crescentMask)"
       />
+
       <polygon
-        points="108,30 110,36 116,36 111,40 113,46 108,42 103,46 105,40 100,36 106,36"
+        points="88,40 91,46 97,46 92,50 94,56 88,52 82,56 84,50 79,46 85,46"
         fill="#f5e090"
         opacity="0.9"
       />
@@ -635,35 +662,67 @@ export function EidExperience() {
   if (introStage < 3) {
     return (
       <div className="eid-intro">
+        <Stars />
         <HomeBtn />
-        <div className={`eid-name ${introStage === 0 ? 'visible' : 'hidden'}`}>
-          {d.recipient.split('').map((c, i) => (
+        
+        {/* All three layers - crossfade between them */}
+        <div 
+          className="eid-intro-layer"
+          style={{ 
+            opacity: introStage === 0 && showName ? 1 : 0,
+            transition: 'opacity 1.2s ease',
+          }}
+        >
+          <div className="eid-name">
+            {d.recipient.split('').map((c, i) => (
+              <span
+                key={i}
+                className="eid-letter"
+                style={{ animationDelay: `${i * 0.08}s` }}
+              >
+                {c}
+              </span>
+            ))}
             <span
-              key={i}
               className="eid-letter"
-              style={{ animationDelay: `${i * 0.08}s` }}
+              style={{ animationDelay: `${d.recipient.length * 0.08}s` }}
             >
-              {c}
+              ...
             </span>
-          ))}
-          <span
-            className="eid-letter"
-            style={{ animationDelay: `${d.recipient.length * 0.08}s` }}
-          >
-            ...
-          </span>
-        </div>
-
-        <div className={`eid-greeting ${introStage === 1 ? 'visible' : 'hidden'}`}>
-          <Moon />
-          <div className="eid-greeting-text">
-            Eid Mubarak
           </div>
         </div>
 
-        <div className={`eid-sender-reveal ${introStage === 2 ? 'visible' : 'hidden'}`}>
-          <div className="eid-sender-text">
-            {d.envFrom}
+        <div 
+          className="eid-intro-layer"
+          style={{ 
+            opacity: introStage === 1 ? 1 : 0,
+            transition: 'opacity 1.2s ease',
+          }}
+        >
+          <div className="eid-greeting">
+            <Moon />
+
+            <div className="eid-greeting-text arabic">
+              عِيد مُبَارَك
+            </div>
+
+            <div className="eid-year">
+              2026 • 1447 AH
+            </div>
+          </div>
+        </div>
+
+        <div 
+          className="eid-intro-layer"
+          style={{ 
+            opacity: introStage === 2 ? 1 : 0,
+            transition: 'opacity 1.2s ease',
+          }}
+        >
+          <div className="eid-sender-reveal">
+            <div className="eid-sender-text">
+              {d.envFrom}
+            </div>
           </div>
         </div>
       </div>
