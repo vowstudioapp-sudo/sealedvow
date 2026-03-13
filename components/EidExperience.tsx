@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import '../styles/eid.css';
 import { EID_DEMOS, type EidDemo } from '../data/eidDemoData.ts';
 
 /* ─────────────────────────────────────────────────────────────
@@ -54,12 +55,13 @@ function ProgressDots({ total, current }: { total: number; current: number }) {
    SCREEN WRAPPER
 ───────────────────────────────────────────────────────────── */
 function Screen({
-  active, children, style, scrollable = false,
+  active, children, style, scrollable = false, className,
 }: {
   active: boolean;
   children: React.ReactNode;
   style?: React.CSSProperties;
   scrollable?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -69,6 +71,7 @@ function Screen({
   return (
     <div
       ref={ref}
+      className={className}
       style={{
         position: 'fixed',
         inset: 0,
@@ -120,111 +123,39 @@ function BtnNext({ children, onClick, style }: { children: React.ReactNode; onCl
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SCREEN 1 — MOON
-───────────────────────────────────────────────────────────── */
-function S1Moon({ d, onNext }: { d: EidDemo; onNext: () => void }) {
-  return (
-    <Screen active style={{ background: 'radial-gradient(ellipse at 50% 30%, #0f4a37 0%, #072018 60%, #030d08 100%)' }}>
-      <div onClick={onNext} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, cursor: 'pointer' }}>
-        <svg width="140" height="140" viewBox="0 0 140 140" fill="none" style={{ filter: 'drop-shadow(0 0 40px rgba(240,208,128,0.5))', animation: 'eid-moonGlow 3s ease-in-out infinite' }}>
-          <defs>
-            <radialGradient id="mg" cx="40%" cy="35%" r="60%">
-              <stop offset="0%" stopColor="#f5e090" />
-              <stop offset="100%" stopColor="#c8900a" />
-            </radialGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="6" result="blur" />
-              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </defs>
-          <path fillRule="evenodd" clipRule="evenodd"
-            d="M70 12 A58 58 0 1 1 69.9 12 A38 38 0 1 0 70.1 12 Z"
-            fill="url(#mg)" filter="url(#glow)" opacity="0.95" />
-          <polygon points="108,30 110,36 116,36 111,40 113,46 108,42 103,46 105,40 100,36 106,36" fill="#f5e090" opacity="0.9" />
-        </svg>
-        <div>
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(2.4rem, 8vw, 4rem)', color: '#e8c97a', textAlign: 'center', lineHeight: 1.2, letterSpacing: '0.03em' }}>
-            Eid Mubarak
-          </div>
-          <div style={{ fontSize: '0.85rem', fontWeight: 300, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(240,208,128,0.65)', textAlign: 'center', marginTop: 10 }}>
-            {d.moonAwaits}
-          </div>
-        </div>
-        <div style={{ fontSize: '0.72rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', animation: 'eid-pulse 2s ease-in-out infinite' }}>
-          ✦ Tap the moon to begin ✦
-        </div>
-        {/* Swipe hint — mobile UX: users need to know experience is swipeable */}
-        <div style={{ fontSize: '0.65rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.18)', marginTop: 8, fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
-          Swipe to continue ✦
-        </div>
-      </div>
-    </Screen>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────
    SCREEN 2 — ENVELOPE
 ───────────────────────────────────────────────────────────── */
 function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   return (
     <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #072018 100%)' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28 }}>
+        <div className="eid-envelope-container">
         <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.7)' }}>
           {d.envFrom}
         </div>
 
         {/* Envelope */}
-        <div
-          onClick={onNext}
-          style={{ width: 'min(320px, 88vw)', cursor: 'pointer', position: 'relative', transition: 'transform 0.3s ease' }}
-          onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-6px)')}
-          onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
-        >
-          {/* Flap */}
-          <div style={{ width: 'min(320px, 88vw)', height: 100, position: 'relative', marginBottom: -2 }}>
-            <svg viewBox="0 0 320 100" fill="none" style={{ width: '100%', height: '100%' }}>
-              <path d="M0 0 L160 80 L320 0 Z" fill="#0a3d2b" />
-              <path d="M0 0 L160 80 L320 0" stroke="rgba(201,168,76,0.25)" strokeWidth="1" fill="none" />
-              <text x="155" y="30" fontSize="18" fill="rgba(201,168,76,0.4)" textAnchor="middle">🌙</text>
-            </svg>
-            {/* Wax seal */}
-            <div style={{
-              position: 'absolute', bottom: -22, left: '50%', transform: 'translateX(-50%)',
-              width: 54, height: 54,
-              background: 'radial-gradient(circle at 40% 35%, #c9a84c, #8a6a1e)',
-              borderRadius: '50%', border: '2px solid rgba(255,220,100,0.4)',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1.4rem', zIndex: 2,
-            }}>🌙</div>
-          </div>
-          {/* Body */}
-          <div style={{
-            background: 'linear-gradient(160deg, #0d4a35 0%, #0a3328 100%)',
-            border: '1px solid rgba(201,168,76,0.35)',
-            borderRadius: '4px 4px 8px 8px',
-            padding: '36px 32px 32px',
-            position: 'relative', overflow: 'hidden',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(201,168,76,0.2)',
-          }}>
-            {/* Pattern */}
-            <div style={{
-              position: 'absolute', inset: 0, opacity: 0.06,
-              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 12px, rgba(201,168,76,1) 12px, rgba(201,168,76,1) 13px)',
-            }} />
-            <div style={{ textAlign: 'center', paddingTop: 18, position: 'relative', zIndex: 1 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.6rem', color: '#e8c97a', letterSpacing: '0.04em' }}>
-                {d.recipient}
-              </div>
-              <div style={{ fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.6)', marginTop: 6 }}>
-                {d.envSenderSub}
-              </div>
+        <div className="eid-envelope">
+          <div className="eid-envelope-flap"></div>
+
+          <div className="eid-envelope-body">
+            <div className="eid-envelope-message">
+              I have sealed an Eidi for you
             </div>
+            <div className="eid-envelope-recipient">
+              {d.recipient}
+            </div>
+          </div>
+
+          <div className="eid-wax-seal" onClick={onNext}>
+            🌙
           </div>
         </div>
 
-        <div style={{ fontSize: '0.72rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', animation: 'eid-pulse 2s ease-in-out infinite' }}>
-          ✦ Tap to open ✦
+        <div className="eid-seal-instruction">
+          ✦ Break the seal ✦
+        </div>
+        <div className="eid-hold-instruction">
+          Tap and hold the seal
         </div>
       </div>
     </Screen>
@@ -544,7 +475,7 @@ function S9Chain({ d }: { d: EidDemo }) {
 function HomeBtn() {
   return (
     <button
-      onClick={() => { window.location.href = '/'; }}
+      onClick={() => { window.location.href = '/demo/eid'; }}
       style={{
         position: 'fixed', top: 18, left: 20, zIndex: 200,
         background: 'none', border: 'none', cursor: 'pointer',
@@ -557,8 +488,32 @@ function HomeBtn() {
       onMouseEnter={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.7)')}
       onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.35)')}
     >
-      ← Home
+      ← Back
     </button>
+  );
+}
+
+function TypingName({ name }: { name: string }) {
+  const [visible, setVisible] = useState('');
+
+  useEffect(() => {
+    let i = 0;
+
+    const interval = setInterval(() => {
+      i += 1;
+      setVisible(name.slice(0, i));
+
+      if (i === name.length) clearInterval(interval);
+    }, 70);
+
+    return () => clearInterval(interval);
+  }, [name]);
+
+  return (
+    <span>
+      {visible}
+      {visible.length === name.length && '...'}
+    </span>
   );
 }
 
@@ -585,6 +540,15 @@ const STYLES = `
     0%, 100% { transform: translateY(0); opacity: 0.8; }
     50% { transform: translateY(-8px); opacity: 1; }
   }
+  .eid-letter {
+    opacity: 0;
+    display: inline-block;
+    animation: eid-letterIn 0.25s forwards;
+  }
+  @keyframes eid-letterIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
   #eid-experience * { box-sizing: border-box; margin: 0; padding: 0; }
   .eid-letter-body p + p { margin-top: 18px; }
   .eid-letter-body em { font-style: italic; }
@@ -600,14 +564,108 @@ export function EidExperience() {
   const d = EID_DEMOS[key];
 
   const [screen, setScreen] = useState(0);
-  const TOTAL = 9;
+  const TOTAL = 8;
+  const [introStage, setIntroStage] = useState(0);
 
   const go = (n: number) => setScreen(n);
+
+  useEffect(() => {
+    if (introStage > 2) return;
+
+    let delay;
+    if (introStage === 0) delay = 3200;
+    else if (introStage === 1) delay = 2800;
+    else delay = 2500;
+
+    const timer = setTimeout(() => {
+      setIntroStage(prev => prev + 1);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [introStage]);
 
   if (!d) {
     return (
       <div style={{ minHeight: '100vh', background: '#0d3b2e', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e8c97a', fontFamily: 'Georgia, serif', fontSize: '1.5rem' }}>
         Eid experience not found 🌙
+      </div>
+    );
+  }
+
+  const Moon = () => (
+    <svg
+      width="140"
+      height="140"
+      viewBox="0 0 120 120"
+      preserveAspectRatio="xMidYMid meet"
+      style={{
+        overflow: 'visible',
+        filter: 'drop-shadow(0 0 40px rgba(240,208,128,0.6))'
+      }}
+    >
+      <defs>
+        <radialGradient id="mg">
+          <stop offset="0%" stopColor="#f5d76e" />
+          <stop offset="100%" stopColor="#c9a84c" />
+        </radialGradient>
+
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      <path
+        d="M70 12 A58 58 0 1 1 69.9 12 A38 38 0 1 0 70.1 12 Z"
+        fill="url(#mg)"
+        filter="url(#glow)"
+        opacity="0.95"
+      />
+      <polygon
+        points="108,30 110,36 116,36 111,40 113,46 108,42 103,46 105,40 100,36 106,36"
+        fill="#f5e090"
+        opacity="0.9"
+      />
+    </svg>
+  );
+
+  if (introStage < 3) {
+    return (
+      <div className="eid-intro">
+        <HomeBtn />
+        <div className={`eid-name ${introStage === 0 ? 'visible' : 'hidden'}`}>
+          {d.recipient.split('').map((c, i) => (
+            <span
+              key={i}
+              className="eid-letter"
+              style={{ animationDelay: `${i * 0.08}s` }}
+            >
+              {c}
+            </span>
+          ))}
+          <span
+            className="eid-letter"
+            style={{ animationDelay: `${d.recipient.length * 0.08}s` }}
+          >
+            ...
+          </span>
+        </div>
+
+        <div className={`eid-greeting ${introStage === 1 ? 'visible' : 'hidden'}`}>
+          <Moon />
+          <div className="eid-greeting-text">
+            Eid Mubarak
+          </div>
+        </div>
+
+        <div className={`eid-sender-reveal ${introStage === 2 ? 'visible' : 'hidden'}`}>
+          <div className="eid-sender-text">
+            {d.envFrom}
+          </div>
+        </div>
       </div>
     );
   }
@@ -619,15 +677,14 @@ export function EidExperience() {
       <HomeBtn />
       <ProgressDots total={TOTAL} current={screen} />
 
-      {screen === 0 && <S1Moon d={d} onNext={() => go(1)} />}
-      {screen === 1 && <S2Envelope d={d} onNext={() => go(2)} />}
-      {screen === 2 && <S3Blessing d={d} onNext={() => go(3)} />}
-      {screen === 3 && <S4Letter d={d} onNext={() => go(4)} />}
-      {screen === 4 && <S5Memories d={d} onNext={() => go(5)} />}
-      <S6Duas d={d} active={screen === 5} onNext={() => go(6)} />
-      {screen === 6 && <S7Eidi d={d} onNext={() => go(7)} />}
-      {screen === 7 && <S8Closing d={d} onNext={() => go(8)} />}
-      {screen === 8 && <S9Chain d={d} />}
+      {screen === 0 && <S2Envelope d={d} onNext={() => go(1)} />}
+      {screen === 1 && <S3Blessing d={d} onNext={() => go(2)} />}
+      {screen === 2 && <S4Letter d={d} onNext={() => go(3)} />}
+      {screen === 3 && <S5Memories d={d} onNext={() => go(4)} />}
+      {screen === 4 && <S6Duas d={d} active={true} onNext={() => go(5)} />}
+      {screen === 5 && <S7Eidi d={d} onNext={() => go(6)} />}
+      {screen === 6 && <S8Closing d={d} onNext={() => go(7)} />}
+      {screen === 7 && <S9Chain d={d} />}
     </div>
   );
 }

@@ -404,3 +404,57 @@
   .eid-orbit-node:hover {
     opacity: 1 !important;
   }
+
+/* ===== Moon glow animation (safe) ===== */
+
+.moon-icon {
+  animation: moonGlow 4s ease-in-out infinite;
+}
+
+@keyframes moonGlow {
+  0%,100% {
+    filter: drop-shadow(0 0 18px rgba(201,168,76,0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 36px rgba(201,168,76,0.55));
+  }
+}
+
+/* ===== Sequential entrance reveal ===== */
+
+.receiver-line-1 {
+  opacity: 0;
+  animation: fadeUp 0.6s ease-out 0.4s forwards;
+}
+
+.receiver-line-2 {
+  opacity: 0;
+  animation: fadeUp 0.6s ease-out 1.0s forwards;
+}
+
+.receiver-cta {
+  opacity: 0;
+  animation: fadeUp 0.6s ease-out 1.7s forwards;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Page fade transition ===== */
+
+.receiver-page {
+  animation: pageFadeIn 0.6s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

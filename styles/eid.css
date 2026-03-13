@@ -1,0 +1,224 @@
+.eid-intro{
+  position:fixed;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  background:linear-gradient(to bottom,#1a3a2e,#0d1f1a);
+  animation:fadeIn 1s ease;
+}
+
+.eid-name{
+  font-family:"Cormorant Garamond",serif;
+  font-size:clamp(2.8rem,8vw,4rem);
+  font-weight:300;
+  color:#c9a84c;
+  letter-spacing:0.05em;
+  text-align:center;
+  transition:opacity 0.7s ease, transform 0.7s ease;
+}
+
+.eid-name.visible{
+  opacity:1;
+  transform:translateY(0);
+}
+
+.eid-name.hidden{
+  opacity:0;
+  transform:translateY(-16px);
+}
+
+.eid-greeting{
+  opacity:0;
+  transform:translateY(20px);
+  transition:opacity 0.8s ease, transform 0.8s ease;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+}
+
+.eid-greeting.visible{
+  opacity:1;
+  transform:translateY(0);
+}
+
+.eid-greeting.hidden{
+  opacity:0;
+  transform:translateY(-16px);
+}
+
+.eid-greeting-text{
+  font-family:"Cormorant Garamond",serif;
+  font-size:clamp(2.2rem,6vw,3.2rem);
+  font-weight:300;
+  color:#e8c97a;
+  letter-spacing:0.06em;
+  margin-top:24px;
+  text-shadow:0 0 20px rgba(201,168,76,0.4);
+}
+
+.eid-sender-reveal{
+  opacity:0;
+  transform:translateY(18px);
+  transition:opacity 0.8s ease, transform 0.8s ease;
+  text-align:center;
+  padding:0 30px;
+}
+
+.eid-sender-reveal.visible{
+  opacity:1;
+  transform:translateY(0);
+}
+
+.eid-sender-reveal.hidden{
+  opacity:0;
+  transform:translateY(-16px);
+}
+
+.eid-sender-text{
+  font-family:"Cormorant Garamond",serif;
+  font-size:clamp(1.4rem,5vw,2rem);
+  font-weight:300;
+  color:#c9a84c;
+  letter-spacing:0.04em;
+  line-height:1.5;
+}
+
+@keyframes fadeUp{
+  from{
+    opacity:0;
+    transform:translateY(8px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+@keyframes fadeIn{
+  from{opacity:0;}
+  to{opacity:1;}
+}
+
+@keyframes letterReveal{
+  from{
+    opacity:0;
+    transform:translateY(4px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+.eid-envelope{
+  position:relative;
+  width:320px;
+  margin:auto;
+  animation:envelopeRise 1s ease;
+}
+
+.eid-envelope-body{
+  background:linear-gradient(#214f3c,#16372a);
+  border-radius:12px;
+  padding:70px 20px 40px;
+  border:1px solid rgba(201,168,76,.25);
+  box-shadow:
+    0 30px 80px rgba(0,0,0,.45),
+    inset 0 1px 0 rgba(255,255,255,.08);
+  text-align:center;
+}
+
+.eid-envelope-container{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:28px;
+}
+
+.eid-envelope-message{
+  font-family:"Cormorant Garamond",serif;
+  font-size:1.1rem;
+  font-weight:300;
+  color:rgba(201,168,76,0.9);
+  letter-spacing:0.03em;
+  margin-bottom:16px;
+  text-align:center;
+}
+
+.eid-envelope-recipient{
+  font-family:"Cormorant Garamond",serif;
+  font-size:1.5rem;
+  font-weight:400;
+  color:#c9a84c;
+  letter-spacing:0.05em;
+  text-align:center;
+}
+
+.eid-envelope-flap{
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:110px;
+  background:linear-gradient(
+    to bottom,
+    rgba(255,255,255,.12),
+    rgba(0,0,0,.08)
+  );
+  clip-path:polygon(0 0,50% 85%,100% 0);
+}
+
+.eid-wax-seal{
+  position:absolute;
+  top:70px;
+  left:50%;
+  transform:translateX(-50%);
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  background:radial-gradient(circle at 30% 30%,#f5d76e,#c9a84c);
+  box-shadow:
+    0 8px 20px rgba(0,0,0,.45),
+    inset 0 2px 2px rgba(255,255,255,.35),
+    inset 0 -4px 8px rgba(0,0,0,.35);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.eid-wax-seal:active{
+  transform:translateX(-50%) scale(.92);
+}
+
+.eid-seal-instruction{
+  font-size:0.75rem;
+  letter-spacing:0.25em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.45);
+  margin-top:24px;
+  text-align:center;
+}
+
+.eid-hold-instruction{
+  font-size:0.65rem;
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.25);
+  margin-top:8px;
+  text-align:center;
+}
+
+@keyframes envelopeRise{
+  from{
+    opacity:0;
+    transform:translateY(80px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
