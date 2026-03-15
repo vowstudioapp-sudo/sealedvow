@@ -1,0 +1,379 @@
+/* ═══════════════════════════════════════════════════════
+   OCCASION SELECTOR
+   Uses same color system as landing page preview cards
+   ═══════════════════════════════════════════════════════ */
+
+   .occasion-selector {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #0a1220 0%, #050810 100%);
+    color: #f2e8d5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 24px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* Background glow effect */
+  .occasion-selector__bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 50% 20%, rgba(76,175,120,0.08), transparent 60%);
+    pointer-events: none;
+  }
+  
+  /* Header */
+  .occasion-selector__header {
+    text-align: center;
+    margin-bottom: 32px;
+    z-index: 1;
+  }
+  
+  .occasion-selector__eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(242,232,213,0.4);
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+  
+  .occasion-selector__title {
+    font-family: Georgia, serif;
+    font-size: 38px;
+    font-style: italic;
+    font-weight: 400;
+    color: #f2e8d5;
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+  
+  /* Hero Eid Card */
+  .occasion-selector__hero {
+    margin-bottom: 32px;
+    z-index: 1;
+  }
+  
+  .occasion-card--hero {
+    width: 480px;
+    max-width: 90vw;
+    height: 150px;
+    padding: 22px;
+  }
+  
+  .occasion-card--hero .occasion-card__icon {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 12px;
+  }
+  
+  .occasion-card--hero .occasion-card__title {
+    font-size: 15px;
+    letter-spacing: 0.3em;
+    margin-bottom: 5px;
+  }
+  
+  .occasion-card--hero .occasion-card__subtitle {
+    font-size: 12px;
+  }
+  
+  /* Divider */
+  .occasion-selector__divider {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 24px;
+    z-index: 1;
+    color: rgba(242,232,213,0.3);
+    font-size: 9px;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  
+  .occasion-selector__divider::before,
+  .occasion-selector__divider::after {
+    content: '';
+    height: 1px;
+    width: 60px;
+    background: rgba(242,232,213,0.15);
+  }
+  
+  /* Grid */
+  .occasion-selector__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(170px, 190px));
+    gap: 16px;
+    max-width: 650px;
+    justify-content: center;
+    z-index: 1;
+    margin-bottom: 36px;
+  }
+  
+  @media (max-width: 640px) {
+    .occasion-selector__grid {
+      grid-template-columns: repeat(2, minmax(160px, 1fr));
+      gap: 16px;
+    }
+  }
+  
+  /* Occasion Cards */
+  .occasion-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 22px 18px;
+    border-radius: 16px;
+    background: rgba(15,20,35,0.6);
+    border: 1px solid rgba(242,232,213,0.08);
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+  }
+  
+  /* Visual gravity - secondary cards slightly dimmer */
+  .occasion-card:not(.occasion-card--hero):not(.occasion-card--eid) {
+    opacity: 0.85;
+  }
+  
+  .occasion-card:not(.occasion-card--hero):not(.occasion-card--eid):hover {
+    opacity: 1;
+  }
+  
+  /* Glow effect behind each card */
+  .occasion-card__glow {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    right: -50%;
+    bottom: -50%;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  
+  .occasion-card:hover .occasion-card__glow {
+    opacity: 1;
+  }
+  
+  .occasion-card:hover {
+    transform: translateY(-4px);
+  }
+  
+  /* Icon */
+  .occasion-card__icon {
+    width: 42px;
+    height: 42px;
+    margin-bottom: 12px;
+    opacity: 0.55;
+    transition: all 0.4s ease;
+  }
+  
+  .occasion-card__icon svg {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .occasion-card:hover .occasion-card__icon {
+    opacity: 0.9;
+    transform: translateY(-2px);
+  }
+  
+  /* Title */
+  .occasion-card__title {
+    font-family: Georgia, serif;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(242,232,213,0.85);
+    margin-bottom: 6px;
+    transition: color 0.3s ease;
+  }
+  
+  .occasion-card:hover .occasion-card__title {
+    color: rgba(242,232,213,1);
+  }
+  
+  /* Subtitle */
+  .occasion-card__subtitle {
+    font-size: 11px;
+    color: rgba(242,232,213,0.45);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    transition: color 0.3s ease;
+  }
+  
+  .occasion-card:hover .occasion-card__subtitle {
+    color: rgba(242,232,213,0.65);
+  }
+  
+  /* ═══════════════════════════════════════════════════════
+     OCCASION-SPECIFIC COLORS
+     Matches landing page color system exactly
+     ═══════════════════════════════════════════════════════ */
+  
+  /* Eid — emerald green #4CAF78 */
+  .occasion-card--eid {
+    color: rgba(100,195,140,0.85);
+  }
+  
+  .occasion-card--eid .occasion-card__glow {
+    background: radial-gradient(circle at 50% 0%, rgba(76,175,120,0.25), rgba(76,175,120,0.08) 45%, transparent 70%);
+  }
+  
+  .occasion-card--eid:hover {
+    background: rgba(14,26,26,0.7);
+    border-color: rgba(76,175,120,0.25);
+    box-shadow: 0 8px 32px rgba(76,175,120,0.15);
+  }
+  
+  /* Anniversary — crimson #C8645A */
+  .occasion-card--anniversary {
+    color: rgba(220,130,120,0.85);
+  }
+  
+  .occasion-card--anniversary .occasion-card__glow {
+    background: radial-gradient(circle at 50% 0%, rgba(200,100,90,0.25), rgba(200,100,90,0.08) 45%, transparent 70%);
+  }
+  
+  .occasion-card--anniversary:hover {
+    background: rgba(26,18,20,0.7);
+    border-color: rgba(200,100,90,0.25);
+    box-shadow: 0 8px 32px rgba(200,100,90,0.15);
+  }
+  
+  /* Just Because — violet #8C7AE6 */
+  .occasion-card--justbecause {
+    color: rgba(170,155,240,0.85);
+  }
+  
+  .occasion-card--justbecause .occasion-card__glow {
+    background: radial-gradient(circle at 50% 0%, rgba(140,122,230,0.25), rgba(140,122,230,0.08) 45%, transparent 70%);
+  }
+  
+  .occasion-card--justbecause:hover {
+    background: rgba(20,18,32,0.7);
+    border-color: rgba(140,122,230,0.25);
+    box-shadow: 0 8px 32px rgba(140,122,230,0.15);
+  }
+  
+  /* Thank You — soft pink #C9849A */
+  .occasion-card--thankyou {
+    color: rgba(225,165,182,0.85);
+  }
+  
+  .occasion-card--thankyou .occasion-card__glow {
+    background: radial-gradient(circle at 50% 0%, rgba(201,132,154,0.25), rgba(201,132,154,0.08) 45%, transparent 70%);
+  }
+  
+  .occasion-card--thankyou:hover {
+    background: rgba(26,18,24,0.7);
+    border-color: rgba(201,132,154,0.25);
+    box-shadow: 0 8px 32px rgba(201,132,154,0.15);
+  }
+  
+  /* Apology — off-white #E8E4EC */
+  .occasion-card--apology {
+    color: rgba(240,238,245,0.9);
+  }
+  
+  .occasion-card--apology .occasion-card__glow {
+    background: radial-gradient(circle at 50% 0%, rgba(232,228,236,0.28), rgba(232,228,236,0.1) 45%, transparent 70%);
+  }
+  
+  .occasion-card--apology:hover {
+    background: rgba(23,23,32,0.7);
+    border-color: rgba(232,228,236,0.3);
+    box-shadow: 0 8px 32px rgba(232,228,236,0.12);
+  }
+  
+  /* Missing You / Long Distance — midnight blue */
+  .occasion-card--longdistance {
+    color: rgba(130,170,220,0.85);
+  }
+  
+  .occasion-card--longdistance .occasion-card__glow {
+    background: radial-gradient(circle at 50% 0%, rgba(100,140,200,0.25), rgba(100,140,200,0.08) 45%, transparent 70%);
+  }
+  
+  .occasion-card--longdistance:hover {
+    background: rgba(12,18,28,0.7);
+    border-color: rgba(100,140,200,0.25);
+    box-shadow: 0 8px 32px rgba(100,140,200,0.15);
+  }
+  
+  /* Birthday — warm gold-amber #D4A857 */
+  .occasion-card--birthday {
+    color: rgba(230,190,120,0.9);
+  }
+  
+  .occasion-card--birthday .occasion-card__glow {
+    background: radial-gradient(circle at 50% 0%, rgba(212,168,87,0.28), rgba(212,168,87,0.08) 45%, transparent 70%);
+  }
+  
+  .occasion-card--birthday:hover {
+    background: rgba(28,22,12,0.7);
+    border-color: rgba(212,168,87,0.28);
+    box-shadow: 0 8px 32px rgba(212,168,87,0.18);
+  }
+  
+  /* Back Button */
+  .occasion-selector__back {
+    background: transparent;
+    border: none;
+    color: rgba(242,232,213,0.35);
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 12px 24px;
+    transition: color 0.3s ease;
+    font-weight: 500;
+    z-index: 1;
+  }
+  
+  .occasion-selector__back:hover {
+    color: rgba(242,232,213,0.6);
+  }
+  
+  /* Mobile adjustments */
+  @media (max-width: 640px) {
+    .occasion-selector {
+      padding: 40px 20px 32px;
+    }
+  
+    .occasion-selector__title {
+      font-size: 30px;
+    }
+  
+    .occasion-card--hero {
+      height: 140px;
+      padding: 20px;
+    }
+  
+    .occasion-card--hero .occasion-card__icon {
+      width: 46px;
+      height: 46px;
+    }
+  
+    .occasion-card--hero .occasion-card__title {
+      font-size: 14px;
+    }
+  
+    .occasion-card {
+      padding: 20px 16px;
+    }
+  
+    .occasion-card__icon {
+      width: 38px;
+      height: 38px;
+    }
+  }

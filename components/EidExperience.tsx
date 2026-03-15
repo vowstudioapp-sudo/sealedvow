@@ -126,6 +126,60 @@ function BtnNext({ children, onClick, style }: { children: React.ReactNode; onCl
 }
 
 /* ─────────────────────────────────────────────────────────────
+   PREMIUM DIGIT COLUMN ROLLING (Tesla-style Mechanical Counter)
+   
+   Each digit is a vertical reel that scrolls smoothly.
+   Only changing digits move - creates intelligent, physical feel.
+───────────────────────────────────────────────────────────── */
+function SlotDigit({ value, isMinusSign = false }: { value: number; isMinusSign?: boolean }) {
+  if (isMinusSign) {
+    return (
+      <span style={{ 
+        fontSize: '0.85em', 
+        fontWeight: 800,
+        opacity: 0.9,
+        display: 'inline-block',
+        width: '0.5em',
+      }}>
+        −
+      </span>
+    );
+  }
+
+  return (
+    <div style={{
+      height: '1em',
+      width: '0.65em',
+      overflow: 'hidden',
+      display: 'inline-block',
+      position: 'relative',
+    }}>
+      <div style={{
+        transform: `translateY(-${value * 10}%)`,
+        transition: 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)', // Apple spring curve
+        willChange: 'transform',
+      }}>
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
+          <div
+            key={digit}
+            style={{
+              height: '1em',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontVariantNumeric: 'tabular-nums', // Consistent width
+              fontFeatureSettings: '"tnum"',
+            }}
+          >
+            {digit}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
    SCREEN 2 — ENVELOPE
 ───────────────────────────────────────────────────────────── */
 function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
@@ -136,12 +190,10 @@ function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   const breakSeal = () => {
     setBreaking(true);
     
-    // Vibration feedback (mobile)
     if (navigator.vibrate) {
       navigator.vibrate(20);
     }
     
-    // Wait for animation to complete (0.7s) then go to next screen
     setTimeout(() => {
       onNext();
     }, 700);
@@ -150,20 +202,12 @@ function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   return (
     <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #072018 100%)' }}>
       <div className="eid-envelope-container">
-        {/* Complete Envelope - Clean State */}
         <div className="eid-envelope">
-          {/* Base body */}
           <div className="eid-envelope-body"></div>
-
-          {/* Bottom flaps */}
           <div className="eid-envelope-flap-bottom-left"></div>
           <div className="eid-envelope-flap-bottom-right"></div>
-
-          {/* Top flaps */}
           <div className="eid-envelope-flap-top-left"></div>
           <div className="eid-envelope-flap-top-right"></div>
-
-          {/* Wax seal - HOLD TO BREAK */}
           <div
             className={`eid-wax-seal ${holding ? 'holding' : ''} ${breaking ? 'breaking' : ''}`}
             onMouseDown={() => {
@@ -194,7 +238,6 @@ function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
             🌙
           </div>
         </div>
-
         <div className="eid-seal-message">
           I have sealed the message for you this Eid
         </div>
@@ -370,48 +413,163 @@ function S6Duas({ d, active, onNext }: { d: EidDemo; active: boolean; onNext: ()
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SCREEN 7 — EIDI POUCH (WITH COUNT-UP ANIMATION)
+   SCREEN 7 — EIDI (TWO JOKES VERSION!)
 ───────────────────────────────────────────────────────────── */
 function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   const [revealed, setRevealed] = useState(false);
   const [displayAmount, setDisplayAmount] = useState(0);
+  const [showJoke1, setShowJoke1] = useState(false); // At +1000: "Is this enough?"
+  const [showJoke2, setShowJoke2] = useState(false); // At -1000: "You owe me!"
+  const [shakeAmount, setShakeAmount] = useState(false); // For crash shake animation
 
-  // Extract numeric value from amount string (e.g., "₹3,000" → 3000)
   const finalAmount = parseInt(d.eidiAmount.replace(/[^\d]/g, ''), 10);
   const currency = d.eidiAmount.match(/[^\d,]+/)?.[0] || '₹';
 
   const revealEidi = () => {
-    if (revealed) return; // Prevent double-tap
+    if (revealed) return;
     
     setRevealed(true);
     
-    // Haptic feedback (mobile only, safe wrapper)
     if (navigator.vibrate) {
       navigator.vibrate(30);
     }
     
-    // Count-up animation from 0 to final amount over 1200ms
-    const duration = 1200;
-    const steps = 60;
-    const increment = finalAmount / steps;
-    const stepDuration = duration / steps;
+    // PHASE 1: CHAOTIC CLIMB from 0 to 3100 (THE TRAP!)
+    let spinCount = 0;
+    const phase1Steps = 25;
     
-    let current = 0;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= finalAmount) {
-        setDisplayAmount(finalAmount);
-        clearInterval(timer);
-      } else {
-        setDisplayAmount(Math.floor(current));
+    const spin1 = setInterval(() => {
+      const progressToTarget = spinCount / phase1Steps;
+      const idealValue = 3100 * progressToTarget; // Climb to 3100 instead of 1000!
+      
+      const bounce = Math.random() * 500 - 200;
+      let next = idealValue + bounce;
+      next = Math.max(0, Math.min(3100, next));
+      
+      setDisplayAmount(Math.floor(next));
+      spinCount++;
+      
+      if (spinCount >= phase1Steps) {
+        clearInterval(spin1);
+        setDisplayAmount(3100); // Peak at 3100
+        
+        // MICRO-TRAP: Pause at 3100, then DROP to 1000
+        setTimeout(() => {
+          // Sudden drop to 1000
+          setDisplayAmount(1000);
+          
+          if (navigator.vibrate) {
+            navigator.vibrate(20); // Small vibration on drop
+          }
+          
+          // Bounce effect at 1000
+          setTimeout(() => setDisplayAmount(980), 100);
+          setTimeout(() => setDisplayAmount(1000), 200);
+          setTimeout(() => setDisplayAmount(990), 300);
+          setTimeout(() => setDisplayAmount(1000), 400);
+          
+          // NOW show JOKE 1 after the bounce
+          setTimeout(() => {
+            setShowJoke1(true);
+            if (navigator.vibrate) {
+              navigator.vibrate([50, 100, 50]);
+            }
+          }, 800); // Pause to let the 1000 sink in
+        }, 600); // Pause at 3100 for 600ms
       }
-    }, stepDuration);
+    }, 200);
   };
 
-  // Format number with commas (3000 → 3,000)
-  const formatAmount = (num: number) => {
-    return num.toLocaleString('en-IN');
+  const rejectOffer = () => {
+    // User clicked NO (either green or red)
+    setShowJoke1(false);
+    
+    if (navigator.vibrate) {
+      navigator.vibrate(30);
+    }
+    
+    // PHASE 2: CHAOTIC CRASH from 1000 to -1000
+    let spinCount = 0;
+    const phase2Steps = 30;
+    
+    const spin2 = setInterval(() => {
+      const progressToTarget = spinCount / phase2Steps;
+      const idealValue = 1000 - (2000 * progressToTarget);
+      
+      const bounce = Math.random() * 500 - 300;
+      let next = idealValue + bounce;
+      next = Math.max(-1000, Math.min(1000, next));
+      
+      setDisplayAmount(Math.floor(next));
+      spinCount++;
+      
+      if (spinCount >= phase2Steps) {
+        clearInterval(spin2);
+        setDisplayAmount(-1000);
+        
+        // ChatGPT's Expectation Break Haptics - "uh-oh" vibration pattern + shake
+        if (navigator.vibrate) {
+          navigator.vibrate([40, 50, 80]); // Pause between bursts creates "uh-oh" feel
+        }
+        
+        // Trigger shake animation
+        setShakeAmount(true);
+        setTimeout(() => setShakeAmount(false), 150);
+        
+        // Show JOKE 2 after reaching -1000
+        setTimeout(() => {
+          setShowJoke2(true);
+          if (navigator.vibrate) {
+            navigator.vibrate([50, 100, 50]);
+          }
+        }, 500);
+      }
+    }, 200);
   };
+
+  const acceptDebt = () => {
+    // User clicked YES (either red or green)
+    setShowJoke2(false);
+    
+    if (navigator.vibrate) {
+      navigator.vibrate(30);
+    }
+    
+    // PHASE 3: CHAOTIC RECOVERY from -1000 to final amount
+    let spinCount = 0;
+    const totalChange = finalAmount - (-1000);
+    const phase3Steps = 35;
+    
+    const spin3 = setInterval(() => {
+      const progressToTarget = spinCount / phase3Steps;
+      const idealValue = -1000 + (totalChange * progressToTarget);
+      
+      const bounce = Math.random() * 600 - 250;
+      let next = idealValue + bounce;
+      next = Math.max(-1000, Math.min(finalAmount, next));
+      
+      setDisplayAmount(Math.floor(next));
+      spinCount++;
+      
+      if (spinCount >= phase3Steps) {
+        clearInterval(spin3);
+        
+        // ChatGPT's Digit Inertia - overshoot then settle for mechanical feel
+        setDisplayAmount(finalAmount + 20); // Overshoot by 20
+        
+        setTimeout(() => {
+          setDisplayAmount(finalAmount); // Settle to exact amount
+          
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+        }, 150); // 150ms overshoot duration
+      }
+    }, 200);
+  };
+
+  const isNegative = displayAmount < 0;
+  const absAmount = Math.abs(displayAmount);
 
   return (
     <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #061810 100%)' }}>
@@ -458,31 +616,283 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
               {d.eidiFrom}
             </div>
             
-            {/* Amount with glow effect */}
-            <div style={{
-              fontFamily: 'Georgia, serif',
-              fontSize: 'clamp(3rem, 12vw, 5.5rem)',
-              color: '#e8c97a', 
-              lineHeight: 1,
-              filter: 'drop-shadow(0 0 20px rgba(201,168,76,0.4)) drop-shadow(0 0 40px rgba(201,168,76,0.2))',
-              animation: revealed ? 'eid-eidiGlow 2s ease-in-out infinite' : 'none',
-            }}>
-              {currency}{formatAmount(displayAmount)}
+            <div 
+              className={shakeAmount ? 'shake-on-crash' : ''}
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 'clamp(3rem, 12vw, 5.5rem)',
+                color: isNegative ? '#ff4a4a' : '#e8c97a',
+                lineHeight: 1,
+                filter: 'drop-shadow(0 0 20px rgba(201,168,76,0.4)) drop-shadow(0 0 40px rgba(201,168,76,0.2))',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.15em',
+              }}>
+              <span>{currency}</span>
+              
+              {isNegative && <SlotDigit value={0} isMinusSign />}
+              
+              {absAmount
+                .toString()
+                .padStart(4, "0")
+                .split("")
+                .map((digit, i) => (
+                  <SlotDigit key={i} value={Number(digit)} />
+                ))}
             </div>
             
-            {/* Emotional nudge */}
-            <div style={{ fontSize: '0.72rem', color: 'rgba(201,168,76,0.5)', fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '0.08em', marginTop: -4 }}>
-              Eidi feels better when you give it too.
-            </div>
-            
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#f5e9c4', fontStyle: 'italic', maxWidth: 300, lineHeight: 1.6 }}>
-              {d.eidiMsg}
-            </div>
-            
-            <BtnNext onClick={onNext} style={{ marginTop: 8 }}>Bhai's Dua for You ✦</BtnNext>
+            {!showJoke1 && !showJoke2 && displayAmount >= finalAmount && (
+              <>
+                <div style={{ fontSize: '0.72rem', color: 'rgba(201,168,76,0.5)', fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '0.08em', marginTop: -4 }}>
+                  Eidi feels better when you give it too.
+                </div>
+                
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#f5e9c4', fontStyle: 'italic', maxWidth: 300, lineHeight: 1.6 }}>
+                  {d.eidiMsg}
+                </div>
+
+                {/* ChatGPT's Screenshot Line - appears after 200ms delay */}
+                <div style={{
+                  fontFamily: 'Georgia, serif',
+                  fontSize: '0.95rem',
+                  color: '#e8c97a',
+                  maxWidth: 340,
+                  lineHeight: 1.6,
+                  marginTop: 16,
+                  opacity: 0,
+                  animation: 'fadeInDelayed 0.4s ease 0.2s forwards', // 200ms delay
+                }}>
+                  Don't worry…<br />
+                  I saw how fast you clicked "NO" earlier 😏
+                </div>
+                
+                <BtnNext onClick={onNext} style={{ marginTop: 8 }}>Bhai's Dua for You ✦</BtnNext>
+              </>
+            )}
           </div>
         )}
       </div>
+
+      {/* JOKE 1: At +1000 - "Is this enough?" with NO/NO */}
+      {showJoke1 && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          animation: 'eid-fadeUp 0.3s ease forwards',
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #0d3b2e 0%, #0a2e1e 100%)',
+            padding: '48px 40px',
+            borderRadius: 16,
+            maxWidth: 420,
+            textAlign: 'center',
+            border: '2px solid rgba(201,168,76,0.3)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ 
+              fontFamily: 'Georgia, serif',
+              fontSize: 'clamp(1.15rem, 4vw, 1.45rem)',
+              color: '#e8c97a',
+              marginBottom: 12,
+              lineHeight: 1.5,
+            }}>
+              Is ₹1000 enough Eidi for you?
+            </div>
+            
+            {/* ChatGPT's subtle nudge */}
+            <div style={{
+              fontSize: '0.85rem',
+              color: 'rgba(201,168,76,0.6)',
+              marginBottom: 32,
+              fontStyle: 'italic',
+            }}>
+              Be honest 😏
+            </div>
+            
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {/* GREEDY BUTTON (LEFT) - Larger, Green, Appears First, Pulsing */}
+              <button
+                onClick={rejectOffer}
+                style={{
+                  padding: '16px 48px', // BIGGER than right button
+                  background: '#2e7d32', // GREEN = good
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: '0.95rem',
+                  letterSpacing: '0.15em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 16px rgba(46,125,50,0.5)',
+                  animation: 'greedyPulse 2s ease-in-out infinite', // PULSE to attract attention
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#27632a';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#2e7d32';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                NO
+              </button>
+              
+              {/* SECOND BUTTON (RIGHT) - Smaller, Red, Delayed Appearance */}
+              <button
+                onClick={rejectOffer}
+                style={{
+                  padding: '14px 40px', // SMALLER than left button
+                  background: '#d32f2f', // RED = bad
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: '0.85rem',
+                  letterSpacing: '0.15em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(211,47,47,0.4)',
+                  opacity: showJoke1 ? 1 : 0, // Fades in after 250ms
+                  animation: 'fadeInDelayed 0.3s ease 0.25s forwards', // 250ms delay
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#c62828';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#d32f2f';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                NO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JOKE 2: At -1000 - "You owe me!" with YES/YES */}
+      {showJoke2 && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          animation: 'eid-fadeUp 0.3s ease forwards',
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #0d3b2e 0%, #0a2e1e 100%)',
+            padding: '48px 40px',
+            borderRadius: 16,
+            maxWidth: 420,
+            textAlign: 'center',
+            border: '2px solid rgba(201,168,76,0.3)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ fontSize: '3.2rem', marginBottom: 24 }}>😏</div>
+            
+            <div style={{ 
+              fontFamily: 'Georgia, serif',
+              fontSize: 'clamp(1.15rem, 4vw, 1.45rem)',
+              color: '#e8c97a',
+              marginBottom: 16,
+              lineHeight: 1.5,
+            }}>
+              Too greedy, huh?
+            </div>
+            
+            <div style={{ 
+              fontFamily: 'Georgia, serif',
+              fontSize: 'clamp(1.05rem, 3.5vw, 1.25rem)',
+              color: '#f5e9c4',
+              marginBottom: 32,
+              lineHeight: 1.6,
+            }}>
+              Now YOU owe me Eidi this year.
+            </div>
+            
+            <div style={{
+              fontSize: '0.9rem',
+              color: 'rgba(201,168,76,0.7)',
+              marginBottom: 28,
+              letterSpacing: '0.05em',
+              fontFamily: 'Georgia, serif',
+            }}>
+              Deal?
+            </div>
+            
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={acceptDebt}
+                style={{
+                  padding: '14px 40px',
+                  background: '#d32f2f',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: '0.9rem',
+                  letterSpacing: '0.15em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(211,47,47,0.4)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#c62828';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#d32f2f';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                YES
+              </button>
+              
+              <button
+                onClick={acceptDebt}
+                style={{
+                  padding: '14px 40px',
+                  background: '#2e7d32',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: '0.9rem',
+                  letterSpacing: '0.15em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(46,125,50,0.4)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#27632a';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#2e7d32';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                YES
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Screen>
   );
 }
@@ -512,7 +922,7 @@ function S8Closing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SCREEN 9 — VIRAL CHAIN (OPTIMIZED WITH CONCRETE RECALL TRIGGER)
+   SCREEN 9 — VIRAL CHAIN
 ───────────────────────────────────────────────────────────── */
 function S9Chain({ d }: { d: EidDemo }) {
   return (
@@ -520,19 +930,16 @@ function S9Chain({ d }: { d: EidDemo }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, maxWidth: 420 }}>
         <div style={{ fontSize: '2.2rem', animation: 'eid-closingMoon 3s ease-in-out infinite' }}>🌙</div>
 
-        {/* Line 1: Emotional context */}
         <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 5vw, 2rem)', color: '#e8c97a', lineHeight: 1.4 }}>
           Someone made your<br />Eid special.
         </div>
 
         <div style={{ width: 48, height: 1, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.4), transparent)' }} />
 
-        {/* Line 2: CONCRETE RECALL TRIGGER - forces brain to visualize a specific person */}
         <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', color: '#e8c97a', lineHeight: 1.5 }}>
           Think of someone who would smile<br />receiving this today.
         </div>
 
-        {/* Button: Changed from "Create" to "Send" */}
         <button
           onClick={() => { window.location.href = '/demo/eid'; }}
           style={{
@@ -561,7 +968,7 @@ function S9Chain({ d }: { d: EidDemo }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   HOME BUTTON — persistent, non-intrusive
+   HOME BUTTON
 ───────────────────────────────────────────────────────────── */
 function HomeBtn() {
   return (
@@ -616,6 +1023,30 @@ const STYLES = `
       filter: drop-shadow(0 0 30px rgba(201,168,76,0.6)) drop-shadow(0 0 60px rgba(201,168,76,0.3));
     }
   }
+  @keyframes greedyPulse {
+    0%, 100% { 
+      transform: scale(1);
+      box-shadow: 0 4px 16px rgba(46,125,50,0.5);
+    }
+    50% { 
+      transform: scale(1.03);
+      box-shadow: 0 6px 24px rgba(46,125,50,0.7);
+    }
+  }
+  @keyframes fadeInDelayed {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    50% { transform: translateX(6px); }
+    75% { transform: translateX(-4px); }
+    100% { transform: translateX(0); }
+  }
+  .shake-on-crash {
+    animation: shake 0.15s ease-in-out;
+  }
   .eid-letter {
     opacity: 0;
     display: inline-block;
@@ -634,7 +1065,6 @@ const STYLES = `
    MAIN COMPONENT
 ───────────────────────────────────────────────────────────── */
 export function EidExperience() {
-  // Read key from URL: /demo/eid/child-parent → 'child-parent'
   const path = window.location.pathname;
   const key = path.split('/demo/eid/')[1] ?? '';
   const d = getDemoByKey(key) ?? EID_DEMOS[key];
@@ -721,7 +1151,6 @@ export function EidExperience() {
         <Stars />
         <HomeBtn />
         
-        {/* All three layers - crossfade between them */}
         <div 
           className="eid-intro-layer"
           style={{ 

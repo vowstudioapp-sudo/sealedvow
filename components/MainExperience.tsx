@@ -712,7 +712,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
             <div style={{ animation: 'closureReveal 0.8s ease-out 2.2s both' }}>
               <button
-                onClick={() => { window.location.href = '/'; }}
+                onClick={() => { window.location.href = '/create'; }}
                 className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[11px] tracking-[0.4em] uppercase px-14 py-5 rounded-full shadow-2xl transition-all duration-300 active:scale-[0.98]"
               >
                 Create Your Own
@@ -906,7 +906,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                       If this reminded you of someone — don't scroll away.
                     </p>
                     <a
-                      href="/"
+                      href="/create"
                       className="inline-block px-14 py-5 rounded-full font-bold text-[11px] tracking-[0.4em] uppercase transition-all duration-300 active:scale-[0.98]"
                       style={{
                         backgroundColor: '#722F37',

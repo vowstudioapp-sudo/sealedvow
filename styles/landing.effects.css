@@ -172,7 +172,7 @@
    HERO
 ══════════════════════════════════ */
 .lp-hero {
-  min-height: 100vh;
+  min-height: calc(100vh - 96px);
   display: grid;
   grid-template-rows: 1fr auto;
   padding: 0 48px;
@@ -185,7 +185,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 40px 0 160px;
+  padding: 24px 0 48px;
   position: relative;
 }
 
@@ -206,8 +206,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 80px;
+  margin-bottom: 60px;
   animation: lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.2s both;
+  position: relative;
+}
+
+.lp-v-ring::after {
+  content: "";
+  position: absolute;
+  inset: -25px;
+  background: radial-gradient(circle, rgba(255,230,180,0.1), transparent 70%);
+  filter: blur(30px);
+  z-index: -1;
+  opacity: 1;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.lp-v-ring:hover::after {
+  opacity: 1.2;
+  transform: scale(1.08);
 }
 
 .lp-v-ring span {
@@ -227,8 +244,10 @@
   color: var(--lp-text-main);
   line-height: 1.06;
   letter-spacing: 0.015em;
-  margin-bottom: 64px;
-  animation: lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.38s both;
+  margin-bottom: 48px;
+  animation: 
+    lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.38s both,
+    heroBreath 6s ease-in-out 2s infinite;
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
 
@@ -236,7 +255,7 @@
   width: 32px;
   height: 1px;
   background: rgba(242,232,213,0.28);
-  margin: 0 auto 52px;
+  margin: 0 auto 40px;
   animation: lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.54s both;
 }
 
@@ -306,9 +325,12 @@
 
 /* Scroll signal */
 .lp-hero__bottom {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: center;
-  padding-bottom: 40px;
   animation: lp-rise 1.4s ease 1s both;
 }
 
@@ -1340,6 +1362,21 @@
 @keyframes lp-slideUp {
   from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes heroBreath {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* ── MOBILE ── */

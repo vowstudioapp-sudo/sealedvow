@@ -57,6 +57,10 @@ const EidOrbitSelector = lazy(() =>
 const EidExperience = lazy(() =>
   import('./components/EidExperience.tsx').then(m => ({ default: m.EidExperience }))
 );
+
+const OccasionSelector = lazy(() =>
+  import('./components/OccasionSelector.tsx').then(m => ({ default: m.OccasionSelector }))
+);
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
@@ -422,6 +426,24 @@ const App: React.FC = () => {
   if (isEidiCreate) {
     return <Suspense fallback={eidiLoadingFallback}><EidiCreatePage /></Suspense>;
   }
+
+  if (routeType === 'OCCASION_SELECTOR') {
+    return <Suspense fallback={null}><OccasionSelector /></Suspense>;
+  }
+
+  if (routeType === 'LETTER_CREATE') {
+    return (
+      <Suspense fallback={eidiLoadingFallback}>
+        <div className="animate-fade-in py-12 px-4">
+          <PreparationForm onComplete={(d) => {
+            setData(hydrateCoupleData(d));
+            safeSetStage(AppStage.REFINE);
+          }} />
+        </div>
+      </Suspense>
+    );
+  }
+
   if (routeType === 'EID_SELECTOR') {
     return <Suspense fallback={eidiLoadingFallback}><EidOrbitSelector /></Suspense>;
   }
@@ -434,7 +456,7 @@ const App: React.FC = () => {
   }
 
   const handleEnterStudio = () => {
-    safeSetStage(AppStage.PREPARE);
+    window.location.href = "/create";
   };
 
   const handleEnvelopeInteract = () => {
@@ -608,7 +630,7 @@ const App: React.FC = () => {
                   </div>
                   <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-[#1C1917] via-[#1C1917]/95 to-transparent pt-12 pb-6 px-6 text-center">
                     <button
-                      onClick={() => { window.location.href = '/'; }}
+                      onClick={() => { window.location.href = '/create'; }}
                       className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[10px] tracking-[0.4em] uppercase px-10 py-4 rounded-full shadow-2xl transition-all active:scale-[0.98] mb-3"
                     >
                       Create Your Own

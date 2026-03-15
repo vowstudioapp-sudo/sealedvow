@@ -166,7 +166,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     };
   }, [isVisible]);
 
-  const handleEnter = () => { if (isEntering) return; setIsEntering(true); };
+  const handleEnter = () => {
+    window.location.href = "/create";
+  };
 
   const handleSendLoginLink = () => {
     if (!emailInput || !emailInput.includes('@')) return;
@@ -203,19 +205,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <div className="lp-v-ring"><span>V</span></div>
           <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
           <div className="lp-hero__rule" />
-          {!isEntering ? (
-            <button className="lp-btn-begin" onClick={handleEnter}>Begin</button>
-          ) : (
-            <div className="lp-progress-wrap">
-              <div className="lp-progress-track">
-                <div className="lp-progress-bar" style={{ width: `${progress}%` }} />
-              </div>
-              <div className="lp-progress-label">
-                <span style={{ animation: 'none' }}>Initializing Studio</span>
-                <span>{Math.floor(progress)}%</span>
-              </div>
-            </div>
-          )}
+          <button className="lp-btn-begin" onClick={handleEnter}>Begin</button>
         </div>
         <div className="lp-hero__bottom">
           <div className="lp-scroll-signal">
