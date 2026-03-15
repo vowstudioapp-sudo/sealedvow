@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import '../styles/eid.css';
-import { EID_DEMOS, type EidDemo } from '../data/eidDemoData.ts';
+import { EID_DEMOS, getDemoByKey, type EidDemo } from '../data/eidDemoData.ts';
 
 /* ─────────────────────────────────────────────────────────────
    STARS background (generated once)
@@ -247,15 +247,12 @@ function S4Letter({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   return (
     <Screen active scrollable style={{ background: '#fdf8ee', color: '#1a120a' }}>
       <div style={{
-        maxWidth: 560, width: '100%',
+        maxWidth: 680, width: '100%',
         background: '#fffef8', borderRadius: 3,
         padding: 'clamp(28px, 6vw, 52px) clamp(24px, 6vw, 52px)',
         boxShadow: '0 8px 40px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06)',
         position: 'relative', borderTop: '3px solid #c9a84c',
       }}>
-        {/* Margin line */}
-        <div style={{ position: 'absolute', left: 62, top: 0, bottom: 0, width: 1, background: 'rgba(201,168,76,0.18)' }} />
-
         <div style={{ textAlign: 'center', fontSize: '1.8rem', marginBottom: 16, opacity: 0.7 }}>🌙</div>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 5vw, 2.4rem)', color: '#0d3b2e', textAlign: 'center', marginBottom: 8 }}>
           {d.letterHeading}
@@ -266,15 +263,16 @@ function S4Letter({ d, onNext }: { d: EidDemo; onNext: () => void }) {
         <div style={{ width: '100%', height: 1, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.4), transparent)', marginBottom: 28 }} />
 
         <div
+          className="eid-letter-body"
           style={{ fontSize: 'clamp(0.92rem, 2.2vw, 1.05rem)', lineHeight: 2, color: '#2a1a10', fontWeight: 300 }}
           dangerouslySetInnerHTML={{ __html: d.letterBody }}
         />
 
-        <div style={{ marginTop: 32, fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#1a5c44' }}>
+        <div className="eid-letter-sign" style={{ marginTop: 32, fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#1a5c44' }}>
           {d.letterSign}
         </div>
 
-        <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center' }}>
+        <div className="eid-letter-continue" style={{ marginTop: 32, display: 'flex', justifyContent: 'center' }}>
           <BtnNext onClick={onNext}>Our Eid Memories ✦</BtnNext>
         </div>
       </div>
@@ -372,10 +370,48 @@ function S6Duas({ d, active, onNext }: { d: EidDemo; active: boolean; onNext: ()
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SCREEN 7 — EIDI POUCH
+   SCREEN 7 — EIDI POUCH (WITH COUNT-UP ANIMATION)
 ───────────────────────────────────────────────────────────── */
 function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   const [revealed, setRevealed] = useState(false);
+  const [displayAmount, setDisplayAmount] = useState(0);
+
+  // Extract numeric value from amount string (e.g., "₹3,000" → 3000)
+  const finalAmount = parseInt(d.eidiAmount.replace(/[^\d]/g, ''), 10);
+  const currency = d.eidiAmount.match(/[^\d,]+/)?.[0] || '₹';
+
+  const revealEidi = () => {
+    if (revealed) return; // Prevent double-tap
+    
+    setRevealed(true);
+    
+    // Haptic feedback (mobile only, safe wrapper)
+    if (navigator.vibrate) {
+      navigator.vibrate(30);
+    }
+    
+    // Count-up animation from 0 to final amount over 1200ms
+    const duration = 1200;
+    const steps = 60;
+    const increment = finalAmount / steps;
+    const stepDuration = duration / steps;
+    
+    let current = 0;
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= finalAmount) {
+        setDisplayAmount(finalAmount);
+        clearInterval(timer);
+      } else {
+        setDisplayAmount(Math.floor(current));
+      }
+    }, stepDuration);
+  };
+
+  // Format number with commas (3000 → 3,000)
+  const formatAmount = (num: number) => {
+    return num.toLocaleString('en-IN');
+  };
 
   return (
     <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #061810 100%)' }}>
@@ -387,10 +423,16 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
         {!revealed ? (
           <>
             <div
-              onClick={() => setRevealed(true)}
-              style={{ width: 120, height: 130, cursor: 'pointer', transition: 'transform 0.3s ease' }}
-              onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.05) rotate(-2deg)')}
-              onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1) rotate(0)')}
+              onClick={revealEidi}
+              style={{ 
+                width: 120, 
+                height: 130, 
+                cursor: 'pointer', 
+                transition: 'transform 0.3s ease',
+                transform: 'scale(1)',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.05)')}
+              onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
             >
               <svg viewBox="0 0 120 130" fill="none" style={{ width: '100%', height: '100%' }}>
                 <defs>
@@ -415,21 +457,28 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
             <div style={{ fontSize: '0.75rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.6)' }}>
               {d.eidiFrom}
             </div>
+            
+            {/* Amount with glow effect */}
             <div style={{
               fontFamily: 'Georgia, serif',
               fontSize: 'clamp(3rem, 12vw, 5.5rem)',
-              color: '#e8c97a', lineHeight: 1,
-              filter: 'drop-shadow(0 0 20px rgba(201,168,76,0.4))',
+              color: '#e8c97a', 
+              lineHeight: 1,
+              filter: 'drop-shadow(0 0 20px rgba(201,168,76,0.4)) drop-shadow(0 0 40px rgba(201,168,76,0.2))',
+              animation: revealed ? 'eid-eidiGlow 2s ease-in-out infinite' : 'none',
             }}>
-              {d.eidiAmount}
+              {currency}{formatAmount(displayAmount)}
             </div>
-            {/* Emotional nudge — not a CTA, purely feeling */}
+            
+            {/* Emotional nudge */}
             <div style={{ fontSize: '0.72rem', color: 'rgba(201,168,76,0.5)', fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '0.08em', marginTop: -4 }}>
               Eidi feels better when you give it too.
             </div>
+            
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.1rem', color: '#f5e9c4', fontStyle: 'italic', maxWidth: 300, lineHeight: 1.6 }}>
               {d.eidiMsg}
             </div>
+            
             <BtnNext onClick={onNext} style={{ marginTop: 8 }}>Bhai's Dua for You ✦</BtnNext>
           </div>
         )}
@@ -463,7 +512,7 @@ function S8Closing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SCREEN 9 — VIRAL CHAIN (receiver → sender)
+   SCREEN 9 — VIRAL CHAIN (OPTIMIZED WITH CONCRETE RECALL TRIGGER)
 ───────────────────────────────────────────────────────────── */
 function S9Chain({ d }: { d: EidDemo }) {
   return (
@@ -471,21 +520,23 @@ function S9Chain({ d }: { d: EidDemo }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, maxWidth: 420 }}>
         <div style={{ fontSize: '2.2rem', animation: 'eid-closingMoon 3s ease-in-out infinite' }}>🌙</div>
 
+        {/* Line 1: Emotional context */}
         <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.5rem, 5vw, 2rem)', color: '#e8c97a', lineHeight: 1.4 }}>
-          Someone thought of you<br />this Eid.
+          Someone made your<br />Eid special.
         </div>
 
         <div style={{ width: 48, height: 1, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.4), transparent)' }} />
 
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(0.95rem, 3vw, 1.1rem)', color: 'rgba(245,233,196,0.75)', lineHeight: 1.8, fontStyle: 'italic' }}>
-          {d.senderName} made your Eid special.<br />
-          Someone's waiting for you to do the same.
+        {/* Line 2: CONCRETE RECALL TRIGGER - forces brain to visualize a specific person */}
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', color: '#e8c97a', lineHeight: 1.5 }}>
+          Think of someone who would smile<br />receiving this today.
         </div>
 
+        {/* Button: Changed from "Create" to "Send" */}
         <button
           onClick={() => { window.location.href = '/demo/eid'; }}
           style={{
-            marginTop: 8,
+            marginTop: 16,
             padding: '14px 36px',
             background: '#c9a84c',
             color: '#0a2e1e',
@@ -502,12 +553,8 @@ function S9Chain({ d }: { d: EidDemo }) {
           onMouseEnter={e => { e.currentTarget.style.background = '#e8c97a'; e.currentTarget.style.transform = 'scale(1.03)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = '#c9a84c'; e.currentTarget.style.transform = 'scale(1)'; }}
         >
-          Create your Eid card ✦
+          Send an Eid card ✦
         </button>
-
-        <div style={{ fontSize: '0.65rem', color: 'rgba(201,168,76,0.35)', letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
-          Send Eid wishes — with or without Eidi.
-        </div>
       </div>
     </Screen>
   );
@@ -538,6 +585,7 @@ function HomeBtn() {
 }
 
 /* ─────────────────────────────────────────────────────────────
+   STYLES
 ───────────────────────────────────────────────────────────── */
 const STYLES = `
   @keyframes eid-twinkle {
@@ -560,6 +608,14 @@ const STYLES = `
     0%, 100% { transform: translateY(0); opacity: 0.8; }
     50% { transform: translateY(-8px); opacity: 1; }
   }
+  @keyframes eid-eidiGlow {
+    0%, 100% { 
+      filter: drop-shadow(0 0 20px rgba(201,168,76,0.4)) drop-shadow(0 0 40px rgba(201,168,76,0.2));
+    }
+    50% { 
+      filter: drop-shadow(0 0 30px rgba(201,168,76,0.6)) drop-shadow(0 0 60px rgba(201,168,76,0.3));
+    }
+  }
   .eid-letter {
     opacity: 0;
     display: inline-block;
@@ -581,7 +637,7 @@ export function EidExperience() {
   // Read key from URL: /demo/eid/child-parent → 'child-parent'
   const path = window.location.pathname;
   const key = path.split('/demo/eid/')[1] ?? '';
-  const d = EID_DEMOS[key];
+  const d = getDemoByKey(key) ?? EID_DEMOS[key];
 
   const [screen, setScreen] = useState(0);
   const TOTAL = 8;

@@ -77,9 +77,59 @@
   letter-spacing:.05em;
   direction:rtl;
 
-  text-shadow:
-  0 0 10px rgba(201,168,76,.35),
-  0 0 30px rgba(201,168,76,.25);
+  /* Gold shimmer gradient background */
+  background:linear-gradient(
+    90deg,
+    #f0d080 0%,
+    #f5e090 25%,
+    #e8c97a 50%,
+    #f5e090 75%,
+    #f0d080 100%
+  );
+  background-size:200% 100%;
+  background-clip:text;
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+
+  opacity:0;
+  transform:scale(.8) translateY(14px);
+  animation:
+    eid-mubarak-reveal 1.2s cubic-bezier(.22,.61,.36,1) .4s forwards,
+    eid-gold-shimmer 2.2s ease-in-out 1.6s forwards;
+}
+
+@keyframes eid-mubarak-reveal{
+  0%{
+    opacity:0;
+    transform:scale(.8) translateY(14px);
+    text-shadow:
+      0 0 8px rgba(201,168,76,.15);
+  }
+
+  60%{
+    opacity:1;
+    transform:scale(1.02) translateY(-2px);
+    text-shadow:
+      0 0 16px rgba(201,168,76,.45),
+      0 0 36px rgba(201,168,76,.25);
+  }
+
+  100%{
+    opacity:1;
+    transform:scale(1) translateY(0);
+    text-shadow:
+      0 0 12px rgba(201,168,76,.35),
+      0 0 28px rgba(201,168,76,.2);
+  }
+}
+
+@keyframes eid-gold-shimmer{
+  0%{
+    background-position:200% 0;
+  }
+  100%{
+    background-position:-200% 0;
+  }
 }
 
 .eid-year{
@@ -192,6 +242,50 @@
   
   opacity:.5;
   mix-blend-mode:multiply;
+}
+
+/* LETTER BODY — PARAGRAPH-BY-PARAGRAPH REVEAL */
+
+.eid-letter-body p{
+  opacity:0;
+  transform:translateY(12px);
+  animation:eid-letterReveal .8s ease forwards;
+}
+
+.eid-letter-body p:nth-child(1){ animation-delay:.2s; }
+.eid-letter-body p:nth-child(2){ animation-delay:.8s; }
+.eid-letter-body p:nth-child(3){ animation-delay:1.4s; }
+.eid-letter-body p:nth-child(4){ animation-delay:2s; }
+
+.eid-letter-sign{
+  opacity:0;
+  transform:translateY(12px);
+  animation:eid-letterReveal .8s ease forwards;
+  animation-delay:2.6s;
+}
+
+@keyframes eid-letterReveal{
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+.eid-letter-body p.highlight{
+  color:#c9a84c;
+  font-weight:500;
+}
+
+.eid-letter-continue{
+  opacity:0;
+  animation:eid-letterButtonReveal .6s ease forwards;
+  animation-delay:3.2s;
+}
+
+@keyframes eid-letterButtonReveal{
+  to{
+    opacity:1;
+  }
 }
 
 /* BOTTOM FLAPS (z-index: 2) */
@@ -365,7 +459,7 @@
   
   background:
   linear-gradient(
-  to bottom,
+    to bottom,
   rgba(255,255,255,.35) 0px,
   rgba(255,255,255,.18) 2px,
   transparent 8px
@@ -428,23 +522,51 @@
   inset:0;
   border-radius:inherit;
   
+  /* Enhanced crack pattern - spreads during holding */
   background:
-  url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 20 L55 40 L48 55 L60 70' stroke='rgba(0,0,0,.45)' stroke-width='2' fill='none'/%3E%3Cpath d='M30 45 L45 50 L40 65' stroke='rgba(0,0,0,.4)' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 20 L55 40 L48 55 L60 70 L65 85' stroke='rgba(0,0,0,.45)' stroke-width='2' fill='none'/%3E%3Cpath d='M30 45 L45 50 L40 65 L50 75' stroke='rgba(0,0,0,.4)' stroke-width='2' fill='none'/%3E%3Cpath d='M70 35 L65 50 L72 65' stroke='rgba(0,0,0,.35)' stroke-width='1.5' fill='none'/%3E%3Cpath d='M45 30 L50 45 L42 60' stroke='rgba(0,0,0,.3)' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
   
   opacity:0;
-  transition:opacity .25s ease;
+  transition:opacity .4s ease;
+  transform:scale(0.8);
+  transition:opacity .4s ease, transform .6s ease;
   
   pointer-events:none;
 }
 
-/* Cracks visible when breaking */
-.eid-wax-seal.breaking::before{
-  opacity:.7;
+/* Cracks spread and become visible during holding */
+.eid-wax-seal.holding::before{
+  opacity:.5;
+  transform:scale(1);
+  animation:crackSpread 1.2s ease-in-out infinite;
 }
 
-/* Pressure feedback while holding */
+/* Cracks fully visible when breaking */
+.eid-wax-seal.breaking::before{
+  opacity:.85;
+  transform:scale(1.1);
+  animation:crackSpread 0.3s ease-out forwards;
+}
+
+@keyframes crackSpread{
+  0%{
+    transform:scale(0.9) rotate(0deg);
+    opacity:.4;
+  }
+  50%{
+    transform:scale(1.05) rotate(1deg);
+    opacity:.6;
+  }
+  100%{
+    transform:scale(1) rotate(0deg);
+    opacity:.5;
+  }
+}
+
+/* Pressure feedback while holding - compression + tension wobble */
 .eid-wax-seal.holding{
   transform:translate(-50%,-50%) scale(.92);
+  animation:waxTension 0.8s ease-in-out infinite;
   
   box-shadow:
   0 10px 25px rgba(0,0,0,.6),
@@ -456,64 +578,122 @@
   inset 0 6px 14px rgba(0,0,0,.4);
 }
 
-/* SEAL BREAKING ANIMATION - Wax snap + collapse */
-.eid-wax-seal.breaking{
-  animation:sealBreak 0.7s cubic-bezier(.2,.8,.3,1) forwards;
+/* Subtle wobble showing wax tension before breaking */
+@keyframes waxTension{
+  0%,100%{
+    transform:translate(-50%,-50%) scale(.92) rotate(0deg);
+  }
+  25%{
+    transform:translate(-50%,-50%) scale(.91) rotate(-0.8deg);
+  }
+  50%{
+    transform:translate(-50%,-50%) scale(.93) rotate(0.5deg);
+  }
+  75%{
+    transform:translate(-50%,-50%) scale(.91) rotate(0.8deg);
+  }
 }
 
-/* organic wax drops */
+/* SEAL BREAKING ANIMATION - Wax snap + collapse */
+.eid-wax-seal.breaking{
+  animation:sealBreak 0.7s cubic-bezier(.3,.1,.4,.95) forwards;
+  /* Additional fragment shapes appear when breaking - move with seal transform */
+  box-shadow:
+    0 18px 40px rgba(0,0,0,.65),
+    -4px -1px 0 3px #7a1a1a,
+    3px -2px 0 3px #6b1414,
+    4px 2px 0 3px #5e1111,
+    -3px 3px 0 3px #6a1414,
+    2px 4px 0 3px #701818,
+    inset 0 6px 12px rgba(255,255,255,.18),
+    inset 0 -10px 20px rgba(0,0,0,.55),
+    /* Fragment 2 - appears at top-right when breaking */
+    14px -12px 0 0 #6b1414,
+    /* Fragment 3 - appears at bottom-left when breaking */
+    -12px 14px 0 0 #701818;
+}
+
+/* Wax drip - sits under seal edge, flies away when breaking */
 .eid-wax-seal::after{
   content:"";
   position:absolute;
-
-  width:14px;
-  height:10px;
-
+  width:12px;
+  height:9px;
   background:#7a1a1a;
-
   border-radius:
   60% 40% 55% 45%
   / 50% 60% 40% 50%;
-
   bottom:-8px;
-  right:-12px;
-
-  box-shadow:
-  10px 6px 0 0 #6b1414,
-  -12px 4px 0 0 #701818;
-
+  right:-10px;
   transform:rotate(-12deg);
+  opacity:1;
+  box-shadow:0 2px 4px rgba(0,0,0,.35);
+  pointer-events:none;
 }
 
-/* SEAL BREAKING ANIMATION - Wax snap + collapse */
+/* Wax drip flies away when seal breaks */
+.eid-wax-seal.breaking::after{
+  animation:waxFrag1 0.65s cubic-bezier(.4,.1,.6,.9) forwards;
+}
+
+/* Fragment flies top-right from drip position */
+@keyframes waxFrag1{
+  0%{
+    opacity:1;
+    transform:rotate(-12deg) translate(0,0) scale(1);
+  }
+  100%{
+    opacity:0;
+    transform:rotate(30deg) translate(26px,-28px) scale(.3);
+  }
+}
+
+/* SEAL BREAKING ANIMATION - Physical snap with better easing */
 @keyframes sealBreak{
   0%{
-    transform:translate(-50%,-50%) scale(1);
+    transform:translate(-50%,-50%) scale(.92) rotate(0deg);
     filter:brightness(1);
   }
   
-  20%{
-    transform:translate(-50%,-50%) scale(.92);
+  8%{
+    transform:translate(-50%,-50%) scale(.88) rotate(-1deg);
+    filter:brightness(0.9);
   }
   
-  35%{
-    transform:translate(-50%,-50%) scale(1.08) rotate(4deg);
-    filter:brightness(1.2);
+  18%{
+    transform:translate(-50%,-50%) scale(1.12) rotate(6deg);
+    filter:brightness(1.3);
+  }
+  
+  28%{
+    transform:translate(-50%,-50%) scale(1.05) rotate(-4deg);
+    filter:brightness(1.1);
+  }
+  
+  40%{
+    transform:translate(-50%,-50%) scale(.98) rotate(2deg);
+    filter:brightness(1);
   }
   
   55%{
-    transform:translate(-50%,-50%) scale(.95) rotate(-3deg);
+    transform:translate(-50%,-50%) scale(.75) rotate(-8deg);
+    opacity:.8;
   }
   
-  75%{
-    transform:translate(-50%,-50%) scale(.6) rotate(-180deg);
-    opacity:.5;
+  70%{
+    transform:translate(-50%,-50%) scale(.5) rotate(-180deg);
+    opacity:.4;
+  }
+  
+  85%{
+    transform:translate(-50%,-50%) scale(.3) rotate(-270deg);
+    opacity:.2;
   }
   
   100%{
-    transform:translate(-50%,-50%) scale(.2) rotate(-360deg);
+    transform:translate(-50%,-50%) scale(.15) rotate(-360deg);
     opacity:0;
-    filter:blur(3px);
+    filter:blur(4px) brightness(0.5);
   }
 }
 

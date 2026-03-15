@@ -1,63 +1,65 @@
-// ============================================================
-// EID DEMO DATA — all 6 relationship demos
-// Ported directly from Vow-Eidi.html EXP object
-// Used exclusively by EidExperience.tsx
-// ============================================================
+// ─────────────────────────────────────────────────────────────────────
+// SealedVow — Eid Demo Data
+// 
+// Contains 6 relationship-specific demo experiences with unique memories
+// Routes: /demo/eid/:relationship
+// ─────────────────────────────────────────────────────────────────────
+
+export type EidDemoKey = 
+  | 'child-parent'
+  | 'sibling'
+  | 'friend'
+  | 'elder-child'
+  | 'parent-child'
+  | 'relative-family';
 
 export interface EidMemory {
-  icon: string;
-  caption: string;
-}
-
-export interface EidDua {
-  icon: string;
-  text: string;
+  icon: string;      // Changed from emoji
+  caption: string;   // Changed from text
 }
 
 export interface EidDemo {
   recipient: string;
-  sender: string;
-  moonAwaits: string;
   envFrom: string;
-  envSenderSub: string;
   blessing: string;
+  
   letterHeading: string;
   letterMeta: string;
   letterBody: string;
   letterSign: string;
-  memTitle: string;
-  memSub: string;
+  
+  memTitle: string;     // Changed from memoryTitle
+  memSub: string;       // Changed from memorySubtitle
   memories: EidMemory[];
+  
   duaTitle: string;
   duaSub: string;
-  duas: EidDua[];
+  duas: Array<{ icon: string; text: string }>;
+  
   eidiLabel: string;
   eidiFrom: string;
   eidiAmount: string;
   eidiMsg: string;
+  
   closingMain: string;
   closingSender: string;
-  senderName: string;  // used in viral chain screen
+  
+  senderName: string;
 }
 
 export const EID_DEMOS: Record<string, EidDemo> = {
-
   'child-parent': {
     recipient: 'Ammi',
-    sender: 'Fahad',
-    moonAwaits: 'Ammi, a message and eidi awaits you 🌙',
-    envFrom: 'A sealed message — especially for you',
-    envSenderSub: 'From Fahad ✦ Eid Mubarak',
+    envFrom: 'From your son',
     blessing: 'May Allah fill your home with peace,\nyour heart with gratitude,\nand your life with barakah.',
-    letterHeading: 'Eid Mubarak, Ammi',
-    letterMeta: 'From Fahad · Eid ul-Fitr 2026',
-    letterBody: `<p>Every Eid, I look for the right words. And every Eid, I realise there aren't enough. So I'll just say what I feel — simply, honestly.</p>
-<p>You are the reason our Eids feel special. Not the clothes, not the food — you. The way you wake up before everyone else. The way the whole house smells different on Eid morning because of what you've cooked through the night.</p>
-<p>I don't think I've ever properly thanked you for all of that. So today — on this blessed day — I want to say it clearly: <em>JazakAllah Khair, Ammi. For everything.</em></p>
-<p>May Allah give you long life, good health, and peace in your heart. May He reward you for every sacrifice you made for us. Eid Mubarak. Your smile today is all I need. 🌙</p>`,
-    letterSign: '— Fahad',
-    memTitle: 'Our Eid Traditions',
-    memSub: 'The moments that make it real',
+    
+    letterHeading: 'Eid Mubarak — to Ammi',
+    letterMeta: 'FROM YOUR SON · EID UL-FITR 2026',
+    letterBody: `<p>Eid Mubarak, Ammi! I wish I could be there this year, but distance doesn't change how much you mean to me.</p><p>Every Eid memory I have starts and ends with you — your sheer khurma, your dua, the way you made sure we all felt special even when things were tight.</p><p>I know I don't say it enough, but everything I am today is because of your duas and your patience. May Allah reward you for every sacrifice you made for us.</p>`,
+    letterSign: "— Your son who's always thinking of you",
+    
+    memTitle: "What You've Given Us",
+    memSub: "The traditions we'll never forget",
     memories: [
       { icon: '🍳', caption: 'Eid morning in the kitchen — your sheer khurma no one can replicate' },
       { icon: '🕌', caption: 'Walking to the masjid together while the city is still quiet' },
@@ -66,232 +68,260 @@ export const EID_DEMOS: Record<string, EidDemo> = {
       { icon: '👗', caption: 'Getting us all dressed and presentable before you thought of yourself' },
       { icon: '🌙', caption: 'Every Eid ending with your dua — the one that always made us cry' },
     ],
-    duaTitle: 'My Duas For You',
-    duaSub: 'From my heart to yours, Ammi',
+    
+    duaTitle: 'My Duas for You',
+    duaSub: 'What I pray for when I think of you',
     duas: [
-      { icon: '🌙', text: 'May Allah grant you long health and keep pain far away from you' },
-      { icon: '✨', text: 'May your heart always stay peaceful — you have given so much, may you only receive now' },
-      { icon: '🤲', text: 'May Allah accept all your prayers and keep His barakah on you always' },
-      { icon: '💛', text: 'May every Eid find you happier and healthier than the last' },
-      { icon: '🌸', text: 'May Allah reward you for every sacrifice you made without ever being asked' },
+      { icon: '🤲', text: 'May Allah grant you health, peace, and endless joy in this life and the next' },
+      { icon: '💝', text: 'May every sacrifice you made for us be rewarded a thousand times over' },
+      { icon: '🌟', text: 'May your days be filled with light, your heart with contentment, and your home with barakah' },
     ],
-    eidiLabel: 'Something for you, Ammi 🌙',
-    eidiFrom: 'Eidi from Fahad',
-    eidiAmount: '₹2,000',
-    eidiMsg: '"A small gift with a big dua. May it bring a smile to your face, Ammi. 🌙"',
-    closingMain: 'May every Eid bring us closer together.\nMay Allah keep our family united,\nhealthy, and full of His blessings.',
-    closingSender: 'Fahad — with all his love 🤍',
-    senderName: 'Fahad',
-  },
-
-  'parent-child': {
-    recipient: 'Zara',
-    sender: 'Ammi & Abu',
-    moonAwaits: 'Zara, something from Ammi & Abu 🌙',
-    envFrom: 'With love — from your parents',
-    envSenderSub: 'From Ammi & Abu ✦ Eid Mubarak',
-    blessing: 'May Allah always keep you\nunder His protection,\nhappy, healthy, and full of His noor.',
-    letterHeading: 'Eid Mubarak, Zara!',
-    letterMeta: 'From Ammi & Abu · Eid ul-Fitr 2026',
-    letterBody: `<p>Eid Mubarak, beta. Today your Ammi and Abu just want to say one thing — watching you grow up into the person you are is the greatest gift we could have asked for.</p>
-<p>You make our home feel complete. On every Eid, when we see you dressed up and smiling — nothing else matters. That image stays with us the whole year.</p>
-<p>We don't always say these things. But we feel them every single day. May Allah keep you happy, keep you safe, and keep you always close to us. 🌙</p>
-<p>Now go enjoy your Eid. You've earned it, beta.</p>`,
-    letterSign: '— Ammi & Abu',
-    memTitle: 'Our Eid Moments Together',
-    memSub: 'The ones we carry all year',
-    memories: [
-      { icon: '👗', caption: 'Getting you dressed on Eid morning — always our favourite part of the day' },
-      { icon: '📸', caption: 'The family photo on Eid — you always made a face, we always kept it' },
-      { icon: '🍽️', caption: 'You at the head of the table, already asking what\'s for dessert' },
-      { icon: '🤲', caption: 'Watching you pray — quietly, on your own — that moment stays with us' },
-      { icon: '🌙', caption: 'Your first proper Eid salaam — so small, so serious, so perfectly done' },
-      { icon: '💛', caption: 'Every Eid hug — the kind that says everything words cannot' },
-    ],
-    duaTitle: 'Our Duas For You',
-    duaSub: 'From Ammi & Abu — always',
-    duas: [
-      { icon: '🌙', text: 'May Allah keep you happy in this world and the next — always' },
-      { icon: '🤲', text: 'May every door of good open for you and every hardship turn to ease' },
-      { icon: '💛', text: 'May you always know how deeply, completely, unconditionally you are loved' },
-      { icon: '✨', text: 'May Allah protect you wherever you go and bring you always home safely' },
-      { icon: '🌸', text: 'May every Eid find you closer to everything good you are working towards' },
-    ],
-    eidiLabel: 'Your Eidi is here, beta 🌙',
-    eidiFrom: 'Eidi from Ammi & Abu',
-    eidiAmount: '₹1,000',
-    eidiMsg: '"Not as much as our love — but it comes with every dua we have. Eid Mubarak, Zara. 🌙"',
-    closingMain: 'You are our everything, Zara.\nMay every Eid find you\nhappier than the last.',
-    closingSender: 'Ammi & Abu — forever and always 🤍',
-    senderName: 'Ammi & Abu',
-  },
-
-  'elder-child': {
-    recipient: 'Zohain',
-    sender: 'Tabish Chacha',
-    moonAwaits: 'Zohain, a message and eidi awaits you 🌙',
-    envFrom: 'A sealed message for you, Zohain',
-    envSenderSub: 'From Tabish Chacha ✦ Eid Mubarak',
-    blessing: 'May Allah fill your life with joy,\nyour path with ease,\nand every Eid bring more smiles\nto your face than the last.',
-    letterHeading: 'Eid Mubarak, Zohain!',
-    letterMeta: 'From Tabish Chacha · Eid ul-Fitr 2026',
-    letterBody: `<p>Eid Mubarak, beta! Every Eid your Chacha thinks about you — about how fast you're growing up, how proud it makes me feel just to watch you become the person you are.</p>
-<p>You know what I remember most? Every Eid when you were little — running around in new clothes, asking "Chacha, where's my eidi?" before even saying salaam. 😄 Those memories make me smile every single time.</p>
-<p>Now you're older — but in my eyes you'll always be that same little Zohain. And your Chacha's dua for you will never change — <em>may Allah make your life full of success, happiness, and His blessings.</em></p>
-<p>Be a good human. Work hard. Make your parents proud — they deserve it more than anyone. And know that your Chacha is always, always in your corner. No matter what. 🌙</p>
-<p>Now go enjoy your Eid — and don't forget to do your eidi wala salaam properly! 😄</p>`,
-    letterSign: '— Tabish Chacha',
-    memTitle: 'Our Eid Memories',
-    memSub: 'The moments Chacha still smiles about',
-    memories: [
-      { icon: '👔', caption: 'New Eid clothes — you\'d always ask to wear them the night before' },
-      { icon: '🕌', caption: 'Walking to Eid namaz together while the streets were still quiet' },
-      { icon: '💵', caption: 'Running to Chacha for eidi before anyone else even woke up' },
-      { icon: '🍽️', caption: 'Family lunch that went on for hours — the way Eid should feel' },
-      { icon: '😄', caption: 'Your laugh that could fill up any room — still the same as always' },
-      { icon: '🤝', caption: 'Eid milans with the whole family — the noise, the love, the chaos' },
-    ],
-    duaTitle: "Chacha's Duas For You",
-    duaSub: 'Straight from the heart, Zohain',
-    duas: [
-      { icon: '🌙', text: 'May Allah give you success in everything you put your hands to' },
-      { icon: '✨', text: 'May your parents always be proud of you — you have what it takes, beta' },
-      { icon: '💪', text: 'May Allah give you strength, wisdom, and a good heart as you grow' },
-      { icon: '🤲', text: 'May every door of good open up for you and every hardship pass quickly' },
-      { icon: '🌸', text: 'May we celebrate many more Eids together — healthy, happy, and close as family' },
-    ],
-    eidiLabel: 'Chacha ne bheja hai — sirf tumhare liye 🌙',
-    eidiFrom: 'Eidi from Tabish Chacha',
-    eidiAmount: '₹500',
-    eidiMsg: '"Thodi si eidi, aur bahut saari duaein. Eid Mubarak Zohain! 🌙"',
-    closingMain: 'May every Eid remind you\nhow loved you are, Zohain.\nYour Chacha is always proud of you.',
-    closingSender: 'Tabish Chacha — with lots of love & dua 🤲',
-    senderName: 'Tabish Chacha',
+    
+    eidiLabel: 'Your Eidi from your son',
+    eidiFrom: 'With love',
+    eidiAmount: '₹5,000',
+    eidiMsg: 'For all the times you gave without asking. For all the duas that carried me through.',
+    
+    closingMain: 'May this Eid bring you\npeace, joy, and countless blessings.\nAmeen.',
+    closingSender: 'From your son',
+    senderName: 'Your son',
   },
 
   'sibling': {
     recipient: 'Sara',
-    sender: 'Amir Bhai',
-    moonAwaits: 'Sara, something is waiting for you 🌙',
-    envFrom: "Yes it's from your annoying Bhai 😄",
-    envSenderSub: 'From Amir Bhai ✦ Eid Mubarak',
-    blessing: 'May Allah always keep you happy,\nprotected, and surrounded by good people.\n(And may you always be nice to your Bhai 😄)',
-    letterHeading: 'Eid Mubarak, Sara! 🌙',
-    letterMeta: 'From your Bhai · Eid ul-Fitr 2026',
-    letterBody: `<p>Okay fine. I'll say the nice things once a year. Today is that day. Don't get used to it. 😄</p>
-<p>Honestly Sara — growing up with you wasn't always easy. You were annoying. You still are. But I also know that you're one of the kindest, most genuine people I know. And I'm proud to call you my little sister.</p>
-<p>You work hard, you care deeply, and you handle things that most people would fall apart over. I see that even when I don't say it. Your Bhai notices. 🌙</p>
-<p>May this Eid bring you everything you've been wishing for. And may you always have a Bhai as amazing as me. 😄 Eid Mubarak, Sara. For real.</p>`,
-    letterSign: '— Amir Bhai (your favourite person, admit it)',
-    memTitle: 'Our Sibling Eid Moments',
-    memSub: "The ones we'll laugh about forever",
+    envFrom: 'From your annoying bhai 😄',
+    blessing: 'May Allah bless every child\nin this family with happiness,\nhealth, and His endless mercy.',
+    
+    letterHeading: 'Eid Mubarak — to Sara',
+    letterMeta: 'FROM YOUR ANNOYING BHAI · EID UL-FITR 2026',
+    letterBody: `<p>Eid Mubarak, Sara! Remember when we used to fight over who got the biggest eidi envelope? Now we're old enough to BE the ones giving eidi. Crazy how fast time moves.</p><p>I know we don't say this stuff out loud, but you've always had my back — even when I didn't deserve it. From covering for me with Ammi to being the only one who actually gets what it's like in our family, you've been real from day one.</p>`,
+    letterSign: "— Your bhai who appreciates you (even if he doesn't show it)",
+    
+    memTitle: 'Our Eid Chaos',
+    memSub: 'The moments only we understand',
     memories: [
-      { icon: '👗', caption: 'Fighting over who looks better in Eid clothes — you always won, I\'ll admit it' },
-      { icon: '💵', caption: 'Comparing eidi amounts and deciding who got more — every single year' },
-      { icon: '😂', caption: 'That one time you cried at Eid because your outfit didn\'t match' },
-      { icon: '🍛', caption: 'Sneaking into the kitchen before everyone woke up and finishing the sheer khurma' },
-      { icon: '📸', caption: 'The family photo where we both made the same face — still cannot explain it' },
-      { icon: '🤝', caption: 'But at the end of every Eid — always together, always us' },
+      { icon: '🎁', caption: 'Fighting over who gets the biggest eidi envelope every single year' },
+      { icon: '📸', caption: 'Forcing awkward family photos before Ammi lets us leave' },
+      { icon: '🍬', caption: 'Sneaking mithai from the kitchen when no one was looking' },
+      { icon: '👔', caption: "You stealing my favorite Eid outfit and pretending you didn't" },
+      { icon: '🚗', caption: 'Late-night drives after all the relatives finally left' },
+      { icon: '🤝', caption: "Being the only one who really gets what it's like in our family" },
     ],
-    duaTitle: "Bhai's Duas For You",
-    duaSub: 'I mean it, every single word',
+    
+    duaTitle: 'My Duas for You',
+    duaSub: 'What I ask Allah for my sister',
     duas: [
-      { icon: '🌙', text: 'May Allah give you a life full of happiness — you deserve every bit of it' },
-      { icon: '💪', text: "May every hardship you're facing right now turn into something good very soon" },
-      { icon: '🤍', text: 'May we celebrate many more Eids together — healthy, happy, and always close' },
-      { icon: '✨', text: 'May Allah protect you and keep you surrounded by people who deserve you' },
-      { icon: '😄', text: 'And may you always have a Bhai this amazing. Ameen. (Say ameen.)' },
+      { icon: '🌟', text: 'May Allah guide you, protect you, and grant you success in everything you do' },
+      { icon: '💝', text: 'May your heart always find peace, and may your duas be answered' },
+      { icon: '🤲', text: 'May you find happiness in this life and the highest place in Jannah' },
     ],
-    eidiLabel: "Your Bhai's eidi — open it 😄",
-    eidiFrom: 'Eidi from Amir Bhai',
-    eidiAmount: '₹200',
-    eidiMsg: '"Don\'t spend it all in one place. Happy Eid Sara — love you (don\'t tell anyone) 😄🌙"',
-    closingMain: 'Eid Mubarak Sara.\nBeing your Bhai is one of\nthe best things that ever happened to me.',
-    closingSender: 'Amir Bhai — your annoying but loving brother 😄🤍',
-    senderName: 'Amir Bhai',
+    
+    eidiLabel: 'Your Eidi from bhai',
+    eidiFrom: 'From your brother',
+    eidiAmount: '₹3,000',
+    eidiMsg: 'For being real when it mattered. For having my back when I needed it.',
+    
+    closingMain: 'May this Eid be filled with\njoy, laughter, and good memories.\nAmeen.',
+    closingSender: 'From your bhai',
+    senderName: 'Your bhai',
   },
 
   'friend': {
     recipient: 'Hamza',
-    sender: 'Bilal',
-    moonAwaits: 'Hamza, your friend has something for you 🌙',
-    envFrom: "Open it yaar — it's from Bilal",
-    envSenderSub: 'From Bilal ✦ Eid Mubarak',
-    blessing: 'May Allah bless you, your family,\nand give you all the good things\nyou\'ve been working towards.',
-    letterHeading: 'Eid Mubarak Hamza! 🌙',
-    letterMeta: 'From Bilal · Eid ul-Fitr 2026',
-    letterBody: `<p>Bhai Eid Mubarak! Sent you this properly this year because a WhatsApp "Eid Mubarak 🌙" felt like not enough for someone like you.</p>
-<p>Honestly yaar — it's rare to have a friend who's genuinely happy when things go right for you. You're that friend. And I don't think I say it enough but having you around is something I'm genuinely grateful for.</p>
-<p>This year has been a lot for both of us. But we're here, we're good, and it's Eid. May Allah make the next year even better for you — in every single way. 🌙</p>
-<p>Now go eat biryani and enjoy your day. Eid Mubarak, yaar. For real. 😄</p>`,
-    letterSign: '— Bilal (your best friend, obviously)',
-    memTitle: 'Our Eid Memories',
-    memSub: 'The ones only we remember',
+    envFrom: 'From your friend',
+    blessing: 'May Allah bless you\nwith peace, joy,\nand countless blessings.',
+    
+    letterHeading: 'Eid Mubarak — to Hamza',
+    letterMeta: 'FROM YOUR FRIEND · EID UL-FITR 2026',
+    letterBody: `<p>Eid Mubarak, bro! Another year, another Eid text at exactly 12:01 AM. You know the drill.</p><p>Real talk though — thanks for being there through everything. From chand raat shopping chaos to late-night existential conversations during Ramadan, you've been solid. Not everyone has friends who show up the way you do.</p>`,
+    letterSign: "— Your friend who's grateful for you",
+    
+    memTitle: 'Our Eid Adventures',
+    memSub: 'The memories we made together',
     memories: [
-      { icon: '🕌', caption: 'Eid namaz together — every year without fail, the tradition continues' },
-      { icon: '🍛', caption: "Jumping between houses for biryani — yours, mine, whoever's was best that day" },
-      { icon: '😂', caption: 'That Eid we were late for namaz and ran in our new clothes 😭' },
-      { icon: '🎉', caption: 'Every Eid Milan where we always ended up in the same corner talking' },
-      { icon: '☕', caption: 'The post-Eid chai that always turned into a 3-hour conversation' },
-      { icon: '🤝', caption: 'Eleven Eids in. Same friend. Same loyalty. Always.' },
+      { icon: '🌃', caption: 'Chand raat at the mall — fighting through crowds for last-minute shopping' },
+      { icon: '🍕', caption: 'Late-night iftar runs when we were too lazy to cook' },
+      { icon: '📱', caption: 'Eid Mubarak texts at exactly 12:01 AM every year without fail' },
+      { icon: '👟', caption: 'New kicks for Eid — comparing who got the better deal' },
+      { icon: '🎮', caption: 'Post-Eid gaming sessions after family obligations ended' },
+      { icon: '🤲', caption: 'Making dua for each other when life got heavy' },
     ],
-    duaTitle: 'My Duas For You',
-    duaSub: 'Said with full sincerity, Hamza',
+    
+    duaTitle: 'My Duas for You',
+    duaSub: 'What I ask Allah for my brother',
     duas: [
-      { icon: '🌙', text: "May Allah bless everything you're building right now — you're closer than you think" },
-      { icon: '✨', text: "May this year bring you the things you've been quietly waiting for" },
-      { icon: '🤲', text: "May our friendship stay strong — few people have a friend like you, and I know I'm lucky" },
-      { icon: '💪', text: 'May every hardship pass quickly and every good thing multiply' },
-      { icon: '😄', text: 'And may the biryani at your place this Eid be the best it has ever been' },
+      { icon: '🌟', text: 'May Allah grant you success in everything you pursue' },
+      { icon: '💝', text: 'May your heart find peace and your path be filled with light' },
+      { icon: '🤲', text: 'May Allah bless you with happiness in this life and Jannah in the next' },
     ],
-    eidiLabel: 'A little something from your yaar 🌙',
-    eidiFrom: 'Eidi from Bilal',
-    eidiAmount: '₹100',
-    eidiMsg: '"Symbolic hai yaar 😄 But the dua is fully real. Eid Mubarak Hamza! 🌙"',
-    closingMain: 'Eid Mubarak Hamza.\nMay this Eid be the start\nof a great year for you.',
-    closingSender: 'Bilal — your friend, always 🤝🌙',
-    senderName: 'Bilal',
+    
+    eidiLabel: 'Your Eidi from your friend',
+    eidiFrom: 'From your brother',
+    eidiAmount: '₹2,000',
+    eidiMsg: 'For all the times you were there. For being solid when it mattered.',
+    
+    closingMain: 'May this Eid bring you\npeace, joy, and good times.\nAmeen.',
+    closingSender: 'From your friend',
+    senderName: 'Your friend',
+  },
+
+  'elder-child': {
+    recipient: 'Zara',
+    envFrom: 'From your Khalid Chachu',
+    blessing: 'May Allah bless every child\nin this family with happiness,\nhealth, and His endless mercy.',
+    
+    letterHeading: 'Eid Mubarak — to Zara',
+    letterMeta: 'FROM YOUR KHALID CHACHU · EID UL-FITR 2026',
+    letterBody: `<p>Eid Mubarak, beta! I still remember the first Eid when you were tiny enough to fit in one hand. Now look at you — growing up so fast it makes my head spin.</p><p>I see so much potential in you, Zara. The way you ask questions, the way you care about people, the way you light up a room when you walk in — that's special. Don't let anyone tell you otherwise.</p>`,
+    letterSign: "— Khalid Chachu (who's very proud of you)",
+    
+    memTitle: 'Watching You Grow',
+    memSub: 'The moments that made me proud',
+    memories: [
+      { icon: '👶', caption: 'Your first Eid when you were just a tiny bundle in our arms' },
+      { icon: '🎨', caption: 'The handmade Eid cards you used to draw for everyone' },
+      { icon: '📚', caption: 'Watching you win that school award and seeing your face light up' },
+      { icon: '🕌', caption: 'The year you started coming to Eid prayer with us by choice' },
+      { icon: '💝', caption: 'The way you always save a piece of your Eid mithai for me' },
+      { icon: '🌟', caption: "Seeing you become the amazing person we always knew you'd be" },
+    ],
+    
+    duaTitle: 'My Duas for You',
+    duaSub: 'What I ask Allah for your future',
+    duas: [
+      { icon: '🌟', text: 'May Allah guide you to success in everything you do' },
+      { icon: '💝', text: 'May your heart always be filled with kindness and your path with light' },
+      { icon: '🤲', text: 'May you grow up to be someone who makes the world better' },
+    ],
+    
+    eidiLabel: 'Your Eidi from Chachu',
+    eidiFrom: 'With love from Khalid Chachu',
+    eidiAmount: '₹5,000',
+    eidiMsg: 'For being the bright light in our family. For making us all so proud.',
+    
+    closingMain: 'May Allah bless you\nwith a beautiful future.\nAmeen.',
+    closingSender: 'From Khalid Chachu',
+    senderName: 'Khalid Chachu',
+  },
+
+  'parent-child': {
+    recipient: 'Noor',
+    envFrom: 'From your Abbu',
+    blessing: 'May Allah fill your home with peace,\nyour heart with gratitude,\nand your life with barakah.',
+    
+    letterHeading: 'Eid Mubarak — to Noor',
+    letterMeta: 'FROM YOUR ABBU · EID UL-FITR 2026',
+    letterBody: `<p>Eid Mubarak, my dear Noor! Every Eid that passes, I'm reminded of how blessed I am to be your father. Watching you grow into the person you are today has been the greatest gift of my life.</p><p>I pray that Allah keeps you safe, guides your steps, and fills your heart with peace. I pray that you find success in this life and the next, and that you never forget how much you are loved.</p>`,
+    letterSign: '— Your Abbu who loves you more than words can say',
+    
+    memTitle: 'My Favorite Eid Moments with You',
+    memSub: 'What I treasure most',
+    memories: [
+      { icon: '🌅', caption: 'Waking you up for Fajr on Eid morning when you were little' },
+      { icon: '👔', caption: 'Helping you pick out your first "grown-up" Eid outfit' },
+      { icon: '📖', caption: 'Teaching you the Eid takbeer and hearing you recite it perfectly' },
+      { icon: '🚗', caption: 'Our drives to visit relatives — just you and me talking about life' },
+      { icon: '🤲', caption: 'Seeing you make dua with sincerity in your eyes during Eid salah' },
+      { icon: '💝', caption: "Realizing you've grown into someone I'm so incredibly proud of" },
+    ],
+    
+    duaTitle: 'My Duas for You',
+    duaSub: 'What I ask Allah for my child',
+    duas: [
+      { icon: '🌟', text: 'May Allah protect you always and guide you to success' },
+      { icon: '💝', text: 'May your life be filled with happiness, peace, and barakah' },
+      { icon: '🤲', text: 'May you find the best in this life and the highest place in Jannah' },
+    ],
+    
+    eidiLabel: 'Your Eidi from Abbu',
+    eidiFrom: 'With all my love',
+    eidiAmount: '₹10,000',
+    eidiMsg: 'For being the light of my life. For making me proud every single day.',
+    
+    closingMain: 'May Allah bless you\nwith everything good.\nAmeen.',
+    closingSender: 'From your Abbu',
+    senderName: 'Your Abbu',
   },
 
   'relative-family': {
-    recipient: 'the family',
-    sender: 'Khalid Bhai',
-    moonAwaits: 'A special Eidi for the whole family 🌙',
-    envFrom: 'From Khalid Bhai — for everyone',
-    envSenderSub: 'From Khalid Bhai ✦ Eid Mubarak',
+    recipient: 'The whole family',
+    envFrom: 'From Khalid Bhai',
     blessing: 'May Allah bless every child\nin this family with happiness,\nhealth, and His endless mercy.',
+    
     letterHeading: 'Eid Mubarak — to the whole family!',
-    letterMeta: 'From Khalid Bhai · Eid ul-Fitr 2026',
-    letterBody: `<p>Eid Mubarak to everyone! This year I couldn't be there in person, but that doesn't mean the eidi stops. 😄</p>
-<p>I've been thinking about all the kids and how fast they're growing up — each one of them is special to me. So I wanted to do something a little different this year.</p>
-<p>Each child has their own eidi waiting. Tell them to tap their pouch and open it. May Allah bless every single one of them. 🌙</p>
-<p>To Bhai and Bhabhi — thank you for keeping this door open every year. You don't know what it means to someone far away.</p>`,
+    letterMeta: 'FROM KHALID BHAI · EID UL-FITR 2026',
+    letterBody: `<p>Eid Mubarak to everyone! This year I couldn't be there in person, but that doesn't mean the eidi stops. 😊</p><p>I've been thinking about all the kids and how fast they're growing up — each one of them is special to me. So I wanted to do something a little different this year.</p><p>Each child has their own eidi waiting. Tell them to tap their pouch and open it. May Allah bless every single one of them. 🌙</p>`,
     letterSign: '— Khalid Bhai',
-    memTitle: 'Family Eids We Remember',
-    memSub: 'The chaos, the love, all of it',
+    
+    memTitle: 'Our Family Eid',
+    memSub: 'The traditions that bind us together',
     memories: [
-      { icon: '🏠', caption: 'The whole family together — the noise alone was worth everything' },
-      { icon: '🍛', caption: "That legendary biryani — everyone claims the recipe, nobody agrees" },
-      { icon: '💵', caption: 'The kids lined up for eidi — smallest to tallest, every single year' },
-      { icon: '🤝', caption: 'The Eid Milan that somehow always went on until midnight' },
-      { icon: '📸', caption: 'The group photo where someone was always blinking — we kept it anyway' },
-      { icon: '🌙', caption: 'Late night chai on the rooftop — the city quiet, the family loud' },
+      { icon: '🏠', caption: 'The entire family cramming into one house on Eid morning' },
+      { icon: '👨‍👩‍👧‍👦', caption: 'Watching all the cousins run around like they own the place' },
+      { icon: '🍽️', caption: 'The massive feast that somehow never runs out no matter how many show up' },
+      { icon: '📸', caption: 'Group photos that take 20 minutes because someone always blinks' },
+      { icon: '🎁', caption: 'The chaos of distributing eidi to every single kid' },
+      { icon: '☕', caption: 'Elders sipping chai and telling the same stories every year' },
     ],
-    duaTitle: 'My Duas For This Family',
-    duaSub: 'Each one of you, always',
+    
+    duaTitle: 'My Duas for All of You',
+    duaSub: 'What I ask Allah for this family',
     duas: [
-      { icon: '🌙', text: 'May Allah keep every child in this family safe, happy, and full of His blessings' },
-      { icon: '🤲', text: "May this family always stay united — distance doesn't change that" },
-      { icon: '✨', text: 'May every Eid bring us closer — in person or not, we are always family' },
-      { icon: '💛', text: 'May Bhai and Bhabhi be rewarded for every door they have kept open' },
-      { icon: '🌸', text: 'May the kids grow up knowing they are loved — from near and from far' },
+      { icon: '🏠', text: 'May Allah keep this family united, happy, and blessed' },
+      { icon: '💝', text: 'May every child grow up healthy, successful, and righteous' },
+      { icon: '🤲', text: 'May our gatherings always be filled with love, laughter, and barakah' },
     ],
-    eidiLabel: 'One eidi for each child 🌙',
-    eidiFrom: 'Eidi from Khalid Bhai',
-    eidiAmount: '₹300 each',
-    eidiMsg: '"Duur se — lekin dil se. Eid Mubarak! 🌙"',
-    closingMain: 'Eid Mubarak to every single one of you.\nDistance means nothing.\nYou are always in my heart.',
-    closingSender: 'Khalid Bhai — with love from far away 🌙',
+    
+    eidiLabel: 'Eidi for the whole family',
+    eidiFrom: 'From Khalid Bhai',
+    eidiAmount: '₹15,000',
+    eidiMsg: 'To be shared among all the kids. May Allah bless each one of them.',
+    
+    closingMain: 'May Allah keep us all\nclose, happy, and blessed.\nAmeen.',
+    closingSender: 'From Khalid Bhai',
     senderName: 'Khalid Bhai',
   },
 };
+
+// Export alias for backward compatibility
+export const eidDemos = EID_DEMOS;
+
+// ═════════════════════════════════════════════════════════════════════
+// DEMO ROUTING — URL to Data Mapping
+// ═════════════════════════════════════════════════════════════════════
+
+// Handle URL aliases for backward compatibility
+export function getDemoByKey(key: string): EidDemo | null {
+  // Direct match
+  if (key in EID_DEMOS) {
+    return EID_DEMOS[key];
+  }
+  
+  // Aliases (for URL friendliness)
+  const aliases: Record<string, EidDemoKey> = {
+    'child': 'child-parent',
+    'parent': 'parent-child',
+    'brother': 'sibling',
+    'sister': 'sibling',
+    'bro': 'sibling',
+    'uncle': 'elder-child',
+    'aunt': 'elder-child',
+    'nephew': 'elder-child',
+    'niece': 'elder-child',
+    'cousin': 'relative-family',
+    'family': 'relative-family',
+    'relative': 'relative-family',
+  };
+  
+  const normalized = key.toLowerCase();
+  if (normalized in aliases) {
+    return EID_DEMOS[aliases[normalized]];
+  }
+  
+  return null;
+}
+
+// Get all demo keys for routing/nav
+export function getAllDemoKeys(): EidDemoKey[] {
+  return Object.keys(EID_DEMOS) as EidDemoKey[];
+}
