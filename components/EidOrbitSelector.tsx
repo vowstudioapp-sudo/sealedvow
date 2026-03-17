@@ -278,7 +278,22 @@ export const EidOrbitSelector: React.FC = () => {
     if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
   };
 
-  const navigate = (key: string) => { window.location.href = '/demo/eid/' + key; };
+  const navigate = (key: string) => {
+    const path = window.location.pathname;
+
+    // DEMO FLOW → stay inside demo
+    if (path.startsWith('/demo/eid')) {
+      const target = `/demo/eid/${key}`;
+      console.log('NAV DEBUG:', { path, key, target });
+      window.location.href = target;
+      return;
+    }
+
+    // CREATE FLOW → go to form
+    const target = `/eid/${key}`;
+    console.log('NAV DEBUG:', { path, key, target });
+    window.location.href = target;
+  };
   const allNodes = [...INNER_NODES, ...OUTER_NODES];
   const activeNodeData = allNodes.find(n => n.key === previewKey);
 

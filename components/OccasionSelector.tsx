@@ -32,7 +32,7 @@ export const OccasionSelector: React.FC = () => {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, delay: 0.2 }}
       >
-        <div className="occasion-card occasion-card--eid occasion-card--hero" onClick={() => go("/demo/eid")}>
+        <div className="occasion-card occasion-card--eid occasion-card--hero" onClick={() => go("/eid")}>
           <div className="occasion-card__glow" />
           <div className="occasion-card__icon">
             <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">

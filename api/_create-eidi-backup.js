@@ -7,8 +7,8 @@
 // ============================================================================
 
 import { adminDb, guardPost, getClientIP, rateLimit, setCors } from './lib/middleware.js';
-import { generateEidiKey } from '../lib/generateEidiKey';
-import { FEATURES } from '../config/features';
+import { generateEidiKey } from '../lib/generateEidiKey.js';
+import { FEATURES } from '../config/features.js';
 
 // ── LIMITS ──────────────────────────────────────────────────────────────
 const MAX_PAYLOAD_SIZE = 15000;    // Prevent abuse

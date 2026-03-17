@@ -8,6 +8,8 @@ export type RouteType =
   | 'EIDI_CREATE'
   | 'EIDI_RECEIVER'
   | 'EID_SELECTOR'
+  | 'EID_PREPARATION'
+  | 'DEMO_EID'
   | 'OCCASION_SELECTOR'
   | 'LETTER_CREATE'
   | 'DEMO'
@@ -16,18 +18,23 @@ export type RouteType =
   | 'HOME';
 
 export function getRouteType(): RouteType {
-  const path = window.location.pathname;
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
 
   if (path === '/eidi/create')                   return 'EIDI_CREATE';
   if (/^\/eidi\/[A-Z0-9]{6}$/i.test(path))      return 'EIDI_RECEIVER';
 
   if (path === '/create')                        return 'OCCASION_SELECTOR';
   if (path === '/letter/create')                 return 'LETTER_CREATE';
+  if (path === '/eid')                           return 'EID_SELECTOR';
+  if (/^\/demo\/eid\/[a-z-]+$/.test(path))       return 'DEMO_EID';
+  if (/^\/eid\/[a-z-]+$/.test(path))             return 'EID_PREPARATION';
   if (path === '/demo/eid')                      return 'EID_SELECTOR';
 
   if (path.startsWith('/demo'))                  return 'DEMO';
   if (path.startsWith('/api'))                   return 'API';
-  if (path.length > 1)                           return 'RECEIVER';
+
+  /* receiver links are short share codes like /AB12CD */
+  if (/^\/[A-Za-z0-9_-]{5,}$/.test(path))        return 'RECEIVER';
 
   return 'HOME';
 }

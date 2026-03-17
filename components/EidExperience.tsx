@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import '../styles/eid.css';
 import { EID_DEMOS, getDemoByKey, type EidDemo } from '../data/eidDemoData.ts';
+import { decodeEidData } from '../utils/eidDecoder';
 
 /* ─────────────────────────────────────────────────────────────
    STARS background (generated once)
@@ -1065,9 +1066,45 @@ const STYLES = `
    MAIN COMPONENT
 ───────────────────────────────────────────────────────────── */
 export function EidExperience() {
+  // Step 2: Detect encoded message from URL
+  const decoded = decodeEidData();
+
+  // Step 3: Convert decoded data to EidDemo format if it exists
+  const customDemo: EidDemo | null = decoded
+    ? {
+        recipient: decoded.recipient || "Someone",
+        envFrom: `From ${decoded.senderName || "Someone"}`,
+        blessing: decoded.blessing || "Eid Mubarak",
+
+        letterHeading: `Eid Mubarak — to ${decoded.recipient || "Someone"}`,
+        letterMeta: `FROM ${decoded.senderName || "Someone"} · EID`,
+        letterBody: `<p>${decoded.blessing || "Eid Mubarak!"}</p>`,
+        letterSign: decoded.senderName || "Someone",
+
+        memTitle: "Our Eid Memories",
+        memSub: "Moments worth remembering",
+        memories: [],
+
+        duaTitle: "My Duas for You",
+        duaSub: "",
+        duas: [],
+
+        eidiLabel: "Your Eidi",
+        eidiFrom: decoded.senderName || "",
+        eidiAmount: decoded.eidiAmount || "₹0",
+        eidiMsg: "",
+
+        closingMain: "Eid Mubarak",
+        closingSender: decoded.senderName || "",
+
+        senderName: decoded.senderName || ""
+      }
+    : null;
+
+  // Step 4: Select data source (prioritize decoded > demo)
   const path = window.location.pathname;
-  const key = path.split('/demo/eid/')[1] ?? '';
-  const d = getDemoByKey(key) ?? EID_DEMOS[key];
+  const key = path.split('/demo/eid/')[1]?.split(/[?#]/)[0] ?? '';
+  const d = customDemo || getDemoByKey(key) || EID_DEMOS[key];
 
   const [screen, setScreen] = useState(0);
   const TOTAL = 8;

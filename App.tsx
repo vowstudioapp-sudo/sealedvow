@@ -43,11 +43,11 @@ const PersonalIntro = lazy(() =>
   import('./components/PersonalIntro.tsx').then(m => ({ default: m.PersonalIntro }))
 );
 const EidiCreatePage = lazy(() =>
-  import('./pages/eidi/create.tsx').then(m => ({ default: m.EidiCreatePage }))
+  import('./pages/eidi/_create_backup.tsx').then(m => ({ default: m.EidiCreatePage }))
 );
 
 const EidiReceiverPage = lazy(() =>
-  import('./pages/eidi/[id].tsx').then(m => ({ default: m.EidiReceiverPage }))
+  import('./pages/eidi/_receiver_backup.tsx').then(m => ({ default: m.EidiReceiverPage }))
 );
 
 
@@ -60,6 +60,10 @@ const EidExperience = lazy(() =>
 
 const OccasionSelector = lazy(() =>
   import('./components/OccasionSelector.tsx').then(m => ({ default: m.OccasionSelector }))
+);
+
+const EidPreparationForm = lazy(() =>
+  import('./components/EidPreparationForm.tsx').then(m => ({ default: m.default }))
 );
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
@@ -445,12 +449,32 @@ const App: React.FC = () => {
   }
 
   if (routeType === 'EID_SELECTOR') {
-    return <Suspense fallback={eidiLoadingFallback}><EidOrbitSelector /></Suspense>;
+    return (
+      <Suspense fallback={eidiLoadingFallback}>
+        <EidOrbitSelector />
+      </Suspense>
+    );
   }
-  // /demo/eid/child-parent, /demo/eid/sibling, etc → dedicated Eid 8-screen experience
-  if (/^\/demo\/eid\/.+/.test(window.location.pathname)) {
-    return <Suspense fallback={eidiLoadingFallback}><EidExperience /></Suspense>;
+
+  if (routeType === 'DEMO_EID') {
+    return (
+      <Suspense fallback={eidiLoadingFallback}>
+        <EidExperience />
+      </Suspense>
+    );
   }
+
+  if (routeType === 'EID_PREPARATION') {
+    const path = window.location.pathname;
+    const relationship = path.split('/eid/')[1]?.split(/[?#]/)[0] || undefined;
+
+    return (
+      <Suspense fallback={eidiLoadingFallback}>
+        <EidPreparationForm relationship={relationship} />
+      </Suspense>
+    );
+  }
+
   if (isEidiReceiver) {
     return <Suspense fallback={eidiLoadingFallback}><EidiReceiverPage /></Suspense>;
   }
