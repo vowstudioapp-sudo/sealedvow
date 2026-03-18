@@ -9,11 +9,13 @@ import { CoupleData, SacredLocation, Occasion } from "../types.ts";
  * The client sends raw data only — never the full prompt.
  */
 const callAPI = async (action: string, payload: Record<string, any>): Promise<any> => {
+  console.log("FETCHING /api/ai");
   const response = await fetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, payload }),
   });
+  console.log("API RESPONSE:", response);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -30,6 +32,7 @@ const callAPI = async (action: string, payload: Record<string, any>): Promise<an
 
 export const generateLoveLetter = async (data: CoupleData): Promise<string> => {
   try {
+    console.log("SERVICE HIT");
     const result = await callAPI('generateLoveLetter', {
       coupleData: {
         senderName: data.senderName,
@@ -43,6 +46,7 @@ export const generateLoveLetter = async (data: CoupleData): Promise<string> => {
     });
     return result.text;
   } catch (error) {
+    console.error("AI ERROR:", error);
     const fallbacks: Record<Occasion, string> = {
       anniversary: "Another year. I'd choose this again. Every part of it.",
       'just-because': "No reason for this. Just wanted you to know I was thinking about you.",

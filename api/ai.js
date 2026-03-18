@@ -25,6 +25,7 @@ import { buildLetterPrompt, buildMythPrompt, buildProphecyPrompt } from './lib/p
 // ===============================
 const ALLOWED_ACTIONS = [
   'generateLoveLetter',
+  'generateEidLetter',
   'generateCoupleMyth',
   'generateFutureProphecy',
   'generateValentineImage',
@@ -33,7 +34,7 @@ const ALLOWED_ACTIONS = [
 ];
 
 // Actions that can fall back to OpenAI (text-only)
-const TEXT_ACTIONS = ['generateLoveLetter', 'generateCoupleMyth', 'generateFutureProphecy', 'generateSacredLocation'];
+const TEXT_ACTIONS = ['generateLoveLetter', 'generateEidLetter', 'generateCoupleMyth', 'generateFutureProphecy', 'generateSacredLocation'];
 
 // ===============================
 // DISTRIBUTED RATE LIMITING (Redis/Vercel KV)
@@ -176,6 +177,83 @@ async function handleLoveLetter(payload) {
   return result;
 }
 
+function buildEidLetterPrompt(payload = {}) {
+  const {
+    relationship,
+    subtype,
+    senderName,
+    recipient,
+    tone,
+    customMessage,
+  } = payload;
+
+  return `You are writing a deeply personal Eid letter between two real people.
+
+This is NOT a greeting card.
+This is NOT a formal message.
+
+It should feel like something someone would actually write late at night, thinking about the person.
+
+RULES:
+- Use natural, human language
+- Avoid cliches like:
+  "On this auspicious occasion"
+  "May this festival bring joy"
+- No over-formality
+- No repetition
+- No generic blessings
+
+EMOTIONAL DIRECTION:
+Use relationship context:
+
+Parent to Child:
+- tone: pride, quiet love, dua
+- style: simple, grounded, not dramatic
+
+Child to Parent:
+- tone: gratitude, respect, emotional warmth
+
+Elder to Child:
+- tone: caring, protective, soft guidance
+
+Sibling:
+- tone: light, slightly playful, but meaningful
+
+Friend:
+- tone: casual but heartfelt
+
+STRUCTURE:
+- 4 to 6 short paragraphs
+- natural flow (no forced sections)
+- end softly, not dramatically
+
+INPUT VARIABLES:
+- senderName: ${senderName || 'Someone'}
+- recipient: ${recipient || 'Someone'}
+- relationship: ${relationship || 'unknown'}
+- subtype: ${subtype || 'none'}
+- customMessage: ${customMessage || 'none'}
+- tone: ${tone || 'none'}
+
+OUTPUT:
+ONLY return the letter text.
+No quotes.
+No formatting.
+No headings.`;
+}
+
+async function handleEidLetter(payload) {
+  console.log('ENTERED generateEidLetter');
+  const prompt = buildEidLetterPrompt(payload);
+  console.log('TRY GEMINI');
+  const text = cleanOutput(await withTimeout(
+    gemini.generateText(prompt, { temperature: 0.85 }),
+    8000
+  ));
+
+  return { letter: text || null };
+}
+
 async function handleCoupleMyth(payload) {
   const prompt = payload.prompt || (payload.coupleData ? buildMythPrompt(payload.coupleData) : null);
   if (!prompt) throw new Error('Missing prompt or coupleData for myth generation');
@@ -284,6 +362,13 @@ async function fallbackCoupleMyth(payload) {
   return validateBasicText(text) ? { text } : null;
 }
 
+async function fallbackEidLetter(payload) {
+  const prompt = buildEidLetterPrompt(payload);
+  const raw = await openai.generateText(prompt, { temperature: 0.85, maxTokens: 350 });
+  if (!raw) return null;
+  return { letter: cleanOutput(raw) };
+}
+
 async function fallbackFutureProphecy(payload) {
   const basePrompt = payload.prompt || buildProphecyPrompt();
   const raw = await openai.generateText(
@@ -325,6 +410,7 @@ async function fallbackSacredLocation(payload) {
 
 const PRIMARY_HANDLERS = {
   generateLoveLetter: handleLoveLetter,
+  generateEidLetter: handleEidLetter,
   generateCoupleMyth: handleCoupleMyth,
   generateFutureProphecy: handleFutureProphecy,
   generateValentineImage: handleValentineImage,
@@ -334,6 +420,7 @@ const PRIMARY_HANDLERS = {
 
 const FALLBACK_HANDLERS = {
   generateLoveLetter: fallbackLoveLetter,
+  generateEidLetter: fallbackEidLetter,
   generateCoupleMyth: fallbackCoupleMyth,
   generateFutureProphecy: fallbackFutureProphecy,
   generateSacredLocation: fallbackSacredLocation,
@@ -344,6 +431,7 @@ const FALLBACK_HANDLERS = {
 // ===============================
 
 export default async function handler(req, res) {
+  console.log('AI ROUTE HIT');
   // CORS
   const origin = getAllowedOrigin(req.headers.origin);
   if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
@@ -358,7 +446,13 @@ export default async function handler(req, res) {
     return res.status(415).json({ error: 'Unsupported Media Type' });
   }
 
+  console.log('PROD ENV CHECK:', {
+    GEMINI: !!process.env.GEMINI_API_KEY,
+    OPENAI: !!process.env.OPENAI_API_KEY,
+  });
+
   const { action, payload } = req.body || {};
+  console.log('ACTION RECEIVED:', req.body?.action);
 
   if (!action || !ALLOWED_ACTIONS.includes(action)) {
     return res.status(400).json({ error: 'Invalid action' });
@@ -414,6 +508,7 @@ export default async function handler(req, res) {
     if (TEXT_ACTIONS.includes(action) && process.env.OPENAI_API_KEY && FALLBACK_HANDLERS[action]) {
       console.log(`[Fallback] Attempting OpenAI for ${action}...`);
       try {
+        console.log('TRY OPENAI');
         const fallbackResult = await FALLBACK_HANDLERS[action](payload);
         if (fallbackResult) {
           console.log(`[Fallback] OpenAI succeeded for ${action}`);

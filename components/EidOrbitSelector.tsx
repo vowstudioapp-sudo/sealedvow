@@ -11,16 +11,17 @@ const OUTER_NODES = [
   { key: 'elder-child',     title: 'Elder → Child',     desc: 'From Chacha, Mama, Khala', primary: false, glow: 0.9  },
   { key: 'sibling',         title: 'Sibling → Sibling', desc: 'Between Bhai and Behen',   primary: false, glow: 1.0  },
   { key: 'friend',          title: 'Friend → Friend',   desc: 'Just an Eid wish',         primary: false, glow: 0.95 },
-  { key: 'relative-family', title: 'Relative → Family', desc: 'Eidi for the kids',        primary: false, glow: 1.05 },
 ];
 
 const INNER_RADIUS = 140;  // SVG units (viewBox 500×500, center 250)
 const OUTER_RADIUS = 210;
 const INNER_STEP   = 360 / INNER_NODES.length;
 const OUTER_STEP   = 360 / OUTER_NODES.length;
+const OUTER_BASE_ANGLES = [210, 330, 90];
 const ELLIPSE_X    = 1.12; // horizontal stretch for elliptical feel
 
 export const EidOrbitSelector: React.FC = () => {
+  console.log("ORBIT COMPONENT FILE:", import.meta.url);
   const stageRef        = useRef<HTMLDivElement>(null);
   const innerSystemRef  = useRef<HTMLDivElement>(null);
   const outerSystemRef  = useRef<HTMLDivElement>(null);
@@ -67,17 +68,25 @@ export const EidOrbitSelector: React.FC = () => {
     });
 
     outerSystemRef.current?.querySelectorAll('.eid-orbit-node').forEach((node, i) => {
-      const rad = (i * OUTER_STEP) * (Math.PI / 180);
+      const baseAngle = OUTER_BASE_ANGLES[i] ?? (i * OUTER_STEP);
+      const rad = baseAngle * (Math.PI / 180);
       (node as HTMLElement).style.left = cx + outerR * ELLIPSE_X * Math.cos(rad) + 'px';
       (node as HTMLElement).style.top  = cy + outerR * Math.sin(rad) + 'px';
     });
   };
 
   // ── Apply depth illusion: nodes in "back" are dimmer + smaller ──
-  const applyDepth = (angle: number, dotRefs: React.MutableRefObject<(HTMLDivElement|null)[]>, step: number, glowArr: number[]) => {
+  const applyDepth = (
+    angle: number,
+    dotRefs: React.MutableRefObject<(HTMLDivElement|null)[]>,
+    step: number,
+    glowArr: number[],
+    baseAngles?: number[]
+  ) => {
     dotRefs.current.forEach((dot, i) => {
       if (!dot) return;
-      const worldDeg = angle + i * step;
+      const nodeAngle = baseAngles ? baseAngles[i] ?? (i * step) : (i * step);
+      const worldDeg = angle + nodeAngle;
       const worldRad = worldDeg * (Math.PI / 180);
       const depth    = Math.sin(worldRad); // -1 (back) to +1 (front)
       const opacity  = 0.35 + 0.65 * (depth + 1) / 2;
@@ -99,7 +108,7 @@ export const EidOrbitSelector: React.FC = () => {
     outerTextRefs.current.forEach(t => { if (t) t.style.transform = `rotate(${-outerAngle}deg)`; });
 
     applyDepth(innerAngle, innerDotRefs, INNER_STEP, INNER_NODES.map(n => n.glow));
-    applyDepth(outerAngle, outerDotRefs, OUTER_STEP, OUTER_NODES.map(n => n.glow));
+    applyDepth(outerAngle, outerDotRefs, OUTER_STEP, OUTER_NODES.map(n => n.glow), OUTER_BASE_ANGLES);
   };
 
   // ── Connector line using current rotation angle ──
@@ -110,7 +119,8 @@ export const EidOrbitSelector: React.FC = () => {
     const step    = isInner ? INNER_STEP : OUTER_STEP;
     const radius  = isInner ? INNER_RADIUS : OUTER_RADIUS;
     if (!line) return;
-    const worldRad = (angle + index * step) * (Math.PI / 180);
+    const nodeAngle = isInner ? (index * step) : (OUTER_BASE_ANGLES[index] ?? (index * step));
+    const worldRad = (angle + nodeAngle) * (Math.PI / 180);
     const sx = 250 + radius * ELLIPSE_X * Math.cos(worldRad);
     const sy = 250 + radius * Math.sin(worldRad);
     line.setAttribute('x2', String(sx.toFixed(1)));

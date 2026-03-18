@@ -3,6 +3,118 @@ import '../styles/eid.css';
 import { EID_DEMOS, getDemoByKey, type EidDemo } from '../data/eidDemoData.ts';
 import { decodeEidData } from '../utils/eidDecoder';
 
+function generateMemories(relationship?: string, recipient?: string) {
+  if (!relationship) return [];
+
+  const map: Record<string, { icon: string; caption: string }[]> = {
+    "parent-child": [
+      { icon: "🧸", caption: "All those times you cared for me without saying a word" },
+      { icon: "🍲", caption: "Your food that always felt like home" },
+      { icon: "🕊️", caption: "Your silent sacrifices I now understand" },
+    ],
+    "child-parent": [
+      { icon: "👶", caption: "From holding my hand to guiding my life" },
+      { icon: "🏡", caption: "You built everything so I could stand tall" },
+      { icon: "❤️", caption: "Your love has always been my strength" },
+    ],
+    "siblings": [
+      { icon: "😂", caption: "All the fights that turned into laughter" },
+      { icon: "🤝", caption: "Always having each other's back" },
+      { icon: "🎮", caption: "The chaos only we understand" },
+    ],
+    "friends": [
+      { icon: "☕", caption: "Endless conversations that made no sense but meant everything" },
+      { icon: "🚶", caption: "Walking through life side by side" },
+      { icon: "🔥", caption: "Memories that still make us laugh randomly" },
+    ]
+  };
+
+  return map[relationship] || [];
+}
+
+function generateDuas(relationship?: string) {
+  return [
+    { icon: "🤲", text: "May Allah fill your life with peace and barakah" },
+    { icon: "🌙", text: "May every Eid bring you closer to happiness" },
+    { icon: "✨", text: "May your القلب always stay light and content" },
+  ];
+}
+
+function sanitize(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function formatSenderDisplay(sender?: string, subtype?: string) {
+  if (sender) return sender;
+  if (subtype === "father") return "Abu";
+  if (subtype === "mother") return "Ammi";
+  return "Someone";
+}
+
+function isMultipleSender(name: string) {
+  if (!name) return false;
+  return name.includes("&") || name.toLowerCase().includes(" and ");
+}
+
+function getPossessive(name: string) {
+  if (!name) return "";
+  if (name.endsWith("s")) {
+    return `${name}'`;
+  }
+  return `${name}'s`;
+}
+
+function getDuaLabel(relationship?: string, subtype?: string, sender?: string) {
+  const senderDisplay = formatSenderDisplay(sender, subtype);
+  const multiple = isMultipleSender(senderDisplay);
+  const possessive = getPossessive(senderDisplay);
+
+  if (relationship === "parent-child") {
+    return multiple
+      ? `${possessive} duas for you`
+      : `${possessive} dua for you`;
+  }
+
+  switch (relationship) {
+    case "child-parent":
+      return "Your child's dua for you";
+    case "elder-child":
+      return "An elder's dua for you";
+    case "sibling":
+    case "friend":
+      return multiple
+        ? `${possessive} duas for you`
+        : `${possessive} dua for you`;
+    default:
+      return "A special dua for you";
+  }
+}
+
+function formatLetter(blessing: string, sender?: string, recipient?: string) {
+  const safeSender = sanitize(sender || "Someone");
+  return `
+    <p>My dear ${recipient || "there"},</p>
+
+    <p>${blessing}</p>
+
+    <p>
+      On this Eid, I just want you to know how much you mean to me.
+      Some feelings are not said every day, but they are always there.
+    </p>
+
+    <p>
+      May Allah bless you with happiness, peace, and barakah.
+    </p>
+
+    <p>Eid Mubarak 🌙</p>
+
+    <p>— ${safeSender}</p>
+  `;
+}
+
 /* ─────────────────────────────────────────────────────────────
    STARS background (generated once)
 ───────────────────────────────────────────────────────────── */
@@ -667,7 +779,7 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
                   I saw how fast you clicked "NO" earlier 😏
                 </div>
                 
-                <BtnNext onClick={onNext} style={{ marginTop: 8 }}>Bhai's Dua for You ✦</BtnNext>
+                <BtnNext onClick={onNext} style={{ marginTop: 8 }}>{d.duaTitle} ✦</BtnNext>
               </>
             )}
           </div>
@@ -1068,43 +1180,58 @@ const STYLES = `
 export function EidExperience() {
   // Step 2: Detect encoded message from URL
   const decoded = decodeEidData();
+  const senderDisplayName = formatSenderDisplay(decoded?.senderName, decoded?.subtype);
+
+  const params = new URLSearchParams(window.location.search);
+  const isPreview = params.get("preview") === "1";
 
   // Step 3: Convert decoded data to EidDemo format if it exists
   const customDemo: EidDemo | null = decoded
     ? {
         recipient: decoded.recipient || "Someone",
-        envFrom: `From ${decoded.senderName || "Someone"}`,
+        envFrom: 'A message for you',
         blessing: decoded.blessing || "Eid Mubarak",
 
         letterHeading: `Eid Mubarak — to ${decoded.recipient || "Someone"}`,
-        letterMeta: `FROM ${decoded.senderName || "Someone"} · EID`,
-        letterBody: `<p>${decoded.blessing || "Eid Mubarak!"}</p>`,
-        letterSign: decoded.senderName || "Someone",
+        letterMeta: 'EID',
+        letterBody: formatLetter(
+          decoded.blessing || "Eid Mubarak!",
+          senderDisplayName,
+          decoded.recipient
+        ),
+        letterSign: '',
 
         memTitle: "Our Eid Memories",
         memSub: "Moments worth remembering",
-        memories: [],
+        memories: generateMemories(decoded.relationship, decoded.recipient),
 
-        duaTitle: "My Duas for You",
+        duaTitle: getDuaLabel(decoded.relationship, decoded.subtype, decoded.senderName),
         duaSub: "",
-        duas: [],
+        duas: generateDuas(decoded.relationship),
 
         eidiLabel: "Your Eidi",
-        eidiFrom: decoded.senderName || "",
+        eidiFrom: 'With love',
         eidiAmount: decoded.eidiAmount || "₹0",
         eidiMsg: "",
 
         closingMain: "Eid Mubarak",
-        closingSender: decoded.senderName || "",
+        closingSender: '',
 
-        senderName: decoded.senderName || ""
+        senderName: senderDisplayName
       }
     : null;
 
   // Step 4: Select data source (prioritize decoded > demo)
   const path = window.location.pathname;
   const key = path.split('/demo/eid/')[1]?.split(/[?#]/)[0] ?? '';
-  const d = customDemo || getDemoByKey(key) || EID_DEMOS[key];
+  const relationship = decoded?.relationship || key || undefined;
+  const baseDemo = customDemo || getDemoByKey(key) || EID_DEMOS[key];
+  const d = baseDemo
+    ? {
+        ...baseDemo,
+        duaTitle: getDuaLabel(relationship, decoded?.subtype, decoded?.senderName),
+      }
+    : baseDemo;
 
   const [screen, setScreen] = useState(0);
   const TOTAL = 8;
@@ -1253,6 +1380,23 @@ export function EidExperience() {
 
   return (
     <div id="eid-experience" style={{ fontFamily: 'Lato, sans-serif', background: '#0d3b2e', color: '#fdf8ee', height: '100%', overflow: 'hidden' }}>
+      {isPreview && (
+        <div style={{
+          position: "fixed",
+          top: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#1C1917",
+          color: "#D4AF37",
+          padding: "6px 14px",
+          fontSize: 10,
+          letterSpacing: "0.3em",
+          borderRadius: 999,
+          zIndex: 1000
+        }}>
+          PREVIEW MODE
+        </div>
+      )}
       <style>{STYLES}</style>
       <Stars />
       <HomeBtn />

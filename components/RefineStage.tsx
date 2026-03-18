@@ -40,6 +40,8 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
 
   useEffect(() => {
     if (data.writingMode === 'assisted' && !data.finalLetter) {
+      console.log("REFINE STAGE TRIGGERED");
+      console.log("DATA:", data);
       // Simulate progress during generation
       const draftInterval = setInterval(() => {
         setDraftingProgress(prev => {
@@ -50,16 +52,23 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
 
       const fetchDraft = async () => {
         setLoading(true);
-        const draft = await generateLoveLetter(data);
-        
-        // Generation done, complete bar
-        clearInterval(draftInterval);
-        setDraftingProgress(100);
-        
-        setTimeout(() => {
-           setLetter(draft);
-           setLoading(false);
-        }, 500); // Brief delay to see 100%
+        try {
+          console.log("CALLING generateLoveLetter");
+          const draft = await generateLoveLetter(data);
+          
+          // Generation done, complete bar
+          clearInterval(draftInterval);
+          setDraftingProgress(100);
+          
+          setTimeout(() => {
+             setLetter(draft);
+             setLoading(false);
+          }, 500); // Brief delay to see 100%
+        } catch (err) {
+          clearInterval(draftInterval);
+          console.error("AI ERROR:", err);
+          setLoading(false);
+        }
       };
       fetchDraft();
       

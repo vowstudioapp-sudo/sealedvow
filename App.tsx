@@ -323,6 +323,18 @@ const App: React.FC = () => {
   const isEidiCreate   = routeType === 'EIDI_CREATE';
   const isEidiReceiver = routeType === 'EIDI_RECEIVER';
 
+  const isEidPreview =
+    window.location.pathname === '/eid' &&
+    new URLSearchParams(window.location.search).get('preview') === '1';
+
+  if (isEidPreview) {
+    return (
+      <Suspense fallback={null}>
+        <EidExperience />
+      </Suspense>
+    );
+  }
+
   // Derived from central route type — no manual path matching
   const isReceiverLink = isReceiverLinkType(routeType);
 

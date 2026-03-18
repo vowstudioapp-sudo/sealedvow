@@ -16,6 +16,7 @@ export interface DecodedEidData {
     blessing?: string
     eidiAmount?: string
     relationship?: string
+    subtype?: string
   }
   
   export function decodeEidData(): DecodedEidData | null {
