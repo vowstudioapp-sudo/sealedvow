@@ -153,7 +153,7 @@ function ProgressDots({ total, current }: { total: number; current: number }) {
   return (
     <div style={{
       position: 'fixed', bottom: 22, left: '50%', transform: 'translateX(-50%)',
-      display: 'flex', gap: 7, zIndex: 100,
+      display: 'flex', gap: 7, zIndex: 100, pointerEvents: 'none',
     }}>
       {Array.from({ length: total }, (_, i) => (
         <div key={i} style={{
