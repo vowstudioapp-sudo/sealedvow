@@ -401,15 +401,23 @@ function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
    SCREEN 3 — BLESSING
 ───────────────────────────────────────────────────────────── */
 function S3Blessing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
+  const shortBlessingLines = useMemo(() => {
+    const lines = (d.blessing || "")
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    return lines.slice(0, 2);
+  }, [d.blessing]);
+
   return (
-    <Screen active scrollable style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #072018 100%)' }}>
+    <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #072018 100%)' }}>
       <div style={{ maxWidth: 480, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', color: '#c9a84c', letterSpacing: '0.1em', opacity: 0.8 }}>
           بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
         </div>
         <div style={{ width: 60, height: 1, background: 'linear-gradient(90deg, transparent, #c9a84c, transparent)' }} />
         <p style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.2rem, 4vw, 1.7rem)', lineHeight: 1.9, color: '#f5e9c4', fontStyle: 'italic' }}>
-          {d.blessing.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}
+          {shortBlessingLines.map((line, i) => <span key={i}>{line}<br /></span>)}
         </p>
         <div style={{ width: 60, height: 1, background: 'linear-gradient(90deg, transparent, #c9a84c, transparent)' }} />
         <button
@@ -437,9 +445,11 @@ function S3Blessing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
 function S4Letter({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   const [idx, setIdx] = useState(0);
   const chunks = useMemo(() => {
-    const raw = stripHtml(d.letterBody || "");
-    return chunkText(raw, 180);
-  }, [d.letterBody]);
+    const raw = (d.blessing || "").trim();
+    if (raw) return chunkText(raw, 180);
+    const fallback = stripHtml(d.letterBody || "");
+    return chunkText(fallback, 180);
+  }, [d.blessing, d.letterBody]);
 
   const advance = () => {
     if (idx < chunks.length - 1) {
