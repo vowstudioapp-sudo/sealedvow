@@ -367,7 +367,7 @@ function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
 ───────────────────────────────────────────────────────────── */
 function S3Blessing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   return (
-    <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #072018 100%)' }}>
+    <Screen active scrollable style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #072018 100%)' }}>
       <div style={{ maxWidth: 480, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', color: '#c9a84c', letterSpacing: '0.1em', opacity: 0.8 }}>
           بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
