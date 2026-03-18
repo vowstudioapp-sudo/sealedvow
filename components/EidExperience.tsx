@@ -402,11 +402,28 @@ function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
 ───────────────────────────────────────────────────────────── */
 function S3Blessing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   const shortBlessingLines = useMemo(() => {
-    const lines = (d.blessing || "")
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean);
-    return lines.slice(0, 2);
+    const raw = (d.blessing || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!raw) return [];
+
+    const maxChars = 140;
+    const teaser = raw.length > maxChars ? `${raw.slice(0, maxChars).trim()}…` : raw;
+
+    if (teaser.length <= 70) return [teaser];
+
+    const mid = Math.floor(teaser.length / 2);
+    const leftSpace = teaser.lastIndexOf(" ", mid);
+    const rightSpace = teaser.indexOf(" ", mid);
+    const splitAt =
+      leftSpace !== -1 && mid - leftSpace < 18 ? leftSpace
+      : rightSpace !== -1 && rightSpace - mid < 18 ? rightSpace
+      : mid;
+
+    const a = teaser.slice(0, splitAt).trim();
+    const b = teaser.slice(splitAt).trim();
+    return b ? [a, b] : [a];
   }, [d.blessing]);
 
   return (
