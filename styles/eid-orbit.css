@@ -267,8 +267,12 @@
     gap: 2px;
     margin-top: 12px;
     opacity: 0.85;
-    transition: opacity 0.3s ease;
+    transform: rotate(0deg);
+    will-change: transform;
+    backface-visibility: hidden;
   }
+
+  /* Text transform is controlled by applyRotation() (single source of truth) */
   
   .eid-orbit-node__title {
     font-size: clamp(0.85rem, 2.2vw, 1rem);

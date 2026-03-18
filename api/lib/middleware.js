@@ -52,6 +52,9 @@ const ALLOWED_ORIGINS = [
   "https://www.sealedvow.com",
   "https://sealedvow.com",
   "https://sealedvow.vercel.app",
+  "http://localhost:5173",      // Vite default port
+  "http://localhost:3000",      // Alternative port
+  "http://127.0.0.1:5173",      // Explicit IP
 ];
 
 export function setCors(req, res) {

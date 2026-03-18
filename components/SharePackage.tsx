@@ -21,8 +21,26 @@ export const SharePackage: React.FC<Props> = ({ data, sessionKey, shareSlug, onP
   const [masterCopied, setMasterCopied] = useState(false);
 
   const baseUrl = window.location.origin;
-  const shareUrl = `${baseUrl}/${shareSlug}`;
-  const masterUrl = `${shareUrl}?role=master`;
+  const shareBaseUrl = `${baseUrl}/${shareSlug}`;
+  const eidPreviewEncoded = data.occasion === 'eid'
+    ? btoa(unescape(encodeURIComponent(JSON.stringify({
+        recipient: data.recipientName,
+        senderName: data.senderName,
+        blessing: data.finalLetter || '',
+        eidiAmount: data.timeShared,
+        relationship: data.relationshipIntent,
+        subtype: data.sharedMoment,
+        mode: data.writingMode === 'assisted' ? 'assist' : 'self',
+      }))))
+    : null;
+
+  const shareUrl = eidPreviewEncoded
+    ? `${shareBaseUrl}?preview=1&r=${encodeURIComponent(eidPreviewEncoded)}`
+    : shareBaseUrl;
+
+  const masterUrl = eidPreviewEncoded
+    ? `${shareBaseUrl}?preview=1&r=${encodeURIComponent(eidPreviewEncoded)}&role=master`
+    : `${shareBaseUrl}?role=master`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);

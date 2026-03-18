@@ -1,14 +1,18 @@
 {
   "framework": "vite",
-  "devCommand": "vite --port $PORT",
   "buildCommand": "vite build",
+  "devCommand": "vite --port $PORT",
   "outputDirectory": "dist",
+  "installCommand": "npm install",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/ai.js": {
+      "maxDuration": 60
+    },
+    "api/generate-eid-letter.js": {
       "maxDuration": 60
     },
     "api/create-order.js": {

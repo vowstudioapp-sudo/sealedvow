@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'rea
 import { LandingPage } from './components/LandingPage.tsx';
 import { Analytics } from '@vercel/analytics/react';
 import { getRouteType, isEidiRoute, isReceiverLinkType } from './utils/routing';
+import { decodeEidData } from './utils/eidDecoder';
 
 const PreparationForm = lazy(() =>
   import('./components/PreparationForm.tsx').then(m => ({ default: m.PreparationForm }))
@@ -141,6 +142,18 @@ const writePersistedCoupleData = (value: CoupleData): void => {
   }
 };
 
+// Type for Eid form data (matches EidPreparationForm output)
+type EidFormData = {
+  recipient: string;
+  senderName: string;
+  relationship: string;
+  subtype: string;
+  mode: 'assist' | 'self';
+  tone: string;
+  blessing: string;
+  eidiAmount: string;
+};
+
 const App: React.FC = () => {
   const { state: linkState, data: sharedData, error: linkError } = useLinkLoader();
   const routeType = getRouteType();
@@ -148,9 +161,12 @@ const App: React.FC = () => {
   const isEidiReceiver = routeType === 'EIDI_RECEIVER';
   const isEidFlow = isEidiRoute(routeType);
   const isReceiverLink = isReceiverLinkType(routeType);
-  const isEidPreview =
-    window.location.pathname === '/eid' &&
-    new URLSearchParams(window.location.search).get('preview') === '1';
+  const eidPreviewParams = new URLSearchParams(window.location.search);
+  const hasEidPayload = !!eidPreviewParams.get('r');
+  const isCreatorEidPreview =
+    eidPreviewParams.get('preview') === '1' &&
+    hasEidPayload &&
+    window.location.pathname === '/eid';
   const demoData = useMemo(() => {
     const path = window.location.pathname;
     const match = path.match(/^\/demo\/([a-z]+(?:\/[a-z-]+)?)$/);
@@ -345,7 +361,99 @@ const App: React.FC = () => {
     }
   }, [demoData, isDemoMode, isEidFlow, isReceiverLink, linkError, linkState, sharedData]);
 
-  if (isEidPreview) {
+  if (hasEidPayload) {
+    if (isCreatorEidPreview) {
+      if (stage === AppStage.PAYMENT && data) {
+        return (
+          <Suspense fallback={null}>
+            <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
+              <PaymentStage
+                data={data}
+                onPaymentComplete={(result: { replyEnabled: boolean; sessionKey: string; shareSlug: string }) => {
+                  updateData({ replyEnabled: result.replyEnabled, sealedAt: new Date().toISOString() });
+                  setSessionKey(result.sessionKey);
+                  setShareSlug(result.shareSlug);
+                  safeSetStage(AppStage.SHARE);
+                }}
+                onBack={() => {
+                  safeSetStage(AppStage.MAIN_EXPERIENCE);
+                  setIsCreatorPreview(true);
+                }}
+              />
+            </div>
+          </Suspense>
+        );
+      }
+
+      if (stage === AppStage.SHARE && data && sessionKey && shareSlug) {
+        return (
+          <Suspense fallback={null}>
+            <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
+              <SharePackage
+                data={data}
+                sessionKey={sessionKey}
+                shareSlug={shareSlug}
+                onPreview={() => {
+                  safeSetStage(AppStage.ENVELOPE);
+                  setIsCreatorPreview(false);
+                }}
+                onEdit={() => safeSetStage(AppStage.PREPARE)}
+              />
+            </div>
+          </Suspense>
+        );
+      }
+
+      return (
+        <Suspense fallback={null}>
+          <EidExperience
+            onPayment={() => {
+              console.log('💰 App.tsx onPayment callback triggered');
+
+              const decoded = decodeEidData();
+              console.log('💰 Decoded data:', decoded);
+
+              if (!decoded) {
+                console.error('❌ Decoded data is null/undefined');
+                alert("Preview data missing - please return to form");
+                window.location.href = '/eid/parent-child';
+                return;
+              }
+
+              console.log('💰 Creating CoupleData object...');
+              const coupleData: CoupleData = {
+                sessionId: `eid-${Date.now()}`,
+                recipientName: decoded.recipient || '',
+                senderName: decoded.senderName || '',
+                occasion: 'eid',
+                theme: 'evergreen',
+                writingMode: decoded.mode === 'assist' ? 'assisted' : 'self',
+                finalLetter: decoded.blessing || '',
+                relationshipIntent: decoded.relationship || '',
+                sharedMoment: decoded.subtype || '',
+                timeShared: decoded.eidiAmount || '',
+                myth: '',
+                sacredLocation: undefined,
+                revealMethod: 'immediate',
+                coupons: [],
+                memoryBoard: [],
+                createdAt: new Date().toISOString(),
+                sealedAt: undefined,
+              };
+
+              console.log('💰 CoupleData created:', coupleData);
+              console.log('💰 Calling setData...');
+              setData(coupleData);
+              console.log('💰 Calling safeSetStage(AppStage.PAYMENT)...');
+              safeSetStage(AppStage.PAYMENT);
+              console.log('💰 Payment stage transition complete');
+            }}
+          />
+        </Suspense>
+      );
+    }
+
+    // Receiver side: render EidExperience from the encoded payload, but without payment callback.
     return (
       <Suspense fallback={null}>
         <EidExperience />
@@ -480,7 +588,14 @@ const App: React.FC = () => {
 
     return (
       <Suspense fallback={eidiLoadingFallback}>
-        <EidPreparationForm relationship={relationship} />
+        <EidPreparationForm
+          relationship={relationship}
+          onPreview={(formData) => {
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(formData))));
+            const url = `/eid?preview=1&r=${encoded}`;
+            window.location.href = url;
+          }}
+        />
       </Suspense>
     );
   }

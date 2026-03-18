@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import '../styles/eid-orbit.css';
 
 // ── Two rings: primary (inner, faster) and secondary (outer, slower) ──
@@ -13,15 +13,15 @@ const OUTER_NODES = [
   { key: 'friend',          title: 'Friend → Friend',   desc: 'Just an Eid wish',         primary: false, glow: 0.95 },
 ];
 
+// console.log("OUTER_NODES:", OUTER_NODES);
+
 const INNER_RADIUS = 140;  // SVG units (viewBox 500×500, center 250)
 const OUTER_RADIUS = 210;
 const INNER_STEP   = 360 / INNER_NODES.length;
 const OUTER_STEP   = 360 / OUTER_NODES.length;
-const OUTER_BASE_ANGLES = [210, 330, 90];
 const ELLIPSE_X    = 1.12; // horizontal stretch for elliptical feel
 
 export const EidOrbitSelector: React.FC = () => {
-  console.log("ORBIT COMPONENT FILE:", import.meta.url);
   const stageRef        = useRef<HTMLDivElement>(null);
   const innerSystemRef  = useRef<HTMLDivElement>(null);
   const outerSystemRef  = useRef<HTMLDivElement>(null);
@@ -68,25 +68,18 @@ export const EidOrbitSelector: React.FC = () => {
     });
 
     outerSystemRef.current?.querySelectorAll('.eid-orbit-node').forEach((node, i) => {
-      const baseAngle = OUTER_BASE_ANGLES[i] ?? (i * OUTER_STEP);
-      const rad = baseAngle * (Math.PI / 180);
+      const angleDeg = (i / OUTER_NODES.length) * 360;
+      const rad = angleDeg * (Math.PI / 180);
       (node as HTMLElement).style.left = cx + outerR * ELLIPSE_X * Math.cos(rad) + 'px';
       (node as HTMLElement).style.top  = cy + outerR * Math.sin(rad) + 'px';
     });
   };
 
   // ── Apply depth illusion: nodes in "back" are dimmer + smaller ──
-  const applyDepth = (
-    angle: number,
-    dotRefs: React.MutableRefObject<(HTMLDivElement|null)[]>,
-    step: number,
-    glowArr: number[],
-    baseAngles?: number[]
-  ) => {
+  const applyDepth = (angle: number, dotRefs: React.MutableRefObject<(HTMLDivElement|null)[]>, step: number, glowArr: number[]) => {
     dotRefs.current.forEach((dot, i) => {
       if (!dot) return;
-      const nodeAngle = baseAngles ? baseAngles[i] ?? (i * step) : (i * step);
-      const worldDeg = angle + nodeAngle;
+      const worldDeg = angle + i * step;
       const worldRad = worldDeg * (Math.PI / 180);
       const depth    = Math.sin(worldRad); // -1 (back) to +1 (front)
       const opacity  = 0.35 + 0.65 * (depth + 1) / 2;
@@ -108,7 +101,7 @@ export const EidOrbitSelector: React.FC = () => {
     outerTextRefs.current.forEach(t => { if (t) t.style.transform = `rotate(${-outerAngle}deg)`; });
 
     applyDepth(innerAngle, innerDotRefs, INNER_STEP, INNER_NODES.map(n => n.glow));
-    applyDepth(outerAngle, outerDotRefs, OUTER_STEP, OUTER_NODES.map(n => n.glow), OUTER_BASE_ANGLES);
+    applyDepth(outerAngle, outerDotRefs, OUTER_STEP, OUTER_NODES.map(n => n.glow));
   };
 
   // ── Connector line using current rotation angle ──
@@ -119,8 +112,7 @@ export const EidOrbitSelector: React.FC = () => {
     const step    = isInner ? INNER_STEP : OUTER_STEP;
     const radius  = isInner ? INNER_RADIUS : OUTER_RADIUS;
     if (!line) return;
-    const nodeAngle = isInner ? (index * step) : (OUTER_BASE_ANGLES[index] ?? (index * step));
-    const worldRad = (angle + nodeAngle) * (Math.PI / 180);
+    const worldRad = (angle + index * step) * (Math.PI / 180);
     const sx = 250 + radius * ELLIPSE_X * Math.cos(worldRad);
     const sy = 250 + radius * Math.sin(worldRad);
     line.setAttribute('x2', String(sx.toFixed(1)));
@@ -134,7 +126,7 @@ export const EidOrbitSelector: React.FC = () => {
   };
 
   // ── Animation loop ──
-  useEffect(() => {
+  useLayoutEffect(() => {
     let lastTs = 0;
 
     const tick = (ts: number) => {
@@ -170,13 +162,11 @@ export const EidOrbitSelector: React.FC = () => {
     const onVisibility = () => { hiddenRef.current = document.hidden; };
     document.addEventListener('visibilitychange', onVisibility);
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        placeNodes();
-        applyRotation(innerAngleRef.current, outerAngleRef.current);
-        rafRef.current = requestAnimationFrame(tick);
-      });
-    });
+    // Prevent a one-frame "vertical text" flicker by applying layout + counter-rotation
+    // before the browser paints.
+    placeNodes();
+    applyRotation(innerAngleRef.current, outerAngleRef.current);
+    rafRef.current = requestAnimationFrame(tick);
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -289,20 +279,8 @@ export const EidOrbitSelector: React.FC = () => {
   };
 
   const navigate = (key: string) => {
-    const path = window.location.pathname;
-
-    // DEMO FLOW → stay inside demo
-    if (path.startsWith('/demo/eid')) {
-      const target = `/demo/eid/${key}`;
-      console.log('NAV DEBUG:', { path, key, target });
-      window.location.href = target;
-      return;
-    }
-
-    // CREATE FLOW → go to form
-    const target = `/eid/${key}`;
-    console.log('NAV DEBUG:', { path, key, target });
-    window.location.href = target;
+    // Always route to the creator-side Eid selector experience.
+    window.location.href = '/eid/' + key;
   };
   const allNodes = [...INNER_NODES, ...OUTER_NODES];
   const activeNodeData = allNodes.find(n => n.key === previewKey);
@@ -335,7 +313,10 @@ export const EidOrbitSelector: React.FC = () => {
       onClick={() => handleNodeClick(node.key)}
     >
       <div className="eid-orbit-node__dot" ref={el => { dotRefs.current[i] = el; }} />
-      <div className="eid-orbit-node__text" ref={el => { textRefs.current[i] = el; }}>
+      <div
+        className="eid-orbit-node__text"
+        ref={el => { textRefs.current[i] = el; }}
+      >
         <span className="eid-orbit-node__title">{node.title}</span>
         <span className="eid-orbit-node__desc">{node.desc}</span>
       </div>
@@ -343,7 +324,7 @@ export const EidOrbitSelector: React.FC = () => {
   );
 
   return (
-    <div className="eid-orbit-page">
+    <div className="eid-orbit-page" key={`${INNER_NODES.length}-${OUTER_NODES.length}`}>
       <div className="eid-orbit-bg" ref={bgRef} />
 
       <button className="eid-orbit-back" onClick={() => { window.location.href = '/'; }}>
@@ -409,12 +390,20 @@ export const EidOrbitSelector: React.FC = () => {
           </div>
 
           {/* Inner ring system */}
-          <div className="eid-orbit-system" ref={innerSystemRef}>
+          <div
+            className="eid-orbit-system"
+            ref={innerSystemRef}
+            style={{ transform: `rotate(${innerAngleRef.current}deg)` }}
+          >
             {INNER_NODES.map((node, i) => renderNode(node, i, 'inner', innerTextRefs, innerDotRefs))}
           </div>
 
           {/* Outer ring system */}
-          <div className="eid-orbit-system" ref={outerSystemRef}>
+          <div
+            className="eid-orbit-system"
+            ref={outerSystemRef}
+            style={{ transform: `rotate(${outerAngleRef.current}deg)` }}
+          >
             {OUTER_NODES.map((node, i) => renderNode(node, i, 'outer', outerTextRefs, outerDotRefs))}
           </div>
 

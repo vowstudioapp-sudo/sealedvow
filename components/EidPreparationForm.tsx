@@ -1,7 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 
+type EidFormData = {
+  recipient: string;
+  senderName: string;
+  blessing: string;
+  eidiAmount: string;
+  tone: "emotional" | "formal" | "playful" | "respectful";
+  relationship?: string;
+  subtype?: string | null;
+  mode: "assist" | "self";
+};
+
 type Props = {
   relationship?: string;
+  onPreview?: (formData: EidFormData) => void;
 };
 
 type FormData = {
@@ -12,10 +24,11 @@ type FormData = {
   tone: "emotional" | "formal" | "playful" | "respectful";
 };
 
-export default function EidPreparationForm({ relationship }: Props) {
+export default function EidPreparationForm({ relationship, onPreview }: Props) {
   const [step, setStep] = useState(1);
   const [subtype, setSubtype] = useState<string | null>(null);
   const [mode, setMode] = useState<"assist" | "self">("assist");
+  const [hasStartedTyping, setHasStartedTyping] = useState(false);
   const [isToneOpen, setIsToneOpen] = useState(false);
   const [loaderLabel, setLoaderLabel] = useState<null | "preview" | "seal" | "craft" | "refine">(null);
   const [loaderProgress, setLoaderProgress] = useState(0);
@@ -33,6 +46,12 @@ export default function EidPreparationForm({ relationship }: Props) {
 
   const update = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleTriggerClick = (text: string) => {
+    update("blessing", text);
+    setGeneratedLetter("");
+    setHasStartedTyping(true);
   };
 
   const isElderChild = relationship === "elder-child";
@@ -53,17 +72,23 @@ export default function EidPreparationForm({ relationship }: Props) {
     recipient: string;
     tone: FormData["tone"];
     customMessage: string;
-  }) {
-    console.log("CALLING API");
+  }, retryCount = 0) {
+    console.log("CALLING API (attempt " + (retryCount + 1) + ")");
     console.log("ENDPOINT:", "/api/generate-eid-letter");
     console.log("REQUEST PAYLOAD:", data);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
       const res = await fetch("/api/generate-eid-letter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const error = await res.json().catch(() => ({ error: "Failed to generate letter" }));
@@ -74,7 +99,24 @@ export default function EidPreparationForm({ relationship }: Props) {
       console.log("API RESPONSE:", result);
       return result;
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error("API FAILED:", err);
+
+      if (err.name === 'AbortError') {
+        if (retryCount < 1) {
+          console.log("Timeout - retrying...");
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return generateLetter(data, retryCount + 1);
+        }
+        throw new Error('AI service timeout - please try again');
+      }
+
+      if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network'))) {
+        console.log("Network error - retrying...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return generateLetter(data, retryCount + 1);
+      }
+
       throw err;
     }
   }
@@ -113,8 +155,9 @@ export default function EidPreparationForm({ relationship }: Props) {
       const letter = result.letter || formData.blessing;
       setFormData(prev => ({ ...prev, blessing: letter }));
       setGeneratedLetter(letter);
-    } catch (_err) {
-      alert("Crafting failed. Please try again.");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Crafting failed. Please try again.";
+      alert(errorMsg);
     } finally {
       setIsGeneratingLetter(false);
       setLoaderLabel(null);
@@ -148,8 +191,9 @@ export default function EidPreparationForm({ relationship }: Props) {
       const letter = result.letter || formData.blessing;
       setFormData(prev => ({ ...prev, blessing: letter }));
       setGeneratedLetter(letter);
-    } catch (_err) {
-      alert("Refine failed. Please try again.");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Refine failed. Please try again.";
+      alert(errorMsg);
     } finally {
       setIsGeneratingLetter(false);
       setLoaderLabel(null);
@@ -196,41 +240,12 @@ export default function EidPreparationForm({ relationship }: Props) {
     return () => document.removeEventListener('click', handleClick);
   }, []);
 
-  const generateLink = async () => {
-    if (!hasRequiredFields()) {
-      alert("Please fill all required fields");
-      return;
-    }
-
-    setLoaderLabel("seal");
-    setLoaderProgress(0);
-    const letter = await ensureGeneratedLetter();
-    const payload = {
-      ...formData,
-      blessing: letter,
-      relationship,
-      subtype,
-    };
-
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    const url = `${window.location.origin}/eid?r=${encoded}`;
-
-    await navigator.clipboard.writeText(url);
-    alert("Link copied ✨");
-    setLoaderProgress(100);
-    window.setTimeout(() => setLoaderLabel(null), 300);
-  };
-
-  const previewLink = async () => {
+  const handlePreview = async () => {
     try {
       if (!hasRequiredFields()) {
         alert("Please fill all required fields");
         return;
       }
-
-      const previewWindow = window.open("about:blank", "_blank");
-      setLoaderLabel("preview");
-      setLoaderProgress(0);
 
       const needsCraft =
         mode === "assist" &&
@@ -239,6 +254,8 @@ export default function EidPreparationForm({ relationship }: Props) {
 
       if (needsCraft) {
         setIsGeneratingLetter(true);
+        setLoaderLabel("craft");
+        setLoaderProgress(0);
         try {
           const result = await generateLetter({
             relationship,
@@ -251,48 +268,50 @@ export default function EidPreparationForm({ relationship }: Props) {
           const letter = result.letter || formData.blessing;
           setFormData(prev => ({ ...prev, blessing: letter }));
           setGeneratedLetter(letter);
+        } catch (err) {
+          setIsGeneratingLetter(false);
+          setLoaderLabel(null);
+          const errorMsg = err instanceof Error ? err.message : "AI generation failed. Please try again.";
+          alert(errorMsg);
+          return;
         } finally {
           setIsGeneratingLetter(false);
+          setLoaderLabel(null);
         }
       }
 
       const letter = await ensureGeneratedLetter();
-      const payload = {
-        ...formData,
-        blessing: letter,
-        relationship,
-        subtype,
-      };
-
-      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-      const url = `${window.location.origin}/eid?preview=1&r=${encoded}`;
-
-      if (previewWindow) {
-        previewWindow.location.href = url;
-      } else {
-        window.open(url, "_blank");
+      
+      // Call onPreview callback with form data
+      if (onPreview) {
+        const eidData: EidFormData = {
+          ...formData,
+          blessing: letter,
+          relationship,
+          subtype,
+          mode,
+        };
+        onPreview(eidData);
       }
-      setLoaderProgress(100);
-      window.setTimeout(() => setLoaderLabel(null), 300);
     } catch (err) {
       console.error("Preview failed:", err);
-      alert("Preview failed");
-      setLoaderLabel(null);
+      const errorMsg = err instanceof Error ? err.message : "Preview failed";
+      alert(errorMsg);
     }
   };
 
   const getRecipientPlaceholder = (relationship?: string) => {
     switch (relationship) {
       case "parent-child":
-        return "Your child’s name";
+        return "Your child's name";
       case "child-parent":
-        return "Your parent’s name";
+        return "Your parent's name";
       case "elder-child":
         return "Their name";
       case "sibling":
-        return "Your sibling’s name";
+        return "Your sibling's name";
       case "friend":
-        return "Your friend’s name";
+        return "Your friend's name";
       default:
         return "Their name";
     }
@@ -322,7 +341,7 @@ export default function EidPreparationForm({ relationship }: Props) {
       return "Write a kind message…";
     }
 
-    if (relationship === "child-parent") return "Say what you’ve never properly said…";
+    if (relationship === "child-parent") return "Say what you've never properly said…";
     if (relationship === "parent-child") return "Tell them how proud you are…";
     if (relationship === "sibling") return "Mix love with a little teasing…";
     if (relationship === "friend") return "Keep it fun and real…";
@@ -331,6 +350,26 @@ export default function EidPreparationForm({ relationship }: Props) {
   };
 
   const isSubtypeStep = hasSubtypeStep && step === 1;
+  const previewText = (generatedLetter || formData.blessing || "").trim();
+
+  const formatTone = (tone: string) => {
+    switch (tone) {
+      case "emotional": return "Heartfelt & deep";
+      case "playful": return "Light & fun";
+      case "respectful": return "Warm & respectful";
+      case "formal": return "Simple & polite";
+      default: return tone;
+    }
+  };
+
+  const chipStyle: React.CSSProperties = {
+    fontSize: 11,
+    padding: "6px 10px",
+    borderRadius: 20,
+    border: "1px solid rgba(212,175,55,0.3)",
+    color: "#D4AF37",
+    background: "transparent"
+  };
 
   return (
     <div style={styles.page}>
@@ -391,7 +430,9 @@ export default function EidPreparationForm({ relationship }: Props) {
         </div>
       )}
       <div style={styles.card}>
-        <p style={styles.step}>Step {step} of {maxStep}</p>
+        {step !== maxStep && (
+          <p style={styles.step}>Step {step} of {maxStep}</p>
+        )}
 
         {isSubtypeStep && (
           <>
@@ -496,17 +537,63 @@ export default function EidPreparationForm({ relationship }: Props) {
               </button>
             </div>
 
+            {!hasStartedTyping && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.5)",
+                  marginBottom: 8,
+                  fontStyle: "italic"
+                }}>
+                  Not sure where to start?
+                </div>
+
+                <div style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerClick("I miss the way you...")}
+                    style={triggerStyle}
+                  >
+                    Something you miss
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerClick("I still remember when we...")}
+                    style={triggerStyle}
+                  >
+                    A memory
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerClick("I always pray that Allah grants you...")}
+                    style={triggerStyle}
+                  >
+                    A dua
+                  </button>
+                </div>
+              </div>
+            )}
+
             <textarea
               style={{ ...styles.input, height: 120 }}
               placeholder={
                 mode === 'assist'
-                  ? "Share a feeling, memory, or something meaningful…"
-                  : "Tell them how proud you are..."
+                  ? "Start with a feeling or memory..."
+                  : "What would you say if they were here?"
               }
               value={formData.blessing}
               onChange={(e) => {
                 update("blessing", e.target.value);
                 setGeneratedLetter("");
+                if (!hasStartedTyping && e.target.value.trim().length > 0) {
+                  setHasStartedTyping(true);
+                }
               }}
             />
 
@@ -538,26 +625,31 @@ export default function EidPreparationForm({ relationship }: Props) {
                 onClick={() => setIsToneOpen(!isToneOpen)}
                 className="w-full px-4 py-3 rounded-xl border border-[#D4AF37]/30 bg-black/40 flex justify-between items-center"
               >
-                <span className="capitalize">{formData.tone}</span>
+                <span className="capitalize">{formatTone(formData.tone)}</span>
                 <span className="text-[#D4AF37]">▾</span>
               </button>
 
               {isToneOpen && (
                 <div className="absolute z-50 w-full mt-2 rounded-xl bg-[#0C0A09] border border-[#D4AF37]/20 shadow-xl overflow-hidden">
-                  {['emotional', 'formal', 'playful', 'respectful'].map((tone) => (
+                  {[
+                    { value: 'emotional', label: 'Heartfelt & deep' },
+                    { value: 'playful', label: 'Light & fun' },
+                    { value: 'respectful', label: 'Warm & respectful' },
+                    { value: 'formal', label: 'Simple & polite' }
+                  ].map((tone) => (
                     <div
-                      key={tone}
+                      key={tone.value}
                       onClick={() => {
-                        update("tone", tone);
+                        update("tone", tone.value);
                         setIsToneOpen(false);
                       }}
-                      className={`px-4 py-3 cursor-pointer transition capitalize ${
-                        formData.tone === tone
+                      className={`px-4 py-3 cursor-pointer transition ${
+                        formData.tone === tone.value
                           ? 'text-[#D4AF37] bg-[#D4AF37]/10'
                           : 'text-white/80 hover:bg-[#D4AF37]/10 hover:text-[#D4AF37]'
                       }`}
                     >
-                      {tone}
+                      {tone.label}
                     </div>
                   ))}
                 </div>
@@ -571,7 +663,7 @@ export default function EidPreparationForm({ relationship }: Props) {
             <h2 style={styles.title}>Add Eidi (optional)</h2>
             <input
               style={styles.input}
-              placeholder="₹ 5000"
+              placeholder="₹ 5000 (or surprise them 😉)"
               value={formData.eidiAmount}
               onChange={(e) => update("eidiAmount", e.target.value)}
             />
@@ -580,23 +672,86 @@ export default function EidPreparationForm({ relationship }: Props) {
 
         {((!hasSubtypeStep && step === 5) || (hasSubtypeStep && step === 6)) ? (
           <>
-            <h2 style={styles.title}>Ready to send 🌙</h2>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{
+                fontSize: 32,
+                color: "#D4AF37",
+                marginBottom: 12,
+                filter: "drop-shadow(0 0 10px rgba(212,175,55,0.3))"
+              }}>
+                🌙
+              </div>
 
-            <div style={styles.summary}>
-              <p><strong>To:</strong> {formData.recipient}</p>
-              <p><strong>From:</strong> {formData.senderName}</p>
-              <p><strong>Tone:</strong> {formData.tone}</p>
-              <p><strong>Message:</strong> {generatedLetter || formData.blessing}</p>
-              <p><strong>Eidi:</strong> {formData.eidiAmount || "None"}</p>
+              <div style={{
+                fontFamily: "Georgia, serif",
+                fontSize: 20,
+                color: "#D4AF37",
+                marginBottom: 16
+              }}>
+                Your message is ready
+              </div>
+
+              <div style={{
+                fontSize: 13,
+                color: "rgba(255,255,255,0.7)",
+                lineHeight: 1.6,
+                marginBottom: 18
+              }}>
+                For <strong style={{ color: "#fff" }}>{formData.recipient}</strong><br />
+                From <strong style={{ color: "#fff" }}>{formData.senderName}</strong>
+              </div>
+
+              <div style={{
+                width: "100%",
+                padding: "16px 18px",
+                borderRadius: 12,
+                border: "1px solid rgba(212,175,55,0.15)",
+                background: "rgba(255,255,255,0.02)",
+                fontStyle: "italic",
+                fontSize: 13,
+                color: "rgba(255,255,255,0.85)",
+                lineHeight: 1.7,
+                marginBottom: 14
+              }}>
+                {previewText
+                  ? previewText.split(" ").slice(0, 12).join(" ") + "..."
+                  : "Your message will appear here..."}
+              </div>
+
+              <div style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                justifyContent: "center",
+                marginBottom: 16
+              }}>
+                <span style={chipStyle}>{formatTone(formData.tone)}</span>
+
+                {formData.eidiAmount && (
+                  <span style={chipStyle}>
+                    Eidi: {formData.eidiAmount}
+                  </span>
+                )}
+              </div>
+
+              <div style={{
+                fontSize: 12,
+                color: "rgba(255,255,255,0.5)",
+                fontStyle: "italic"
+              }}>
+                This will be delivered as an experience ✦
+              </div>
             </div>
 
-            <button style={styles.secondary} onClick={previewLink} disabled={isGeneratingLetter}>
-              {isGeneratingLetter ? "Generating..." : "Preview Experience 👁"}
-            </button>
-
-            <button style={styles.primary} onClick={generateLink} disabled={isGeneratingLetter}>
-              {isGeneratingLetter ? "Generating..." : "Seal & Copy Link ✨"}
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button 
+                style={styles.primary} 
+                onClick={handlePreview}
+                disabled={isGeneratingLetter}
+              >
+                {isGeneratingLetter ? "Preparing preview..." : "Preview Experience 👁"}
+              </button>
+            </div>
           </>
         ) : null}
 
@@ -814,4 +969,15 @@ const styles: Record<string, React.CSSProperties> = {
     color: "rgba(255,255,255,0.55)",
     letterSpacing: "0.02em",
   },
+};
+
+const triggerStyle: React.CSSProperties = {
+  fontSize: 11,
+  padding: "6px 10px",
+  borderRadius: 20,
+  border: "1px solid rgba(212,175,55,0.25)",
+  background: "transparent",
+  color: "#D4AF37",
+  cursor: "pointer",
+  transition: "all 0.2s ease"
 };

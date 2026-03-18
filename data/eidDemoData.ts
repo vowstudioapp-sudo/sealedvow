@@ -22,6 +22,7 @@ export interface EidDemo {
   recipient: string;
   envFrom: string;
   blessing: string;
+  shortBlessing?: string;
   
   letterHeading: string;
   letterMeta: string;

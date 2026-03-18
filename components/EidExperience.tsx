@@ -401,30 +401,30 @@ function S2Envelope({ d, onNext }: { d: EidDemo; onNext: () => void }) {
    SCREEN 3 — BLESSING
 ───────────────────────────────────────────────────────────── */
 function S3Blessing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
-  const shortBlessingLines = useMemo(() => {
+  const blessingText = useMemo(() => {
+    if (d.shortBlessing && d.shortBlessing.trim().length > 0) {
+      return d.shortBlessing.trim();
+    }
+
     const raw = (d.blessing || "")
       .replace(/\s+/g, " ")
       .trim();
 
-    if (!raw) return [];
+    if (!raw) return "";
 
-    const maxChars = 140;
-    const teaser = raw.length > maxChars ? `${raw.slice(0, maxChars).trim()}…` : raw;
+    const sentences = raw.match(/[^.!?]+[.!?]+/g);
 
-    if (teaser.length <= 70) return [teaser];
+    if (sentences && sentences.length > 0) {
+      return sentences[0].trim();
+    }
 
-    const mid = Math.floor(teaser.length / 2);
-    const leftSpace = teaser.lastIndexOf(" ", mid);
-    const rightSpace = teaser.indexOf(" ", mid);
-    const splitAt =
-      leftSpace !== -1 && mid - leftSpace < 18 ? leftSpace
-      : rightSpace !== -1 && rightSpace - mid < 18 ? rightSpace
-      : mid;
+    const fallback = raw.slice(0, 120);
+    const lastSpace = fallback.lastIndexOf(" ");
 
-    const a = teaser.slice(0, splitAt).trim();
-    const b = teaser.slice(splitAt).trim();
-    return b ? [a, b] : [a];
-  }, [d.blessing]);
+    return lastSpace > 60
+      ? fallback.slice(0, lastSpace).trim() + "…"
+      : fallback.trim() + "…";
+  }, [d.shortBlessing, d.blessing]);
 
   return (
     <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #072018 100%)' }}>
@@ -434,7 +434,7 @@ function S3Blessing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
         </div>
         <div style={{ width: 60, height: 1, background: 'linear-gradient(90deg, transparent, #c9a84c, transparent)' }} />
         <p style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.2rem, 4vw, 1.7rem)', lineHeight: 1.9, color: '#f5e9c4', fontStyle: 'italic' }}>
-          {shortBlessingLines.map((line, i) => <span key={i}>{line}<br /></span>)}
+          {blessingText}
         </p>
         <div style={{ width: 60, height: 1, background: 'linear-gradient(90deg, transparent, #c9a84c, transparent)' }} />
         <button
@@ -462,10 +462,16 @@ function S3Blessing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
 function S4Letter({ d, onNext }: { d: EidDemo; onNext: () => void }) {
   const [idx, setIdx] = useState(0);
   const chunks = useMemo(() => {
+    const letter = (d.letterBody || "").trim();
+    if (letter) {
+      const fallback = stripHtml(letter);
+      return chunkText(fallback, 180);
+    }
+
+    // Fallback (should be rare): show blessing if letterBody is missing.
     const raw = (d.blessing || "").trim();
     if (raw) return chunkText(raw, 180);
-    const fallback = stripHtml(d.letterBody || "");
-    return chunkText(fallback, 180);
+    return [];
   }, [d.blessing, d.letterBody]);
 
   const advance = () => {
@@ -544,36 +550,105 @@ function S4Letter({ d, onNext }: { d: EidDemo; onNext: () => void }) {
    SCREEN 5 — MEMORIES
 ───────────────────────────────────────────────────────────── */
 function S5Memories({ d, onNext }: { d: EidDemo; onNext: () => void }) {
+  const memories = d.memories || [];
+  const [currentMemoryIndex, setCurrentMemoryIndex] = useState(0);
+  const [transitionStep, setTransitionStep] = useState<0 | 1>(0);
+  const [phase, setPhase] = useState<"memory" | "transition">("memory");
+
+  useEffect(() => {
+    if (!memories.length && phase === "memory") {
+      onNext();
+      return;
+    }
+
+    if (phase === "memory") {
+      const timer = setTimeout(() => {
+        if (currentMemoryIndex < memories.length - 1) {
+          setCurrentMemoryIndex(prev => prev + 1);
+        } else {
+          setPhase("transition");
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+
+    if (phase === "transition") {
+      const timer = setTimeout(() => {
+        if (transitionStep === 0) {
+          setTransitionStep(1);
+        } else {
+          onNext();
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, currentMemoryIndex, memories.length, transitionStep, onNext]);
+
+  const handleTap = () => {
+    if (phase === "memory") {
+      if (currentMemoryIndex < memories.length - 1) {
+        setCurrentMemoryIndex(prev => prev + 1);
+      } else {
+        setPhase("transition");
+      }
+      return;
+    }
+
+    if (phase === "transition") {
+      if (transitionStep === 0) {
+        setTransitionStep(1);
+      } else {
+        onNext();
+      }
+    }
+  };
+
   return (
-    <Screen active scrollable style={{ background: 'linear-gradient(160deg, #0a2e1e 0%, #061810 100%)' }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 6vw, 2.8rem)', color: '#e8c97a', textAlign: 'center', marginBottom: 8 }}>
-        {d.memTitle}
-      </div>
-      <div style={{ fontSize: '0.72rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.5)', textAlign: 'center', marginBottom: 40 }}>
-        {d.memSub}
-      </div>
+    <Screen active style={{ background: 'linear-gradient(160deg, #0a2e1e 0%, #061810 100%)' }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          padding: '0 24px',
+          cursor: 'pointer',
+        }}
+        onClick={handleTap}
+        onTouchEnd={handleTap}
+      >
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.6rem, 5vw, 2.4rem)', color: '#e8c97a', marginBottom: 16 }}>
+          {d.memTitle}
+        </div>
+        <div style={{ fontSize: '0.72rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.5)', marginBottom: 32 }}>
+          {d.memSub}
+        </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 20, maxWidth: 680, width: '100%' }}>
-        {d.memories.map((m, i) => (
-          <div key={i} style={{
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,168,76,0.15)',
-            borderRadius: 6, overflow: 'hidden', transition: 'transform 0.25s ease',
-          }}
-            onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-4px)')}
-            onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
-          >
-            <div style={{ width: '100%', height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3.2rem', background: 'rgba(201,168,76,0.06)', borderBottom: '1px solid rgba(201,168,76,0.1)' }}>
-              {m.icon}
-            </div>
-            <div style={{ padding: '14px 16px', fontFamily: 'Georgia, serif', fontSize: '0.95rem', color: '#f5e9c4', lineHeight: 1.5 }}>
-              {m.caption}
-            </div>
+        {phase === "memory" && memories[currentMemoryIndex] && (
+          <div style={{ maxWidth: 520 }}>
+            <p style={{ fontSize: '2.4rem', marginBottom: 20 }}>
+              {memories[currentMemoryIndex].icon}
+            </p>
+            <p style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.05rem, 3vw, 1.3rem)', color: '#f5e9c4', lineHeight: 1.7 }}>
+              {memories[currentMemoryIndex].caption}
+            </p>
           </div>
-        ))}
-      </div>
+        )}
 
-      <div style={{ marginTop: 36 }}>
-        <BtnNext onClick={onNext}>{d.duaTitle} ✦</BtnNext>
+        {phase === "transition" && (
+          <div style={{ maxWidth: 520 }}>
+            <p style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.2rem, 3.5vw, 1.6rem)', color: '#e8c97a', lineHeight: 1.7 }}>
+              {transitionStep === 0 ? "And because of all this…" : "With all my heart…"}
+            </p>
+          </div>
+        )}
+
+        <div style={{ marginTop: 32, fontSize: '0.7rem', letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.6)' }}>
+          Tap to continue ✦
+        </div>
       </div>
     </Screen>
   );
@@ -583,47 +658,92 @@ function S5Memories({ d, onNext }: { d: EidDemo; onNext: () => void }) {
    SCREEN 6 — DUAS
 ───────────────────────────────────────────────────────────── */
 function S6Duas({ d, active, onNext }: { d: EidDemo; active: boolean; onNext: () => void }) {
-  const [visibleCount, setVisibleCount] = useState(0);
+  const [currentBlessingIndex, setCurrentBlessingIndex] = useState(0);
+  const [showCta, setShowCta] = useState(false);
+
+  const blessings = useMemo(() => {
+    const items = (d.duas || []).map(x => (x?.text || "").replace(/\s+/g, " ").trim()).filter(Boolean);
+    return items;
+  }, [d.duas]);
 
   useEffect(() => {
-    if (!active) { setVisibleCount(0); return; }
-    const timers = d.duas.map((_, i) =>
-      setTimeout(() => setVisibleCount(n => Math.max(n, i + 1)), 300 + i * 180)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [active, d.duas]);
+    if (!active) {
+      setCurrentBlessingIndex(0);
+      setShowCta(false);
+      return;
+    }
+
+    if (showCta || !blessings.length) return;
+
+    const timer = setTimeout(() => {
+      if (currentBlessingIndex < blessings.length - 1) {
+        setCurrentBlessingIndex(prev => prev + 1);
+      } else {
+        setShowCta(true);
+      }
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [active, blessings.length, currentBlessingIndex, showCta]);
+
+  const handleTap = () => {
+    if (!active) return;
+
+    if (!blessings.length) {
+      setShowCta(true);
+      return;
+    }
+
+    if (!showCta) {
+      if (currentBlessingIndex < blessings.length - 1) {
+        setCurrentBlessingIndex(prev => prev + 1);
+      } else {
+        setShowCta(true);
+      }
+    }
+  };
 
   return (
-    <Screen active={active} scrollable style={{ background: 'linear-gradient(160deg, #0a2e1e 0%, #061810 100%)' }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 6vw, 2.8rem)', color: '#e8c97a', textAlign: 'center', marginBottom: 8 }}>
-        {d.duaTitle}
-      </div>
-      <div style={{ fontSize: '0.72rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.5)', textAlign: 'center', marginBottom: 40 }}>
-        {d.duaSub}
-      </div>
+    <Screen active={active} style={{ background: 'linear-gradient(160deg, #0a2e1e 0%, #061810 100%)' }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          padding: '0 24px',
+          cursor: 'pointer',
+        }}
+        onClick={handleTap}
+        onTouchEnd={handleTap}
+      >
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.8rem, 6vw, 2.8rem)', color: '#e8c97a', marginBottom: 16 }}>
+          {d.duaTitle}
+        </div>
+        <div style={{ fontSize: '0.72rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.5)', marginBottom: 32 }}>
+          {d.duaSub}
+        </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520, width: '100%' }}>
-        {d.duas.map((dua, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'flex-start', gap: 16,
-            padding: '20px 22px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(201,168,76,0.15)',
-            borderLeft: '3px solid #c9a84c', borderRadius: 4,
-            opacity: i < visibleCount ? 1 : 0,
-            transform: i < visibleCount ? 'translateY(0)' : 'translateY(16px)',
-            transition: 'opacity 0.5s ease, transform 0.5s ease',
-          }}>
-            <div style={{ fontSize: '1.4rem', marginTop: 2 }}>{dua.icon}</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1rem, 3vw, 1.2rem)', color: '#f5e9c4', lineHeight: 1.65 }}>
-              {dua.text}
-            </div>
+        {blessings.length > 0 && !showCta && (
+          <p style={{ maxWidth: 560, fontFamily: 'Georgia, serif', fontSize: 'clamp(1.05rem, 3vw, 1.3rem)', color: '#f5e9c4', lineHeight: 1.7 }}>
+            {blessings[currentBlessingIndex]}
+          </p>
+        )}
+
+        {showCta && (
+          <div style={{ marginTop: 12 }}>
+            <BtnNext onClick={onNext}>Your Eidi ✦</BtnNext>
           </div>
-        ))}
-      </div>
+        )}
 
-      <div style={{ marginTop: 36 }}>
-        <BtnNext onClick={onNext}>Your Eidi ✦</BtnNext>
+        {!showCta && (
+          <div style={{ marginTop: 32, fontSize: '0.7rem', letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.6)' }}>
+            Tap to continue ✦
+          </div>
+        )}
       </div>
     </Screen>
   );
@@ -883,7 +1003,7 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
                   I saw how fast you clicked "NO" earlier 😏
                 </div>
                 
-                <BtnNext onClick={onNext} style={{ marginTop: 8 }}>{d.duaTitle} ✦</BtnNext>
+                <BtnNext onClick={onNext} style={{ marginTop: 8 }}>Continue ✦</BtnNext>
               </>
             )}
           </div>
@@ -1117,22 +1237,59 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
 /* ─────────────────────────────────────────────────────────────
    SCREEN 8 — CLOSING
 ───────────────────────────────────────────────────────────── */
-function S8Closing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
+function S8Closing({ d, onNext, isPreview, onPayment }: { d: EidDemo; onNext: () => void; isPreview?: boolean; onPayment?: () => void }) {
   return (
     <Screen active style={{ background: 'radial-gradient(ellipse at 50% 30%, #0f4a37 0%, #061810 100%)', textAlign: 'center' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, maxWidth: 440 }}>
-        <div style={{ fontSize: '3rem', animation: 'eid-closingMoon 3s ease-in-out infinite' }}>🌙</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.8rem', color: '#c9a84c', opacity: 0.7 }}>عيد مبارك</div>
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 'clamp(1.4rem, 5vw, 2rem)', color: '#e8c97a', lineHeight: 1.65 }}>
-          {d.closingMain.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.4rem', color: '#e8c97a' }}>
+          With all my love,
         </div>
-        <div style={{ fontSize: '0.75rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.5)' }}>
-          ✦ &nbsp; Eid Mubarak &nbsp; ✦
+
+        <div style={{ marginTop: 8, fontSize: '1.1rem', color: '#f5e9c4' }}>
+          {d.senderName || ""}
         </div>
-        <div style={{ fontSize: '0.78rem', color: 'rgba(201,168,76,0.4)', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-          {d.closingSender}
-        </div>
-        <BtnNext onClick={onNext} style={{ marginTop: 8 }}>Continue ✦</BtnNext>
+
+        {isPreview && onPayment ? (
+          <button
+            onClick={() => {
+              console.log('🔥 SEAL & DELIVER clicked');
+              console.log('🔥 onPayment exists?', !!onPayment);
+              if (onPayment) {
+                console.log('🔥 Calling onPayment...');
+                onPayment();
+              } else {
+                console.error('❌ onPayment is undefined');
+              }
+            }}
+            style={{
+              marginTop: 16,
+              padding: '14px 40px',
+              background: 'rgba(201,168,76,0.9)',
+              border: 'none',
+              borderRadius: 40,
+              fontSize: '0.72rem',
+              letterSpacing: '0.25em',
+              textTransform: 'uppercase',
+              color: '#0a2e1e',
+              cursor: 'pointer',
+              fontWeight: 700,
+              transition: 'all 0.25s ease',
+              boxShadow: '0 0 30px rgba(201,168,76,0.3)',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = '#e8c97a';
+              e.currentTarget.style.transform = 'scale(1.03)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(201,168,76,0.9)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            SEAL & DELIVER ✨
+          </button>
+        ) : (
+          <BtnNext onClick={onNext} style={{ marginTop: 16 }}>Continue ✦</BtnNext>
+        )}
       </div>
     </Screen>
   );
@@ -1191,6 +1348,27 @@ function HomeBtn() {
   return (
     <button
       onClick={() => { window.location.href = '/demo/eid'; }}
+      style={{
+        position: 'fixed', top: 18, left: 20, zIndex: 200,
+        background: 'none', border: 'none', cursor: 'pointer',
+        fontFamily: 'Georgia, serif', fontStyle: 'italic',
+        fontSize: '0.72rem', letterSpacing: '0.12em',
+        color: 'rgba(201,168,76,0.35)',
+        transition: 'color 0.2s ease',
+        padding: '6px 8px',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.7)')}
+      onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.35)')}
+    >
+      ← Back
+    </button>
+  );
+}
+
+function ScreenBackBtn({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      onClick={onBack}
       style={{
         position: 'fixed', top: 18, left: 20, zIndex: 200,
         background: 'none', border: 'none', cursor: 'pointer',
@@ -1281,7 +1459,11 @@ const STYLES = `
 /* ─────────────────────────────────────────────────────────────
    MAIN COMPONENT
 ───────────────────────────────────────────────────────────── */
-export function EidExperience() {
+type EidExperienceProps = {
+  onPayment?: () => void;
+};
+
+export function EidExperience({ onPayment }: EidExperienceProps = {}) {
   // Step 2: Detect encoded message from URL
   const decoded = decodeEidData();
   const senderDisplayName = formatSenderDisplay(decoded?.senderName, decoded?.subtype);
@@ -1295,6 +1477,7 @@ export function EidExperience() {
         recipient: decoded.recipient || "Someone",
         envFrom: 'A message for you',
         blessing: decoded.blessing || "Eid Mubarak",
+        shortBlessing: (decoded as any).shortBlessing || "",
 
         letterHeading: `Eid Mubarak — to ${decoded.recipient || "Someone"}`,
         letterMeta: 'EID',
@@ -1338,11 +1521,15 @@ export function EidExperience() {
     : baseDemo;
 
   const [screen, setScreen] = useState(0);
+  const screenKey = `screen-${screen}`;
   const TOTAL = 8;
   const [introStage, setIntroStage] = useState(0);
   const [showName, setShowName] = useState(false);
 
   const go = (n: number) => setScreen(n);
+  const goBack = () => {
+    setScreen(prev => Math.max(prev - 1, 0));
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1503,17 +1690,17 @@ export function EidExperience() {
       )}
       <style>{STYLES}</style>
       <Stars />
-      <HomeBtn />
+      {screen > 0 ? <ScreenBackBtn onBack={goBack} /> : <HomeBtn />}
       <ProgressDots total={TOTAL} current={screen} />
 
-      {screen === 0 && <S2Envelope d={d} onNext={() => go(1)} />}
-      {screen === 1 && <S3Blessing d={d} onNext={() => go(2)} />}
-      {screen === 2 && <S4Letter d={d} onNext={() => go(3)} />}
-      {screen === 3 && <S5Memories d={d} onNext={() => go(4)} />}
-      {screen === 4 && <S6Duas d={d} active={true} onNext={() => go(5)} />}
-      {screen === 5 && <S7Eidi d={d} onNext={() => go(6)} />}
-      {screen === 6 && <S8Closing d={d} onNext={() => go(7)} />}
-      {screen === 7 && <S9Chain d={d} />}
+      {screen === 0 && <S2Envelope key={screenKey} d={d} onNext={() => go(1)} />}
+      {screen === 1 && <S3Blessing key={screenKey} d={d} onNext={() => go(2)} />}
+      {screen === 2 && <S4Letter key={screenKey} d={d} onNext={() => go(3)} />}
+      {screen === 3 && <S5Memories key={screenKey} d={d} onNext={() => go(4)} />}
+      {screen === 4 && <S6Duas key={screenKey} d={d} active={true} onNext={() => go(5)} />}
+      {screen === 5 && <S7Eidi key={screenKey} d={d} onNext={() => go(6)} />}
+      {screen === 6 && <S8Closing key={screenKey} d={d} onNext={() => go(7)} isPreview={isPreview} onPayment={onPayment} />}
+      {screen === 7 && <S9Chain key={screenKey} d={d} />}
     </div>
   );
 }

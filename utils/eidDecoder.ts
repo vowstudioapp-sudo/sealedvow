@@ -17,6 +17,7 @@ export interface DecodedEidData {
     eidiAmount?: string
     relationship?: string
     subtype?: string
+    mode?: 'assist' | 'self'
   }
   
   export function decodeEidData(): DecodedEidData | null {
