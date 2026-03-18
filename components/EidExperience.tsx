@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/eid.css';
 import { EID_DEMOS, getDemoByKey, type EidDemo } from '../data/eidDemoData.ts';
 import { decodeEidData } from '../utils/eidDecoder';
@@ -45,6 +45,41 @@ function sanitize(text: string) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+function stripHtml(html: string) {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function chunkText(text: string, maxChars: number) {
+  const explicitParagraphs = text.split('\n').filter(p => p.trim().length > 0);
+  const chunks: string[] = [];
+
+  explicitParagraphs.forEach(p => {
+    const words = p.split(' ');
+    let currentChunk = "";
+
+    words.forEach(word => {
+      if ((currentChunk + " " + word).length > maxChars && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = word;
+      } else {
+        currentChunk += (currentChunk ? " " : "") + word;
+      }
+    });
+
+    if (currentChunk) chunks.push(currentChunk.trim());
+  });
+
+  return chunks;
 }
 
 function formatSenderDisplay(sender?: string, subtype?: string) {
@@ -400,8 +435,22 @@ function S3Blessing({ d, onNext }: { d: EidDemo; onNext: () => void }) {
    SCREEN 4 — LETTER
 ───────────────────────────────────────────────────────────── */
 function S4Letter({ d, onNext }: { d: EidDemo; onNext: () => void }) {
+  const [idx, setIdx] = useState(0);
+  const chunks = useMemo(() => {
+    const raw = stripHtml(d.letterBody || "");
+    return chunkText(raw, 180);
+  }, [d.letterBody]);
+
+  const advance = () => {
+    if (idx < chunks.length - 1) {
+      setIdx(prev => prev + 1);
+      return;
+    }
+    onNext();
+  };
+
   return (
-    <Screen active scrollable style={{ background: '#fdf8ee', color: '#1a120a' }}>
+    <Screen active style={{ background: '#fdf8ee', color: '#1a120a' }}>
       <div style={{
         maxWidth: 680, width: '100%',
         background: '#fffef8', borderRadius: 3,
@@ -419,17 +468,45 @@ function S4Letter({ d, onNext }: { d: EidDemo; onNext: () => void }) {
         <div style={{ width: '100%', height: 1, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.4), transparent)', marginBottom: 28 }} />
 
         <div
-          className="eid-letter-body"
-          style={{ fontSize: 'clamp(0.92rem, 2.2vw, 1.05rem)', lineHeight: 2, color: '#2a1a10', fontWeight: 300 }}
-          dangerouslySetInnerHTML={{ __html: d.letterBody }}
-        />
+          style={{
+            minHeight: 220,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            textAlign: 'center',
+            cursor: 'pointer',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
+          onClick={advance}
+          onTouchEnd={advance}
+        >
+          <p
+            className="eid-letter-body"
+            style={{
+              fontSize: 'clamp(0.98rem, 2.4vw, 1.12rem)',
+              lineHeight: 2,
+              color: '#2a1a10',
+              fontWeight: 300,
+              fontFamily: 'Georgia, serif',
+              fontStyle: 'italic',
+              maxWidth: 560,
+              margin: 0,
+            }}
+          >
+            {chunks[idx] || ""}
+          </p>
 
-        <div className="eid-letter-sign" style={{ marginTop: 32, fontFamily: 'Georgia, serif', fontSize: '1.3rem', color: '#1a5c44' }}>
-          {d.letterSign}
-        </div>
-
-        <div className="eid-letter-continue" style={{ marginTop: 32, display: 'flex', justifyContent: 'center' }}>
-          <BtnNext onClick={onNext}>Our Eid Memories ✦</BtnNext>
+          {idx < chunks.length - 1 ? (
+            <div style={{ marginTop: 24, fontSize: '0.68rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(26,18,10,0.35)' }}>
+              Tap to continue ✦
+            </div>
+          ) : (
+            <div style={{ marginTop: 24, fontSize: '0.68rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(26,18,10,0.35)' }}>
+              Tap to open memories ✦
+            </div>
+          )}
         </div>
       </div>
     </Screen>
