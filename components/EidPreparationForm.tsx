@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 type Props = {
   relationship?: string;
@@ -15,6 +15,11 @@ type FormData = {
 export default function EidPreparationForm({ relationship }: Props) {
   const [step, setStep] = useState(1);
   const [subtype, setSubtype] = useState<string | null>(null);
+  const [mode, setMode] = useState<"assist" | "self">("assist");
+  const [isToneOpen, setIsToneOpen] = useState(false);
+  const [loaderLabel, setLoaderLabel] = useState<null | "preview" | "seal" | "craft" | "refine">(null);
+  const [loaderProgress, setLoaderProgress] = useState(0);
+  const loaderIntervalRef = useRef<number | null>(null);
 
   const [formData, setFormData] = useState<FormData>({
     recipient: "",
@@ -81,33 +86,115 @@ export default function EidPreparationForm({ relationship }: Props) {
       return "";
     }
 
+    const letter = formData.blessing;
+    setGeneratedLetter(letter);
+    return letter;
+  };
+
+  const craftMessage = async () => {
+    if (!hasRequiredFields()) {
+      alert("Please fill all required fields");
+      return;
+    }
+
     setIsGeneratingLetter(true);
+    setLoaderLabel("craft");
+    setLoaderProgress(0);
     try {
-      console.log("BUTTON CLICKED");
-      let letter = formData.blessing;
+      const result = await generateLetter({
+        relationship,
+        subtype,
+        senderName: formData.senderName,
+        recipient: formData.recipient,
+        tone: formData.tone,
+        customMessage: formData.blessing,
+      });
 
-      try {
-        const result = await generateLetter({
-          relationship,
-          subtype,
-          senderName: formData.senderName,
-          recipient: formData.recipient,
-          tone: formData.tone,
-          customMessage: formData.blessing,
-        });
-
-        letter = result.letter || formData.blessing;
-      } catch (_err) {
-        letter = formData.blessing;
-        alert("AI failed. Using your message instead.");
-      }
-
+      const letter = result.letter || formData.blessing;
+      setFormData(prev => ({ ...prev, blessing: letter }));
       setGeneratedLetter(letter);
-      return letter;
+    } catch (_err) {
+      alert("Crafting failed. Please try again.");
     } finally {
       setIsGeneratingLetter(false);
+      setLoaderLabel(null);
     }
   };
+
+  const refineMessage = async () => {
+    if (!hasRequiredFields()) {
+      alert("Please fill all required fields");
+      return;
+    }
+
+    if (!formData.blessing.trim()) {
+      alert("Write a message first.");
+      return;
+    }
+
+    setIsGeneratingLetter(true);
+    setLoaderLabel("refine");
+    setLoaderProgress(0);
+    try {
+      const result = await generateLetter({
+        relationship,
+        subtype,
+        senderName: formData.senderName,
+        recipient: formData.recipient,
+        tone: formData.tone,
+        customMessage: formData.blessing,
+      });
+
+      const letter = result.letter || formData.blessing;
+      setFormData(prev => ({ ...prev, blessing: letter }));
+      setGeneratedLetter(letter);
+    } catch (_err) {
+      alert("Refine failed. Please try again.");
+    } finally {
+      setIsGeneratingLetter(false);
+      setLoaderLabel(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!loaderLabel) {
+      if (loaderIntervalRef.current !== null) {
+        window.clearInterval(loaderIntervalRef.current);
+        loaderIntervalRef.current = null;
+      }
+      setLoaderProgress(0);
+      return;
+    }
+
+    if (loaderIntervalRef.current !== null) {
+      window.clearInterval(loaderIntervalRef.current);
+      loaderIntervalRef.current = null;
+    }
+
+    loaderIntervalRef.current = window.setInterval(() => {
+      setLoaderProgress(prev => {
+        if (prev >= 90) return prev;
+        return Math.min(90, prev + 3 + Math.random() * 4);
+      });
+    }, 180);
+
+    return () => {
+      if (loaderIntervalRef.current !== null) {
+        window.clearInterval(loaderIntervalRef.current);
+        loaderIntervalRef.current = null;
+      }
+    };
+  }, [loaderLabel]);
+
+  useEffect(() => {
+    const handleClick = (e: any) => {
+      if (!e.target.closest('[data-tone-dropdown="true"]')) {
+        setIsToneOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
 
   const generateLink = async () => {
     if (!hasRequiredFields()) {
@@ -115,6 +202,8 @@ export default function EidPreparationForm({ relationship }: Props) {
       return;
     }
 
+    setLoaderLabel("seal");
+    setLoaderProgress(0);
     const letter = await ensureGeneratedLetter();
     const payload = {
       ...formData,
@@ -128,6 +217,8 @@ export default function EidPreparationForm({ relationship }: Props) {
 
     await navigator.clipboard.writeText(url);
     alert("Link copied ✨");
+    setLoaderProgress(100);
+    window.setTimeout(() => setLoaderLabel(null), 300);
   };
 
   const previewLink = async () => {
@@ -135,6 +226,34 @@ export default function EidPreparationForm({ relationship }: Props) {
       if (!hasRequiredFields()) {
         alert("Please fill all required fields");
         return;
+      }
+
+      const previewWindow = window.open("about:blank", "_blank");
+      setLoaderLabel("preview");
+      setLoaderProgress(0);
+
+      const needsCraft =
+        mode === "assist" &&
+        !generatedLetter.trim() &&
+        !formData.blessing.trim();
+
+      if (needsCraft) {
+        setIsGeneratingLetter(true);
+        try {
+          const result = await generateLetter({
+            relationship,
+            subtype,
+            senderName: formData.senderName,
+            recipient: formData.recipient,
+            tone: formData.tone,
+            customMessage: formData.blessing,
+          });
+          const letter = result.letter || formData.blessing;
+          setFormData(prev => ({ ...prev, blessing: letter }));
+          setGeneratedLetter(letter);
+        } finally {
+          setIsGeneratingLetter(false);
+        }
       }
 
       const letter = await ensureGeneratedLetter();
@@ -148,10 +267,17 @@ export default function EidPreparationForm({ relationship }: Props) {
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
       const url = `${window.location.origin}/eid?preview=1&r=${encoded}`;
 
-      window.open(url, "_blank");
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      } else {
+        window.open(url, "_blank");
+      }
+      setLoaderProgress(100);
+      window.setTimeout(() => setLoaderLabel(null), 300);
     } catch (err) {
       console.error("Preview failed:", err);
       alert("Preview failed");
+      setLoaderLabel(null);
     }
   };
 
@@ -208,6 +334,62 @@ export default function EidPreparationForm({ relationship }: Props) {
 
   return (
     <div style={styles.page}>
+      {loaderLabel && (
+        <div style={styles.loaderOverlay} role="status" aria-live="polite">
+          <div style={styles.loaderCard}>
+            <div style={styles.ringWrap}>
+              <svg width="130" height="130" viewBox="0 0 130 130" style={styles.ringSvg}>
+                <circle
+                  cx="65"
+                  cy="65"
+                  r="54"
+                  stroke="rgba(212,175,55,0.18)"
+                  strokeWidth="6"
+                  fill="none"
+                />
+                <circle
+                  cx="65"
+                  cy="65"
+                  r="54"
+                  stroke="#D4AF37"
+                  strokeWidth="6"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={339.292}
+                  strokeDashoffset={339.292 - (339.292 * Math.min(100, Math.max(0, loaderProgress))) / 100}
+                  style={{ transition: "stroke-dashoffset 180ms ease-out" }}
+                />
+              </svg>
+
+              <div style={styles.loaderCenter}>
+                <img src="/logo-gold.webp" alt="VOW" style={styles.loaderLogo} />
+              </div>
+            </div>
+
+            <div style={styles.loaderText}>
+              <p style={styles.loaderTitle}>
+                {loaderLabel === "preview"
+                  ? "Generating preview…"
+                  : loaderLabel === "seal"
+                    ? "Sealing your link…"
+                    : loaderLabel === "craft"
+                      ? "Crafting your message…"
+                      : "Refining your words…"}
+              </p>
+              <p style={styles.loaderSub}>
+                {formData.recipient.trim() ? `For ${formData.recipient.trim()}` : "One moment"}
+              </p>
+            </div>
+
+            <div style={styles.loaderBarWrap}>
+              <div style={styles.loaderBarBg}>
+                <div style={{ ...styles.loaderBarFill, width: `${Math.min(100, Math.max(0, loaderProgress))}%` }} />
+              </div>
+              <div style={styles.loaderPct}>{Math.round(loaderProgress)}%</div>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={styles.card}>
         <p style={styles.step}>Step {step} of {maxStep}</p>
 
@@ -288,25 +470,99 @@ export default function EidPreparationForm({ relationship }: Props) {
         {(!hasSubtypeStep && step === 3) || (hasSubtypeStep && step === 4) ? (
           <>
             <h2 style={styles.title}>Your Eid message</h2>
+            <div className="flex gap-2 mb-5">
+              <button
+                type="button"
+                onClick={() => setMode('assist')}
+                className={`px-4 py-2 rounded-full text-xs ${
+                  mode === 'assist'
+                    ? 'bg-[#D4AF37] text-black'
+                    : 'border border-[#D4AF37]/30 text-[#D4AF37]'
+                }`}
+              >
+                ✨ SealedVow helps you write
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode('self')}
+                className={`px-4 py-2 rounded-full text-xs ${
+                  mode === 'self'
+                    ? 'bg-[#D4AF37] text-black'
+                    : 'border border-[#D4AF37]/30 text-[#D4AF37]'
+                }`}
+              >
+                ✍️ Write your own
+              </button>
+            </div>
+
             <textarea
               style={{ ...styles.input, height: 120 }}
-              placeholder={getMessagePlaceholder()}
+              placeholder={
+                mode === 'assist'
+                  ? "Share a feeling, memory, or something meaningful…"
+                  : "Tell them how proud you are..."
+              }
               value={formData.blessing}
               onChange={(e) => {
                 update("blessing", e.target.value);
                 setGeneratedLetter("");
               }}
             />
-            <select
-              style={{ ...styles.input, marginTop: 12, height: 48 }}
-              value={formData.tone}
-              onChange={(e) => update("tone", e.target.value as FormData["tone"])}
-            >
-              <option value="emotional">Emotional</option>
-              <option value="formal">Formal</option>
-              <option value="playful">Playful</option>
-              <option value="respectful">Respectful</option>
-            </select>
+
+            {mode === 'assist' && (
+              <button
+                type="button"
+                onClick={craftMessage}
+                className="mt-3 px-5 py-2 rounded-full text-xs bg-[#D4AF37] text-black"
+                disabled={isGeneratingLetter}
+              >
+                {isGeneratingLetter ? "Crafting..." : "Craft message ✨"}
+              </button>
+            )}
+
+            {mode === 'self' && formData.blessing && (
+              <button
+                type="button"
+                onClick={refineMessage}
+                className="mt-3 px-5 py-2 rounded-full text-xs border border-[#D4AF37]/40 text-[#D4AF37]"
+                disabled={isGeneratingLetter}
+              >
+                {isGeneratingLetter ? "Refining..." : "Refine it ✨"}
+              </button>
+            )}
+
+            <div className="relative mt-4" data-tone-dropdown="true">
+              <button
+                type="button"
+                onClick={() => setIsToneOpen(!isToneOpen)}
+                className="w-full px-4 py-3 rounded-xl border border-[#D4AF37]/30 bg-black/40 flex justify-between items-center"
+              >
+                <span className="capitalize">{formData.tone}</span>
+                <span className="text-[#D4AF37]">▾</span>
+              </button>
+
+              {isToneOpen && (
+                <div className="absolute z-50 w-full mt-2 rounded-xl bg-[#0C0A09] border border-[#D4AF37]/20 shadow-xl overflow-hidden">
+                  {['emotional', 'formal', 'playful', 'respectful'].map((tone) => (
+                    <div
+                      key={tone}
+                      onClick={() => {
+                        update("tone", tone);
+                        setIsToneOpen(false);
+                      }}
+                      className={`px-4 py-3 cursor-pointer transition capitalize ${
+                        formData.tone === tone
+                          ? 'text-[#D4AF37] bg-[#D4AF37]/10'
+                          : 'text-white/80 hover:bg-[#D4AF37]/10 hover:text-[#D4AF37]'
+                      }`}
+                    >
+                      {tone}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         ) : null}
 
@@ -379,6 +635,102 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 16,
     backdropFilter: "blur(10px)",
   },
+  loaderOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.82)",
+    backdropFilter: "blur(6px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 9999,
+    padding: 22,
+  },
+  loaderCard: {
+    width: 360,
+    maxWidth: "100%",
+    borderRadius: 18,
+    background: "rgba(12,10,9,0.92)",
+    border: "1px solid rgba(212,175,55,0.18)",
+    boxShadow: "0 30px 80px rgba(0,0,0,0.65)",
+    padding: 22,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 16,
+  },
+  ringWrap: {
+    position: "relative",
+    width: 130,
+    height: 130,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ringSvg: {
+    transform: "rotate(-90deg)",
+    filter: "drop-shadow(0 0 16px rgba(212,175,55,0.18))",
+  },
+  loaderCenter: {
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loaderLogo: {
+    width: 52,
+    height: 52,
+    opacity: 0.95,
+  },
+  loaderText: {
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+  loaderTitle: {
+    margin: 0,
+    fontSize: 12,
+    letterSpacing: "0.35em",
+    textTransform: "uppercase",
+    color: "#D4AF37",
+    fontWeight: 800,
+  },
+  loaderSub: {
+    margin: 0,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.6)",
+    fontStyle: "italic",
+  },
+  loaderBarWrap: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+  },
+  loaderBarBg: {
+    flex: 1,
+    height: 2,
+    borderRadius: 999,
+    background: "rgba(212,175,55,0.18)",
+    overflow: "hidden",
+  },
+  loaderBarFill: {
+    height: "100%",
+    borderRadius: 999,
+    background: "#D4AF37",
+    transition: "width 180ms ease-out",
+  },
+  loaderPct: {
+    width: 44,
+    textAlign: "right",
+    fontSize: 10,
+    fontWeight: 800,
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+    color: "rgba(212,175,55,0.9)",
+  },
   step: {
     fontSize: 10,
     color: "rgba(212,175,55,0.5)",
@@ -426,5 +778,40 @@ const styles: Record<string, React.CSSProperties> = {
     color: "rgba(255,255,255,0.7)",
     marginBottom: 20,
     lineHeight: 1.6,
+  },
+  modeToggle: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 10,
+    marginBottom: 14,
+  },
+  modeBtn: {
+    padding: "10px 12px",
+    background: "transparent",
+    border: "1px solid rgba(212,175,55,0.3)",
+    borderRadius: 10,
+    color: "#D4AF37",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    textAlign: "center",
+  },
+  modeBtnActive: {
+    padding: "10px 12px",
+    background: "rgba(212,175,55,0.14)",
+    border: "1px solid rgba(212,175,55,0.55)",
+    borderRadius: 10,
+    color: "#D4AF37",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    textAlign: "center",
+  },
+  helper: {
+    marginTop: 4,
+    marginBottom: -4,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: "0.02em",
   },
 };
