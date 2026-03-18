@@ -168,6 +168,7 @@ const App: React.FC = () => {
   const [isCreatorPreview, setIsCreatorPreview] = useState(false);
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
+  const [, forceLocationUpdate] = useState(0);
 
   const previousStageRef = useRef<AppStage | null>(null);
 
@@ -186,6 +187,20 @@ const App: React.FC = () => {
   const updateData = (patch: Partial<CoupleData>) => {
     setData(prev => (prev ? { ...prev, ...patch } : prev));
   };
+
+  useEffect(() => {
+    const onPopState = () => {
+      forceLocationUpdate(k => k + 1);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (routeType === 'LETTER_CREATE' && stage === AppStage.LANDING) {
+      safeSetStage(AppStage.PREPARE);
+    }
+  }, [routeType, stage]);
 
   // DEV PREVIEW — ?preview=receiver|intro|envelope|letter
   useEffect(() => {
@@ -476,35 +491,6 @@ const App: React.FC = () => {
 
   if (routeType === 'OCCASION_SELECTOR') {
     return <Suspense fallback={null}><OccasionSelector /></Suspense>;
-  }
-
-  if (routeType === 'LETTER_CREATE') {
-    return (
-      <Suspense fallback={eidiLoadingFallback}>
-        <div className="animate-fade-in py-12 px-4">
-          {stage === AppStage.REFINE && data ? (
-            <RefineStage
-              data={data}
-              onSave={(finalLetter, enrichedData) => {
-                if (!data) return;
-                const updated: CoupleData = hydrateCoupleData({ ...data, ...enrichedData, finalLetter });
-                setData(updated);
-                setIsCreatorPreview(true);
-                safeSetStage(AppStage.ENVELOPE);
-                writePersistedCoupleData(updated);
-              }}
-              onBack={() => safeSetStage(AppStage.PREPARE)}
-            />
-          ) : (
-            <PreparationForm onComplete={(d) => {
-              console.log("FETCH START");
-              setData(hydrateCoupleData(d));
-              safeSetStage(AppStage.REFINE);
-            }} />
-          )}
-        </div>
-      </Suspense>
-    );
   }
 
   const handleEnterStudio = () => {

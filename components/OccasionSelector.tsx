@@ -5,7 +5,8 @@ import "../styles/occasion-selector.css";
 export const OccasionSelector: React.FC = () => {
 
   const go = (path: string) => {
-    window.location.href = path;
+    window.history.pushState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   return (
