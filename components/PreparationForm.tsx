@@ -228,6 +228,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   };
 
   const handleSubmit = (e: React.FormEvent) => {
+    console.log("FUNCTION CALLED");
     e.preventDefault();
 
     if (step < 3) {
@@ -1053,7 +1054,11 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
              </button>
            ) : <div></div>}
            
-           <button type="submit" className="px-12 py-5 bg-luxury-wine text-white font-bold rounded-full shadow-2xl hover:bg-[#3D1F1F] transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs">
+           <button
+             type="submit"
+             onClick={() => console.log("CLICKED")}
+             className="px-12 py-5 bg-luxury-wine text-white font-bold rounded-full shadow-2xl hover:bg-[#3D1F1F] transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs"
+           >
              {step === 3 ? 'Generate Draft' : 'Continue'}
            </button>
         </div>

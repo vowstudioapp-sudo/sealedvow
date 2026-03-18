@@ -38,6 +38,9 @@ export default function EidPreparationForm({ relationship }: Props) {
   const next = () => setStep((s) => Math.min(s + 1, maxStep));
   const back = () => setStep((s) => Math.max(s - 1, 1));
 
+  const hasRequiredFields = () =>
+    formData.senderName.trim() !== "" && formData.recipient.trim() !== "";
+
   async function generateLetter(data: {
     relationship?: string;
     subtype?: string | null;
@@ -73,20 +76,32 @@ export default function EidPreparationForm({ relationship }: Props) {
 
   const ensureGeneratedLetter = async () => {
     if (generatedLetter.trim()) return generatedLetter;
+    if (!hasRequiredFields()) {
+      alert("Please fill all required fields");
+      return "";
+    }
 
     setIsGeneratingLetter(true);
     try {
       console.log("BUTTON CLICKED");
-      const result = await generateLetter({
-        relationship,
-        subtype,
-        senderName: formData.senderName,
-        recipient: formData.recipient,
-        tone: formData.tone,
-        customMessage: formData.blessing,
-      });
+      let letter = formData.blessing;
 
-      const letter = result.letter || formData.blessing;
+      try {
+        const result = await generateLetter({
+          relationship,
+          subtype,
+          senderName: formData.senderName,
+          recipient: formData.recipient,
+          tone: formData.tone,
+          customMessage: formData.blessing,
+        });
+
+        letter = result.letter || formData.blessing;
+      } catch (_err) {
+        letter = formData.blessing;
+        alert("AI failed. Using your message instead.");
+      }
+
       setGeneratedLetter(letter);
       return letter;
     } finally {
@@ -95,6 +110,11 @@ export default function EidPreparationForm({ relationship }: Props) {
   };
 
   const generateLink = async () => {
+    if (!hasRequiredFields()) {
+      alert("Please fill all required fields");
+      return;
+    }
+
     const letter = await ensureGeneratedLetter();
     const payload = {
       ...formData,
@@ -103,7 +123,7 @@ export default function EidPreparationForm({ relationship }: Props) {
       subtype,
     };
 
-    const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     const url = `${window.location.origin}/eid?r=${encoded}`;
 
     await navigator.clipboard.writeText(url);
@@ -112,6 +132,11 @@ export default function EidPreparationForm({ relationship }: Props) {
 
   const previewLink = async () => {
     try {
+      if (!hasRequiredFields()) {
+        alert("Please fill all required fields");
+        return;
+      }
+
       const letter = await ensureGeneratedLetter();
       const payload = {
         ...formData,
@@ -186,7 +211,6 @@ export default function EidPreparationForm({ relationship }: Props) {
       <div style={styles.card}>
         <p style={styles.step}>Step {step} of {maxStep}</p>
 
-        {/* STEP 1 — SUBTYPE */}
         {isSubtypeStep && (
           <>
             <h2 style={styles.title}>Who are you to them?</h2>
@@ -237,7 +261,6 @@ export default function EidPreparationForm({ relationship }: Props) {
           </>
         )}
 
-        {/* RECIPIENT STEP */}
         {(!hasSubtypeStep && step === 1) || (hasSubtypeStep && step === 2) ? (
           <>
             <h2 style={styles.title}>Who is this for?</h2>
@@ -250,7 +273,6 @@ export default function EidPreparationForm({ relationship }: Props) {
           </>
         ) : null}
 
-        {/* SENDER STEP */}
         {(!hasSubtypeStep && step === 2) || (hasSubtypeStep && step === 3) ? (
           <>
             <h2 style={styles.title}>Who is sending this?</h2>
@@ -263,7 +285,6 @@ export default function EidPreparationForm({ relationship }: Props) {
           </>
         ) : null}
 
-        {/* MESSAGE STEP */}
         {(!hasSubtypeStep && step === 3) || (hasSubtypeStep && step === 4) ? (
           <>
             <h2 style={styles.title}>Your Eid message</h2>
@@ -289,7 +310,6 @@ export default function EidPreparationForm({ relationship }: Props) {
           </>
         ) : null}
 
-        {/* EIDI STEP */}
         {(!hasSubtypeStep && step === 4) || (hasSubtypeStep && step === 5) ? (
           <>
             <h2 style={styles.title}>Add Eidi (optional)</h2>
@@ -302,7 +322,6 @@ export default function EidPreparationForm({ relationship }: Props) {
           </>
         ) : null}
 
-        {/* FINAL STEP */}
         {((!hasSubtypeStep && step === 5) || (hasSubtypeStep && step === 6)) ? (
           <>
             <h2 style={styles.title}>Ready to send 🌙</h2>
@@ -325,7 +344,6 @@ export default function EidPreparationForm({ relationship }: Props) {
           </>
         ) : null}
 
-        {/* NAVIGATION */}
         <div style={styles.nav}>
           {step > 1 && (
             <button style={styles.secondary} onClick={back}>

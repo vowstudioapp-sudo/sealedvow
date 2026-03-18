@@ -16,6 +16,7 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
   const [packageStatus, setPackageStatus] = useState("Initializing...");
   // Separate progress for drafting phase
   const [draftingProgress, setDraftingProgress] = useState(0);
+  const hasGeneratedRef = useRef(false);
 
   // Helper to compress AI images so they fit in the URL
   const compressBase64 = (base64Str: string): Promise<string> => {
@@ -39,10 +40,16 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
   };
 
   useEffect(() => {
-    if (data.writingMode === 'assisted' && !data.finalLetter) {
-      console.log("REFINE STAGE TRIGGERED");
-      console.log("DATA:", data);
-      // Simulate progress during generation
+    if (
+      data &&
+      data.senderName &&
+      data.recipientName &&
+      data.writingMode === 'assisted' &&
+      !data.finalLetter &&
+      !hasGeneratedRef.current
+    ) {
+      hasGeneratedRef.current = true;
+
       const draftInterval = setInterval(() => {
         setDraftingProgress(prev => {
           if (prev >= 90) return prev;
@@ -53,28 +60,26 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
       const fetchDraft = async () => {
         setLoading(true);
         try {
-          console.log("CALLING generateLoveLetter");
           const draft = await generateLoveLetter(data);
-          
-          // Generation done, complete bar
+
           clearInterval(draftInterval);
           setDraftingProgress(100);
-          
+
           setTimeout(() => {
-             setLetter(draft);
-             setLoading(false);
-          }, 500); // Brief delay to see 100%
+            setLetter(draft);
+            setLoading(false);
+          }, 300);
         } catch (err) {
           clearInterval(draftInterval);
-          console.error("AI ERROR:", err);
           setLoading(false);
         }
       };
+
       fetchDraft();
-      
+
       return () => clearInterval(draftInterval);
     }
-  }, [data]);
+  }, []);
 
   const handleFinalize = async () => {
     setIsPackaging(true);

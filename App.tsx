@@ -143,6 +143,22 @@ const writePersistedCoupleData = (value: CoupleData): void => {
 
 const App: React.FC = () => {
   const { state: linkState, data: sharedData, error: linkError } = useLinkLoader();
+  const routeType = getRouteType();
+  const isEidiCreate = routeType === 'EIDI_CREATE';
+  const isEidiReceiver = routeType === 'EIDI_RECEIVER';
+  const isEidFlow = isEidiRoute(routeType);
+  const isReceiverLink = isReceiverLinkType(routeType);
+  const isEidPreview =
+    window.location.pathname === '/eid' &&
+    new URLSearchParams(window.location.search).get('preview') === '1';
+  const demoData = useMemo(() => {
+    const path = window.location.pathname;
+    const match = path.match(/^\/demo\/([a-z]+(?:\/[a-z-]+)?)$/);
+    const slug = match ? match[1].replace('/', '-') : null;
+    if (slug) return getDemoData(slug);
+    return null;
+  }, []);
+  const isDemoMode = !!demoData;
   
   const [stage, setStage] = useState<AppStage>(AppStage.LANDING);
   const [data, setData] = useState<CoupleData | null>(null);
@@ -271,6 +287,10 @@ const App: React.FC = () => {
       if (params.get('preview')) return;
     }
 
+    if (isEidFlow || isDemoMode) {
+      return;
+    }
+
     // Demo mode — load hardcoded data, skip all backend
     if (isDemoMode && demoData) {
       setData(demoData);
@@ -305,27 +325,10 @@ const App: React.FC = () => {
     } else if (linkState === LoaderState.ERROR) {
       console.error('Link loading error:', linkError);
       safeSetStage(AppStage.LANDING);
+    } else if (linkState !== LoaderState.LOADING && !sharedData && !isReceiverLink) {
+      safeSetStage(AppStage.LANDING);
     }
-  }, [linkState, sharedData, linkError]);
-
-  // Detect demo mode (/demo/slug or /demo/eid/child-parent)
-  const demoData = useMemo(() => {
-    const path = window.location.pathname;
-    const match = path.match(/^\/demo\/([a-z]+(?:\/[a-z-]+)?)$/);
-    const slug = match ? match[1].replace('/', '-') : null;
-    if (slug) return getDemoData(slug);
-    return null;
-  }, []);
-  const isDemoMode = !!demoData;
-
-  // Route detection — logic lives in utils/routing.ts
-  const routeType      = getRouteType();
-  const isEidiCreate   = routeType === 'EIDI_CREATE';
-  const isEidiReceiver = routeType === 'EIDI_RECEIVER';
-
-  const isEidPreview =
-    window.location.pathname === '/eid' &&
-    new URLSearchParams(window.location.search).get('preview') === '1';
+  }, [demoData, isDemoMode, isEidFlow, isReceiverLink, linkError, linkState, sharedData]);
 
   if (isEidPreview) {
     return (
@@ -334,9 +337,6 @@ const App: React.FC = () => {
       </Suspense>
     );
   }
-
-  // Derived from central route type — no manual path matching
-  const isReceiverLink = isReceiverLinkType(routeType);
 
   useEffect(() => {
     // Skip boot animation entirely for receiver links
@@ -443,23 +443,6 @@ const App: React.FC = () => {
     return <Suspense fallback={eidiLoadingFallback}><EidiCreatePage /></Suspense>;
   }
 
-  if (routeType === 'OCCASION_SELECTOR') {
-    return <Suspense fallback={null}><OccasionSelector /></Suspense>;
-  }
-
-  if (routeType === 'LETTER_CREATE') {
-    return (
-      <Suspense fallback={eidiLoadingFallback}>
-        <div className="animate-fade-in py-12 px-4">
-          <PreparationForm onComplete={(d) => {
-            setData(hydrateCoupleData(d));
-            safeSetStage(AppStage.REFINE);
-          }} />
-        </div>
-      </Suspense>
-    );
-  }
-
   if (routeType === 'EID_SELECTOR') {
     return (
       <Suspense fallback={eidiLoadingFallback}>
@@ -489,6 +472,39 @@ const App: React.FC = () => {
 
   if (isEidiReceiver) {
     return <Suspense fallback={eidiLoadingFallback}><EidiReceiverPage /></Suspense>;
+  }
+
+  if (routeType === 'OCCASION_SELECTOR') {
+    return <Suspense fallback={null}><OccasionSelector /></Suspense>;
+  }
+
+  if (routeType === 'LETTER_CREATE') {
+    return (
+      <Suspense fallback={eidiLoadingFallback}>
+        <div className="animate-fade-in py-12 px-4">
+          {stage === AppStage.REFINE && data ? (
+            <RefineStage
+              data={data}
+              onSave={(finalLetter, enrichedData) => {
+                if (!data) return;
+                const updated: CoupleData = hydrateCoupleData({ ...data, ...enrichedData, finalLetter });
+                setData(updated);
+                setIsCreatorPreview(true);
+                safeSetStage(AppStage.ENVELOPE);
+                writePersistedCoupleData(updated);
+              }}
+              onBack={() => safeSetStage(AppStage.PREPARE)}
+            />
+          ) : (
+            <PreparationForm onComplete={(d) => {
+              console.log("FETCH START");
+              setData(hydrateCoupleData(d));
+              safeSetStage(AppStage.REFINE);
+            }} />
+          )}
+        </div>
+      </Suspense>
+    );
   }
 
   const handleEnterStudio = () => {
