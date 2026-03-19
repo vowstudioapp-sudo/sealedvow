@@ -5,6 +5,7 @@ type EidFormData = {
   senderName: string;
   blessing: string;
   eidiAmount: string;
+  receiverPhoneNumber?: string;
   tone: "emotional" | "formal" | "playful" | "respectful";
   relationship?: string;
   subtype?: string | null;
@@ -21,6 +22,7 @@ type FormData = {
   senderName: string;
   blessing: string;
   eidiAmount: string;
+  receiverPhoneNumber: string;
   tone: "emotional" | "formal" | "playful" | "respectful";
 };
 
@@ -39,6 +41,7 @@ export default function EidPreparationForm({ relationship, onPreview }: Props) {
     senderName: "",
     blessing: "",
     eidiAmount: "",
+    receiverPhoneNumber: "",
     tone: "emotional",
   });
   const [generatedLetter, setGeneratedLetter] = useState("");
@@ -667,6 +670,12 @@ export default function EidPreparationForm({ relationship, onPreview }: Props) {
               value={formData.eidiAmount}
               onChange={(e) => update("eidiAmount", e.target.value)}
             />
+            <input
+              style={{ ...styles.input, marginTop: 10 }}
+              placeholder="Receiver mobile (recommended for safe claim lock)"
+              value={formData.receiverPhoneNumber}
+              onChange={(e) => update("receiverPhoneNumber", e.target.value.replace(/[^\d+]/g, ""))}
+            />
           </>
         ) : null}
 
@@ -730,6 +739,11 @@ export default function EidPreparationForm({ relationship, onPreview }: Props) {
                 {formData.eidiAmount && (
                   <span style={chipStyle}>
                     Eidi: {formData.eidiAmount}
+                  </span>
+                )}
+                {formData.receiverPhoneNumber && (
+                  <span style={chipStyle}>
+                    Receiver phone: {formData.receiverPhoneNumber}
                   </span>
                 )}
               </div>

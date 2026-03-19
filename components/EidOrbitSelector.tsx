@@ -127,28 +127,45 @@ export const EidOrbitSelector: React.FC = () => {
 
   // ── Animation loop ──
   useLayoutEffect(() => {
-    let lastTs = 0;
+    // Force correct initial angles for deterministic first layout.
+    innerAngleRef.current = -90;
+    outerAngleRef.current = -60;
+
+    // Apply rotation before positioning text nodes.
+    applyRotation(innerAngleRef.current, outerAngleRef.current);
+
+    // Wait for layout, then place nodes and re-apply rotation (now refs are fully consistent).
+    requestAnimationFrame(() => {
+      placeNodes();
+      applyRotation(innerAngleRef.current, outerAngleRef.current);
+    });
+
+    let lastTs = performance.now();
 
     const tick = (ts: number) => {
       rafRef.current = requestAnimationFrame(tick);
-      if (ts - lastTs < 33) return;
+
+      const delta = ts - lastTs;
       lastTs = ts;
+
+      const normalized = Math.min(Math.max(delta / 16, 0.5), 2);
+
       if (hiddenRef.current) return;
 
       if (!pausedRef.current) {
         // Different orbital speeds — inner faster (like planets closer to sun)
-        innerAngleRef.current += 0.10;
-        outerAngleRef.current += 0.05;
+        innerAngleRef.current += 0.10 * normalized;
+        outerAngleRef.current += 0.05 * normalized;
       } else if (velocityRef.current !== 0) {
         // Momentum decay after drag release
-        innerAngleRef.current += velocityRef.current;
-        outerAngleRef.current += velocityRef.current * 0.7; // outer slower even in inertia
-        velocityRef.current   *= 0.96;
+        innerAngleRef.current += velocityRef.current * normalized;
+        outerAngleRef.current += velocityRef.current * 0.7 * normalized; // outer slower even in inertia
+        velocityRef.current *= 0.96;
         if (Math.abs(velocityRef.current) < 0.01) velocityRef.current = 0;
       } else if (!draggingRef.current) {
         // Slow drift on hover
-        innerAngleRef.current += 0.02;
-        outerAngleRef.current += 0.01;
+        innerAngleRef.current += 0.02 * normalized;
+        outerAngleRef.current += 0.01 * normalized;
       }
 
       applyRotation(innerAngleRef.current, outerAngleRef.current);
@@ -159,13 +176,11 @@ export const EidOrbitSelector: React.FC = () => {
       }
     };
 
-    const onVisibility = () => { hiddenRef.current = document.hidden; };
+    const onVisibility = () => {
+      hiddenRef.current = document.hidden;
+    };
     document.addEventListener('visibilitychange', onVisibility);
 
-    // Prevent a one-frame "vertical text" flicker by applying layout + counter-rotation
-    // before the browser paints.
-    placeNodes();
-    applyRotation(innerAngleRef.current, outerAngleRef.current);
     rafRef.current = requestAnimationFrame(tick);
 
     return () => {
@@ -279,8 +294,9 @@ export const EidOrbitSelector: React.FC = () => {
   };
 
   const navigate = (key: string) => {
-    // Always route to the creator-side Eid selector experience.
-    window.location.href = '/eid/' + key;
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    const isDemoSelector = path === '/demo/eid';
+    window.location.href = isDemoSelector ? `/demo/eid/${key}` : `/eid/${key}`;
   };
   const allNodes = [...INNER_NODES, ...OUTER_NODES];
   const activeNodeData = allNodes.find(n => n.key === previewKey);
@@ -324,7 +340,7 @@ export const EidOrbitSelector: React.FC = () => {
   );
 
   return (
-    <div className="eid-orbit-page" key={`${INNER_NODES.length}-${OUTER_NODES.length}`}>
+    <div className="eid-orbit-page">
       <div className="eid-orbit-bg" ref={bgRef} />
 
       <button className="eid-orbit-back" onClick={() => { window.location.href = '/'; }}>
@@ -393,7 +409,6 @@ export const EidOrbitSelector: React.FC = () => {
           <div
             className="eid-orbit-system"
             ref={innerSystemRef}
-            style={{ transform: `rotate(${innerAngleRef.current}deg)` }}
           >
             {INNER_NODES.map((node, i) => renderNode(node, i, 'inner', innerTextRefs, innerDotRefs))}
           </div>
@@ -402,7 +417,6 @@ export const EidOrbitSelector: React.FC = () => {
           <div
             className="eid-orbit-system"
             ref={outerSystemRef}
-            style={{ transform: `rotate(${outerAngleRef.current}deg)` }}
           >
             {OUTER_NODES.map((node, i) => renderNode(node, i, 'outer', outerTextRefs, outerDotRefs))}
           </div>

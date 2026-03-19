@@ -43,6 +43,14 @@ const TIERS: Record<Tier, { name: string; price: number; tagline: string; featur
   },
 };
 
+function parseAmountFromText(value?: string): number {
+  if (!value) return 0;
+  const digits = String(value).replace(/[^\d]/g, '');
+  if (!digits) return 0;
+  const parsed = Number.parseInt(digits, 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     if (document.getElementById('razorpay-script')) { resolve(true); return; }
@@ -80,6 +88,10 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
 
   const effectiveTier = isReplyEnabled ? selectedTier : 'standard';
   const tier = TIERS[effectiveTier];
+  const isEidFlow = data.occasion === 'eid';
+  const eidiAmount = isEidFlow ? parseAmountFromText(data.timeShared) : 0;
+  const totalPayable = tier.price + eidiAmount;
+  const totalPayablePaise = totalPayable * 100;
 
   // ── Founder code handler ──
   // Step 1: Validate code on server (create-order) → get founderToken
@@ -152,7 +164,10 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
       const orderRes = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: effectiveTier }),
+        body: JSON.stringify({
+          tier: effectiveTier,
+          customAmountPaise: isEidFlow ? totalPayablePaise : undefined,
+        }),
       });
 
       if (!orderRes.ok) {
@@ -235,23 +250,23 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
   };
 
   return (
-    <div className="max-w-lg mx-auto p-4 md:p-8 animate-fade-in pb-32">
+    <div className="max-w-lg mx-auto p-3 md:p-4 animate-fade-in pb-6">
       <div className="bg-luxury-paper border border-[#D4C5A5] rounded-xl shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] overflow-hidden">
 
         {/* Header */}
-        <div className="bg-[#1C1917] p-8 md:p-10 text-center relative">
+        <div className="bg-[#1C1917] p-5 md:p-6 text-center relative">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-luxury-gold to-transparent opacity-50" />
-          <div className="w-16 h-16 rounded-full bg-luxury-wine/30 border-2 border-luxury-gold/50 flex items-center justify-center mx-auto mb-6">
-            <img src="/favicon.svg" alt="VOW" className="w-10 h-10" />
+          <div className="w-12 h-12 rounded-full bg-luxury-wine/30 border-2 border-luxury-gold/50 flex items-center justify-center mx-auto mb-3">
+            <img src="/favicon.svg" alt="VOW" className="w-7 h-7" />
           </div>
-          <h2 className="text-[10px] uppercase tracking-[0.5em] text-luxury-gold font-bold mb-2">Finalize Your Gift</h2>
-          <h1 className="text-3xl font-serif-elegant italic text-white">Choose Your Seal</h1>
+          <h2 className="text-[9px] uppercase tracking-[0.4em] text-luxury-gold font-bold mb-1">Finalize Your Gift</h2>
+          <h1 className="text-2xl md:text-3xl font-serif-elegant italic text-white">Choose Your Seal</h1>
         </div>
 
-        <div className="p-6 md:p-10">
+        <div className="p-4 md:p-5">
 
           {/* Tier Selection */}
-          <div className="mb-8 space-y-3">
+          <div className="mb-5 space-y-2">
             {(Object.entries(TIERS) as [Tier, typeof TIERS['standard']][]).map(([key, t]) => {
               const isDisabled = key === 'reply' && !isReplyEnabled;
               return (
@@ -286,13 +301,30 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
                       )}
                     </div>
                     {!isDisabled && (
-                      <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">₹{t.price}</p>
+                      <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">₹{isEidFlow ? t.price + eidiAmount : t.price}</p>
                     )}
                   </div>
                 </button>
               );
             })}
           </div>
+
+          {isEidFlow && (
+            <div className="mb-5 text-[9px] uppercase tracking-[0.22em] text-luxury-ink/70 font-bold space-y-1.5">
+              <div className="flex items-center justify-between border-b border-[#D4C5A5]/40 pb-2">
+                <span>Eidi amount</span>
+                <span>₹{eidiAmount}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-[#D4C5A5]/40 pb-2">
+                <span>Platform charges</span>
+                <span>₹{tier.price}</span>
+              </div>
+              <div className="flex items-center justify-between pt-1 text-luxury-ink">
+                <span>Total payable</span>
+                <span>₹{totalPayable}</span>
+              </div>
+            </div>
+          )}
 
           {/* Error */}
           {error && (
@@ -305,21 +337,12 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
             </div>
           )}
 
-          {/* Features */}
-          <div className="mb-10 space-y-3">
-            {tier.features.map(f => (
-              <div key={f} className="flex items-center text-xs font-bold uppercase tracking-widest text-luxury-ink/80">
-                <span className="w-2 h-2 bg-luxury-gold rounded-full mr-3 flex-shrink-0" />{f}
-              </div>
-            ))}
-          </div>
-
           {/* Pay Button */}
-          <div className="space-y-5">
+          <div className="space-y-3">
             <button
               onClick={handlePay}
               disabled={isProcessing || !scriptLoaded}
-              className={`w-full py-5 rounded-full text-white font-bold text-[10px] md:text-xs tracking-[0.4em] uppercase shadow-2xl transition-all flex items-center justify-center ${
+              className={`w-full py-4 rounded-full text-white font-bold text-[10px] md:text-xs tracking-[0.35em] uppercase shadow-2xl transition-all flex items-center justify-center ${
                 isProcessing ? 'bg-luxury-stone cursor-wait' : !scriptLoaded ? 'bg-luxury-stone/50 cursor-not-allowed' : 'bg-luxury-wine hover:bg-black active:scale-[0.98]'
               }`}
             >
@@ -331,32 +354,32 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
               ) : !scriptLoaded ? (
                 <span>Loading Payment...</span>
               ) : (
-                <span>Seal for ₹{tier.price}</span>
+                <span>Seal for ₹{isEidFlow ? totalPayable : tier.price}</span>
               )}
             </button>
 
             <button
               onClick={onBack}
               disabled={isProcessing}
-              className="w-full py-4 text-[10px] font-bold text-luxury-stone/60 uppercase tracking-[0.3em] hover:text-luxury-stone transition-colors"
+              className="w-full py-2.5 text-[10px] font-bold text-luxury-stone/80 uppercase tracking-[0.28em] hover:text-luxury-stone transition-colors"
             >
-              ← Back to Preview
+              ← Modify Contents
             </button>
           </div>
 
           {/* Security */}
-          <div className="mt-10 text-center">
-            <p className="text-[9px] uppercase tracking-[0.3em] text-luxury-stone/40 font-bold">
+          <div className="mt-5 text-center">
+            <p className="text-[9px] uppercase tracking-[0.3em] text-luxury-stone/65 font-bold">
               🔒 Secured by Razorpay · PCI DSS Compliant · 256-bit Encryption
             </p>
           </div>
 
           {/* Founder Access — subtle, minimal */}
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center">
             {!showCodeInput ? (
               <button
                 onClick={() => setShowCodeInput(true)}
-                className="text-[8px] uppercase tracking-[0.3em] text-luxury-stone/25 hover:text-luxury-stone/50 transition-colors font-bold"
+                className="text-[8px] uppercase tracking-[0.3em] text-luxury-stone/55 hover:text-luxury-stone/80 transition-colors font-bold"
               >
                 Have a private access code?
               </button>

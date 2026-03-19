@@ -59,21 +59,28 @@ function stripHtml(html: string) {
     .trim();
 }
 
-function chunkText(text: string, maxChars: number) {
+function chunkText(text: string, maxChars: number, minChars: number = 200) {
   const explicitParagraphs = text.split('\n').filter(p => p.trim().length > 0);
   const chunks: string[] = [];
 
   explicitParagraphs.forEach(p => {
-    const words = p.split(' ');
+    const words = p.split(' ').filter(Boolean);
     let currentChunk = "";
 
     words.forEach(word => {
-      if ((currentChunk + " " + word).length > maxChars && currentChunk.length > 0) {
-        chunks.push(currentChunk.trim());
-        currentChunk = word;
-      } else {
-        currentChunk += (currentChunk ? " " : "") + word;
+      const candidate = currentChunk ? `${currentChunk} ${word}` : word;
+      const candidateLen = candidate.length;
+
+      if (candidateLen > maxChars && currentChunk.length > 0) {
+        // Prefer splitting only when we already reached the minimum screen size.
+        if (currentChunk.length >= minChars) {
+          chunks.push(currentChunk.trim());
+          currentChunk = word;
+          return;
+        }
       }
+
+      currentChunk = candidate;
     });
 
     if (currentChunk) chunks.push(currentChunk.trim());
@@ -215,6 +222,20 @@ function Screen({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setEntered(false);
+      return;
+    }
+
+    // Fade-in on screen switch (keeps pacing premium).
+    setEntered(false);
+    const raf = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
+
   useEffect(() => {
     if (active && ref.current) ref.current.scrollTop = 0;
   }, [active]);
@@ -231,9 +252,9 @@ function Screen({
         alignItems: 'center',
         justifyContent: scrollable ? 'flex-start' : 'center',
         padding: scrollable ? '48px 20px 80px' : '24px',
-        opacity: active ? 1 : 0,
-        pointerEvents: active ? 'all' : 'none',
-        transition: 'opacity 0.7s ease',
+        opacity: active && entered ? 1 : 0,
+        pointerEvents: active && entered ? 'all' : 'none',
+        transition: 'opacity 0.6s ease',
         zIndex: 10,
         overflowY: scrollable ? 'auto' : 'hidden',
         WebkitOverflowScrolling: 'touch' as 'touch',
@@ -465,12 +486,12 @@ function S4Letter({ d, onNext }: { d: EidDemo; onNext: () => void }) {
     const letter = (d.letterBody || "").trim();
     if (letter) {
       const fallback = stripHtml(letter);
-      return chunkText(fallback, 180);
+      return chunkText(fallback, 280, 200);
     }
 
     // Fallback (should be rare): show blessing if letterBody is missing.
     const raw = (d.blessing || "").trim();
-    if (raw) return chunkText(raw, 180);
+    if (raw) return chunkText(raw, 280, 200);
     return [];
   }, [d.blessing, d.letterBody]);
 
@@ -752,59 +773,138 @@ function S6Duas({ d, active, onNext }: { d: EidDemo; active: boolean; onNext: ()
 /* ─────────────────────────────────────────────────────────────
    SCREEN 7 — EIDI (TWO JOKES VERSION!)
 ───────────────────────────────────────────────────────────── */
-function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
+function S7Eidi({ d, onNext, startCompleted = false }: { d: EidDemo; onNext: () => void; startCompleted?: boolean }) {
   const [revealed, setRevealed] = useState(false);
   const [displayAmount, setDisplayAmount] = useState(0);
   const [showJoke1, setShowJoke1] = useState(false); // At +1000: "Is this enough?"
   const [showJoke2, setShowJoke2] = useState(false); // At -1000: "You owe me!"
+  const [completedFlow, setCompletedFlow] = useState(false);
+  const [phaseLock, setPhaseLock] = useState(false);
   const [shakeAmount, setShakeAmount] = useState(false); // For crash shake animation
+  const [headingVisible, setHeadingVisible] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [burstSeed, setBurstSeed] = useState(0);
+  const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const finalAmount = parseInt(d.eidiAmount.replace(/[^\d]/g, ''), 10);
   const currency = d.eidiAmount.match(/[^\d,]+/)?.[0] || '₹';
 
-  const revealEidi = () => {
-    if (revealed) return;
-    
+  useEffect(() => {
+    if (revealed) {
+      setHeadingVisible(false);
+      return;
+    }
+
+    // Pouch appears first, then the heading fades in.
+    setHeadingVisible(false);
+    const t = setTimeout(() => setHeadingVisible(true), 250);
+    return () => clearTimeout(t);
+  }, [revealed]);
+
+  useEffect(() => {
+    if (!revealed) {
+      setCompletedFlow(false);
+      setShowJoke1(false);
+      setShowJoke2(false);
+      setPhaseLock(false);
+    }
+  }, [revealed]);
+
+  useEffect(() => {
+    if (!startCompleted) return;
     setRevealed(true);
-    
+    setDisplayAmount(finalAmount);
+    setCompletedFlow(true);
+    setShowJoke1(false);
+    setShowJoke2(false);
+    setPhaseLock(false);
+  }, [startCompleted, finalAmount]);
+
+  useEffect(() => {
+    return () => {
+      if (openTimerRef.current) clearTimeout(openTimerRef.current);
+    };
+  }, []);
+
+  const playOpenChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.value = 523.25; // C5-ish
+      gain.gain.value = 0.0001;
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.075, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.12); // E5-ish
+
+      osc.start(now);
+      osc.stop(now + 0.14);
+
+      osc.onended = () => {
+        try {
+          ctx.close?.();
+        } catch {
+          // ignore
+        }
+      };
+    } catch {
+      // ignore sound failures (autoplay restrictions, etc.)
+    }
+  };
+
+  const startRevealAnimation = () => {
+    setRevealed(true);
+
     if (navigator.vibrate) {
       navigator.vibrate(30);
     }
-    
+
     // PHASE 1: CHAOTIC CLIMB from 0 to 3100 (THE TRAP!)
     let spinCount = 0;
     const phase1Steps = 25;
-    
+
     const spin1 = setInterval(() => {
       const progressToTarget = spinCount / phase1Steps;
       const idealValue = 3100 * progressToTarget; // Climb to 3100 instead of 1000!
-      
+
       const bounce = Math.random() * 500 - 200;
       let next = idealValue + bounce;
       next = Math.max(0, Math.min(3100, next));
-      
+
       setDisplayAmount(Math.floor(next));
       spinCount++;
-      
+
       if (spinCount >= phase1Steps) {
         clearInterval(spin1);
         setDisplayAmount(3100); // Peak at 3100
-        
+
         // MICRO-TRAP: Pause at 3100, then DROP to 1000
         setTimeout(() => {
           // Sudden drop to 1000
           setDisplayAmount(1000);
-          
+
           if (navigator.vibrate) {
             navigator.vibrate(20); // Small vibration on drop
           }
-          
+
           // Bounce effect at 1000
           setTimeout(() => setDisplayAmount(980), 100);
           setTimeout(() => setDisplayAmount(1000), 200);
           setTimeout(() => setDisplayAmount(990), 300);
           setTimeout(() => setDisplayAmount(1000), 400);
-          
+
           // NOW show JOKE 1 after the bounce
           setTimeout(() => {
             setShowJoke1(true);
@@ -817,7 +917,28 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
     }, 200);
   };
 
+  const openPouch = () => {
+    if (revealed || opening || phaseLock) return;
+    setOpening(true);
+    setBurstSeed(prev => prev + 1);
+
+    if (navigator.vibrate) {
+      navigator.vibrate(18);
+    }
+    playOpenChime();
+
+    // Compress -> expand -> reveal (not instant).
+    if (openTimerRef.current) clearTimeout(openTimerRef.current);
+    openTimerRef.current = setTimeout(() => {
+      startRevealAnimation();
+      setOpening(false);
+    }, 240);
+  };
+
   const rejectOffer = () => {
+    if (phaseLock) return;
+    setPhaseLock(true);
+
     // User clicked NO (either green or red)
     setShowJoke1(false);
     
@@ -890,61 +1011,89 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
       
       if (spinCount >= phase3Steps) {
         clearInterval(spin3);
-        
-        // ChatGPT's Digit Inertia - overshoot then settle for mechanical feel
-        setDisplayAmount(finalAmount + 20); // Overshoot by 20
-        
+
+        setDisplayAmount(finalAmount + 20);
+
         setTimeout(() => {
-          setDisplayAmount(finalAmount); // Settle to exact amount
-          
+          setDisplayAmount(finalAmount);
+
           if (navigator.vibrate) {
             navigator.vibrate(50);
           }
-        }, 150); // 150ms overshoot duration
+
+          setCompletedFlow(true);
+          setPhaseLock(false);
+
+        }, 150);
       }
     }, 200);
   };
 
   const isNegative = displayAmount < 0;
   const absAmount = Math.abs(displayAmount);
+  const params = new URLSearchParams(window.location.search);
+  const isPreview = params.get("preview") === "1";
+  const isSenderPreview = isPreview && window.location.pathname === '/eid';
 
   return (
     <Screen active style={{ background: 'radial-gradient(ellipse at 50% 40%, #0f4a37 0%, #061810 100%)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, textAlign: 'center' }}>
-        <div style={{ fontSize: '0.72rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.6)' }}>
-          {d.eidiLabel}
-        </div>
-
         {!revealed ? (
           <>
             <div
-              onClick={revealEidi}
-              style={{ 
-                width: 120, 
-                height: 130, 
-                cursor: 'pointer', 
-                transition: 'transform 0.3s ease',
-                transform: 'scale(1)',
+              style={{
+                fontSize: '0.72rem',
+                letterSpacing: '0.3em',
+                textTransform: 'uppercase',
+                color: 'rgba(201,168,76,0.7)',
+                opacity: headingVisible ? 0.95 : 0,
+                transform: headingVisible ? 'translateY(0px)' : 'translateY(-8px)',
+                transition: 'opacity 0.35s ease, transform 0.35s ease',
               }}
-              onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.05)')}
-              onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              <svg viewBox="0 0 120 130" fill="none" style={{ width: '100%', height: '100%' }}>
-                <defs>
-                  <radialGradient id="pg" cx="40%" cy="30%" r="70%">
-                    <stop offset="0%" stopColor="#1a6646" />
-                    <stop offset="100%" stopColor="#0a3328" />
-                  </radialGradient>
-                </defs>
-                <ellipse cx="60" cy="85" rx="46" ry="40" fill="url(#pg)" stroke="rgba(201,168,76,0.4)" strokeWidth="1.5" />
-                <path d="M38 55 Q60 42 82 55 Q74 68 60 65 Q46 68 38 55Z" fill="#0d4a35" stroke="rgba(201,168,76,0.35)" strokeWidth="1" />
-                <path d="M48 52 Q60 44 72 52" stroke="#c9a84c" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-                <text x="60" y="95" textAnchor="middle" fontSize="22" fill="rgba(201,168,76,0.7)">🌙</text>
-                <ellipse cx="44" cy="72" rx="8" ry="4" fill="rgba(255,255,255,0.07)" transform="rotate(-20 44 72)" />
-              </svg>
+              Your Eidi has arrived
             </div>
-            <div style={{ fontSize: '0.72rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', animation: 'eid-pulse 2s ease-in-out infinite' }}>
-              ✦ Tap the pouch to open your eidi ✦
+
+            <div style={{ position: 'relative' }}>
+              {opening && <div key={burstSeed} className="eid-burst-flash" aria-hidden="true" />}
+
+              <div
+                className={`eid-pouch-button ${opening ? 'eid-pouch-button--opening' : ''}`}
+                onClick={openPouch}
+                role="button"
+                aria-label="Open your eidi"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') openPouch();
+                }}
+              >
+                <svg viewBox="0 0 120 130" fill="none" style={{ width: '100%', height: '100%' }}>
+                  <defs>
+                    <radialGradient id="pg" cx="40%" cy="30%" r="70%">
+                      <stop offset="0%" stopColor="#1a6646" />
+                      <stop offset="100%" stopColor="#0a3328" />
+                    </radialGradient>
+                  </defs>
+                  <ellipse cx="60" cy="85" rx="46" ry="40" fill="url(#pg)" stroke="rgba(201,168,76,0.4)" strokeWidth="1.5" />
+                  <path d="M38 55 Q60 42 82 55 Q74 68 60 65 Q46 68 38 55Z" fill="#0d4a35" stroke="rgba(201,168,76,0.35)" strokeWidth="1" />
+                  <path d="M48 52 Q60 44 72 52" stroke="#c9a84c" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                  <text x="60" y="95" textAnchor="middle" fontSize="22" fill="rgba(201,168,76,0.7)">🌙</text>
+                  <ellipse cx="44" cy="72" rx="8" ry="4" fill="rgba(255,255,255,0.07)" transform="rotate(-20 44 72)" />
+                </svg>
+              </div>
+            </div>
+
+            <div
+              style={{
+                fontSize: '0.72rem',
+                letterSpacing: '0.22em',
+                textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.3)',
+                opacity: opening ? 0 : 1,
+                transition: 'opacity 0.15s ease',
+              }}
+            >
+              Tap to open ✦
             </div>
           </>
         ) : (
@@ -978,7 +1127,7 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
                 ))}
             </div>
             
-            {!showJoke1 && !showJoke2 && displayAmount >= finalAmount && (
+            {revealed && completedFlow && !showJoke1 && !showJoke2 && (
               <>
                 <div style={{ fontSize: '0.72rem', color: 'rgba(201,168,76,0.5)', fontFamily: 'Georgia, serif', fontStyle: 'italic', letterSpacing: '0.08em', marginTop: -4 }}>
                   Eidi feels better when you give it too.
@@ -1003,7 +1152,53 @@ function S7Eidi({ d, onNext }: { d: EidDemo; onNext: () => void }) {
                   I saw how fast you clicked "NO" earlier 😏
                 </div>
                 
-                <BtnNext onClick={onNext} style={{ marginTop: 8 }}>Continue ✦</BtnNext>
+                {isSenderPreview ? (
+                  <BtnNext onClick={onNext} style={{ marginTop: 8 }}>Continue ✦</BtnNext>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sessionFromQuery = params.get('session') ?? params.get('sessionKey') ?? '';
+                    const slugMatch = window.location.pathname.match(/-([a-z0-9]{8})$/i);
+                    const sessionKey = sessionFromQuery || (slugMatch?.[1] ?? '');
+                    const queryParts = sessionKey ? [`session=${encodeURIComponent(sessionKey)}`] : [];
+
+                    if (sessionKey) {
+                      window.sessionStorage.setItem('claimSessionKey', sessionKey);
+                    }
+
+                    if (isSenderPreview) {
+                      const returnParams = new URLSearchParams(window.location.search);
+                      returnParams.set('preview', '1');
+                      returnParams.set('resume', 'eidi');
+                      const returnUrl = `${window.location.pathname}?${returnParams.toString()}`;
+                      window.sessionStorage.setItem('previewReturnUrl', returnUrl);
+
+                      queryParts.push('preview=1');
+                      const query = queryParts.length ? `?${queryParts.join('&')}` : '';
+                      window.location.href = `/claim${query}`;
+                      return;
+                    }
+
+                    const query = queryParts.length ? `?${queryParts.join('&')}` : '';
+                    window.location.href = `/claim${query}`;
+                  }}
+                  style={{
+                    marginTop: 12,
+                    padding: '12px 32px',
+                    background: 'transparent',
+                    color: '#e8c97a',
+                    border: '1px solid rgba(201,168,76,0.5)',
+                    borderRadius: 40,
+                    fontSize: '0.72rem',
+                    letterSpacing: '0.25em',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isSenderPreview ? 'See how receiver will claim' : 'Claim Eidi'}
+                </button>
               </>
             )}
           </div>
@@ -1418,6 +1613,75 @@ const STYLES = `
       filter: drop-shadow(0 0 30px rgba(201,168,76,0.6)) drop-shadow(0 0 60px rgba(201,168,76,0.3));
     }
   }
+  @keyframes eid-pouch-breathe {
+    0%, 100% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 12px rgba(201,168,76,0.35));
+    }
+    50% {
+      transform: scale(1.04);
+      filter: drop-shadow(0 0 22px rgba(201,168,76,0.55));
+    }
+  }
+  @keyframes eid-pouch-open {
+    0% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 12px rgba(201,168,76,0.35));
+    }
+    18% {
+      transform: scale(0.96);
+      filter: drop-shadow(0 0 18px rgba(201,168,76,0.55));
+    }
+    55% {
+      transform: scale(1.12);
+      filter: drop-shadow(0 0 32px rgba(201,168,76,0.75));
+    }
+    100% {
+      transform: scale(1.06);
+      filter: drop-shadow(0 0 26px rgba(201,168,76,0.6));
+    }
+  }
+  @keyframes eid-burst-flash {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.2);
+    }
+    35% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.05);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1.35);
+    }
+  }
+  .eid-pouch-button {
+    width: 120px;
+    height: 130px;
+    cursor: pointer;
+    border-radius: 18px;
+    position: relative;
+    transition: transform 0.2s ease, filter 0.2s ease;
+    animation: eid-pouch-breathe 3.2s ease-in-out infinite;
+  }
+  .eid-pouch-button:hover {
+    transform: scale(1.06);
+  }
+  .eid-pouch-button--opening {
+    animation: eid-pouch-open 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .eid-burst-flash {
+    position: absolute;
+    left: 50%;
+    top: 55%;
+    width: 220px;
+    height: 220px;
+    transform: translate(-50%, -50%) scale(0.2);
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(201,168,76,0.35) 0%, rgba(201,168,76,0.18) 38%, rgba(201,168,76,0) 72%);
+    pointer-events: none;
+    animation: eid-burst-flash 0.28s ease-out forwards;
+  }
   @keyframes greedyPulse {
     0%, 100% { 
       transform: scale(1);
@@ -1470,6 +1734,7 @@ export function EidExperience({ onPayment }: EidExperienceProps = {}) {
 
   const params = new URLSearchParams(window.location.search);
   const isPreview = params.get("preview") === "1";
+  const resumeEidi = params.get("resume") === "eidi";
 
   // Step 3: Convert decoded data to EidDemo format if it exists
   const customDemo: EidDemo | null = decoded
@@ -1520,11 +1785,11 @@ export function EidExperience({ onPayment }: EidExperienceProps = {}) {
       }
     : baseDemo;
 
-  const [screen, setScreen] = useState(0);
+  const [screen, setScreen] = useState(resumeEidi ? 4 : 0);
   const screenKey = `screen-${screen}`;
-  const TOTAL = 8;
-  const [introStage, setIntroStage] = useState(0);
-  const [showName, setShowName] = useState(false);
+  const TOTAL = 7;
+  const [introStage, setIntroStage] = useState(resumeEidi ? 2 : 0);
+  const [showName, setShowName] = useState(resumeEidi);
 
   const go = (n: number) => setScreen(n);
   const goBack = () => {
@@ -1539,12 +1804,11 @@ export function EidExperience({ onPayment }: EidExperienceProps = {}) {
   }, []);
 
   useEffect(() => {
-    if (introStage > 2) return;
+    if (introStage > 1) return;
 
     let delay;
     if (introStage === 0) delay = 3200;
-    else if (introStage === 1) delay = 2800;
-    else delay = 2500;
+    else delay = 2800;
 
     const timer = setTimeout(() => {
       setIntroStage(prev => prev + 1);
@@ -1600,7 +1864,7 @@ export function EidExperience({ onPayment }: EidExperienceProps = {}) {
     </svg>
   );
 
-  if (introStage < 3) {
+  if (introStage < 2) {
     return (
       <div className="eid-intro">
         <Stars />
@@ -1651,20 +1915,6 @@ export function EidExperience({ onPayment }: EidExperienceProps = {}) {
             </div>
           </div>
         </div>
-
-        <div 
-          className="eid-intro-layer"
-          style={{ 
-            opacity: introStage === 2 ? 1 : 0,
-            transition: 'opacity 1.2s ease',
-          }}
-        >
-          <div className="eid-sender-reveal">
-            <div className="eid-sender-text">
-              {d.envFrom}
-            </div>
-          </div>
-        </div>
       </div>
     );
   }
@@ -1697,10 +1947,9 @@ export function EidExperience({ onPayment }: EidExperienceProps = {}) {
       {screen === 1 && <S3Blessing key={screenKey} d={d} onNext={() => go(2)} />}
       {screen === 2 && <S4Letter key={screenKey} d={d} onNext={() => go(3)} />}
       {screen === 3 && <S5Memories key={screenKey} d={d} onNext={() => go(4)} />}
-      {screen === 4 && <S6Duas key={screenKey} d={d} active={true} onNext={() => go(5)} />}
-      {screen === 5 && <S7Eidi key={screenKey} d={d} onNext={() => go(6)} />}
-      {screen === 6 && <S8Closing key={screenKey} d={d} onNext={() => go(7)} isPreview={isPreview} onPayment={onPayment} />}
-      {screen === 7 && <S9Chain key={screenKey} d={d} />}
+      {screen === 4 && <S7Eidi key={screenKey} d={d} onNext={() => go(5)} startCompleted={resumeEidi} />}
+      {screen === 5 && <S8Closing key={screenKey} d={d} onNext={() => go(6)} isPreview={isPreview} onPayment={onPayment} />}
+      {screen === 6 && <S9Chain key={screenKey} d={d} />}
     </div>
   );
 }

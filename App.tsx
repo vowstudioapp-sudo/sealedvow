@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { LandingPage } from './components/LandingPage.tsx';
+import AdminPanel from './components/AdminPanel';
+import ClaimPage from './components/ClaimPage';
 import { Analytics } from '@vercel/analytics/react';
 import { getRouteType, isEidiRoute, isReceiverLinkType } from './utils/routing';
 import { decodeEidData } from './utils/eidDecoder';
@@ -152,6 +154,7 @@ type EidFormData = {
   tone: string;
   blessing: string;
   eidiAmount: string;
+  receiverPhoneNumber?: string;
 };
 
 const App: React.FC = () => {
@@ -361,6 +364,26 @@ const App: React.FC = () => {
     }
   }, [demoData, isDemoMode, isEidFlow, isReceiverLink, linkError, linkState, sharedData]);
 
+  useEffect(() => {
+    if (linkState !== LoaderState.SUCCESS || !sharedData) return;
+
+    if (sharedData.occasion === 'eid') {
+      const payload = {
+        recipient: sharedData.recipientName || '',
+        senderName: sharedData.senderName || '',
+        blessing: sharedData.finalLetter || '',
+        eidiAmount: sharedData.timeShared || '',
+        relationship: sharedData.relationshipIntent || '',
+        subtype: sharedData.sharedMoment || '',
+        mode: sharedData.writingMode === 'assisted' ? 'assist' : 'self',
+      };
+      window.sessionStorage.setItem('eidDecodedData', JSON.stringify(payload));
+      return;
+    }
+
+    window.sessionStorage.removeItem('eidDecodedData');
+  }, [linkState, sharedData]);
+
   if (hasEidPayload) {
     if (isCreatorEidPreview) {
       if (stage === AppStage.PAYMENT && data) {
@@ -421,10 +444,11 @@ const App: React.FC = () => {
               }
 
               console.log('💰 Creating CoupleData object...');
-              const coupleData: CoupleData = {
+              const coupleData = {
                 sessionId: `eid-${Date.now()}`,
                 recipientName: decoded.recipient || '',
                 senderName: decoded.senderName || '',
+                receiverPhoneNumber: decoded.receiverPhoneNumber || '',
                 occasion: 'eid',
                 theme: 'evergreen',
                 writingMode: decoded.mode === 'assist' ? 'assisted' : 'self',
@@ -439,7 +463,7 @@ const App: React.FC = () => {
                 memoryBoard: [],
                 createdAt: new Date().toISOString(),
                 sealedAt: undefined,
-              };
+              } as CoupleData;
 
               console.log('💰 CoupleData created:', coupleData);
               console.log('💰 Calling setData...');
@@ -562,8 +586,27 @@ const App: React.FC = () => {
     </div>
   );
 
+  const path = window.location.pathname;
+  const normalizedPath = path.replace(/\/+$/, '') || '/';
+
+  if (normalizedPath === '/admin' || normalizedPath === '/admin/claims') {
+    return <AdminPanel />;
+  }
+  if (normalizedPath === '/claim') {
+    return <ClaimPage />;
+  }
+
+  if (linkState === LoaderState.SUCCESS && sharedData?.occasion === 'eid') {
+    return (
+      <Suspense fallback={eidiLoadingFallback}>
+        <EidExperience />
+      </Suspense>
+    );
+  }
+
   if (isEidiCreate) {
-    return <Suspense fallback={eidiLoadingFallback}><EidiCreatePage /></Suspense>;
+    // Deprecated: we intentionally route `/eidi/create` to the same dark "Choose the Occasion" flow.
+    return <Suspense fallback={eidiLoadingFallback}><OccasionSelector /></Suspense>;
   }
 
   if (routeType === 'EID_SELECTOR') {

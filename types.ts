@@ -127,6 +127,7 @@ export interface CoupleData {
   sessionId?: string;
   recipientName: string;
   senderName: string;
+  receiverPhoneNumber?: string;
 
   // -------------------------------------------------------------------------
   // LIFECYCLE

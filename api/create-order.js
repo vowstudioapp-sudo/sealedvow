@@ -79,7 +79,7 @@ export default async function handler(req, res) {
     });
   }
 
-  let { tier = 'standard', founderCode } = req.body || {};
+  let { tier = 'standard', founderCode, customAmountPaise } = req.body || {};
 
   // Input hygiene: ensure tier is always a string before validation
   if (typeof tier !== 'string') tier = 'standard';
@@ -136,7 +136,13 @@ export default async function handler(req, res) {
   }
 
   const validTier = TIER_PRICES[tier] ? tier : 'standard';
-  const amount = TIER_PRICES[validTier];
+  const baseAmount = TIER_PRICES[validTier];
+  const parsedCustomAmount = Number(customAmountPaise);
+  const hasValidCustomAmount =
+    Number.isInteger(parsedCustomAmount) &&
+    parsedCustomAmount >= baseAmount &&
+    parsedCustomAmount <= 50000000; // 5,00,000 INR upper bound safety
+  const amount = hasValidCustomAmount ? parsedCustomAmount : baseAmount;
   const product = TIER_PRODUCTS[validTier];
 
   try {

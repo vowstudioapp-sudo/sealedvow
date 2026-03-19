@@ -70,7 +70,7 @@ export const FESTIVALS: Festival[] = [
     type:  'eid',
     start: '2026-03-07',
     end:   '2026-03-31',
-    route: '/eidi/create',
+    route: '/create',
 
     theme: {
       bg:      '#050505',

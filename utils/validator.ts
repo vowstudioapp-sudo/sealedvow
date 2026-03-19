@@ -97,6 +97,11 @@ const AudioDataSchema = z.object({
 export const CoupleDataSchema = z.object({
   recipientName: z.string().min(1).max(SECURITY_LIMITS.MAX_NAME_LENGTH).transform(sanitizeString),
   senderName: z.string().min(1).max(SECURITY_LIMITS.MAX_NAME_LENGTH).transform(sanitizeString),
+  receiverPhoneNumber: z
+    .string()
+    .max(20)
+    .transform(sanitizeString)
+    .optional(),
 
   theme: z.enum(['obsidian', 'velvet', 'crimson', 'midnight', 'evergreen', 'pearl']),
   occasion: z.enum(['anniversary', 'apology', 'just-because', 'long-distance', 'thank-you', 'eid']),

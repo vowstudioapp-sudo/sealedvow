@@ -390,7 +390,7 @@ export const EidiEnvelope: React.FC<Props> = ({ eidiId }) => {
         {/* Viral loop CTA */}
         <div style={{ marginTop: 32, animation: 'fadeUp 0.8s ease 0.6s forwards', opacity: 0 }}>
           <a
-            href="/eidi/create"
+            href="/create"
             style={{ display: 'inline-block', padding: '14px 32px', background: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', borderRadius: 100, fontSize: 11, fontWeight: 'bold', letterSpacing: '0.3em', textTransform: 'uppercase', textDecoration: 'none', fontFamily: 'Georgia, serif' }}
           >
             Send Eidi to someone →
