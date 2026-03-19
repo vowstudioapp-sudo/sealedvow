@@ -1163,12 +1163,13 @@ function S7Eidi({ d, onNext, startCompleted = false }: { d: EidDemo; onNext: () 
                     const slugMatch = window.location.pathname.match(/-([a-z0-9]{8})$/i);
                     const sessionKey = sessionFromQuery || (slugMatch?.[1] ?? '');
                     const queryParts = sessionKey ? [`session=${encodeURIComponent(sessionKey)}`] : [];
+                    const isDemoFlow = window.location.pathname.startsWith('/demo/eid');
 
                     if (sessionKey) {
                       window.sessionStorage.setItem('claimSessionKey', sessionKey);
                     }
 
-                    if (isSenderPreview) {
+                    if (isSenderPreview || isDemoFlow) {
                       const returnParams = new URLSearchParams(window.location.search);
                       returnParams.set('preview', '1');
                       returnParams.set('resume', 'eidi');
@@ -1725,45 +1726,65 @@ const STYLES = `
 ───────────────────────────────────────────────────────────── */
 type EidExperienceProps = {
   onPayment?: () => void;
+  sharedSession?: {
+    recipientName?: string;
+    senderName?: string;
+    finalLetter?: string;
+    timeShared?: string;
+    relationshipIntent?: string;
+    sharedMoment?: string;
+    writingMode?: string;
+  };
 };
 
-export function EidExperience({ onPayment }: EidExperienceProps = {}) {
+export function EidExperience({ onPayment, sharedSession }: EidExperienceProps = {}) {
   // Step 2: Detect encoded message from URL
   const decoded = decodeEidData();
-  const senderDisplayName = formatSenderDisplay(decoded?.senderName, decoded?.subtype);
+  const resolvedRecipient = decoded?.recipient || sharedSession?.recipientName || "Someone";
+  const resolvedSenderName = decoded?.senderName || sharedSession?.senderName || "";
+  const resolvedBlessing = decoded?.blessing || sharedSession?.finalLetter || "Eid Mubarak";
+  const resolvedEidiAmount = decoded?.eidiAmount || sharedSession?.timeShared || "₹0";
+  const resolvedRelationship = decoded?.relationship || sharedSession?.relationshipIntent || "";
+  const resolvedSubtype = decoded?.subtype || sharedSession?.sharedMoment || "";
+  const resolvedMode =
+    decoded?.mode ||
+    (sharedSession?.writingMode === 'assisted' ? 'assist' : 'self');
+
+  const senderDisplayName = formatSenderDisplay(resolvedSenderName, decoded?.subtype);
 
   const params = new URLSearchParams(window.location.search);
   const isPreview = params.get("preview") === "1";
   const resumeEidi = params.get("resume") === "eidi";
 
   // Step 3: Convert decoded data to EidDemo format if it exists
-  const customDemo: EidDemo | null = decoded
+  const hasResolvedEidPayload = !!(decoded || sharedSession);
+  const customDemo: EidDemo | null = hasResolvedEidPayload
     ? {
-        recipient: decoded.recipient || "Someone",
+        recipient: resolvedRecipient,
         envFrom: 'A message for you',
-        blessing: decoded.blessing || "Eid Mubarak",
+        blessing: resolvedBlessing,
         shortBlessing: (decoded as any).shortBlessing || "",
 
-        letterHeading: `Eid Mubarak — to ${decoded.recipient || "Someone"}`,
+        letterHeading: `Eid Mubarak — to ${resolvedRecipient}`,
         letterMeta: 'EID',
         letterBody: formatLetter(
-          decoded.blessing || "Eid Mubarak!",
+          resolvedBlessing || "Eid Mubarak!",
           senderDisplayName,
-          decoded.recipient
+          resolvedRecipient
         ),
         letterSign: '',
 
         memTitle: "Our Eid Memories",
         memSub: "Moments worth remembering",
-        memories: generateMemories(decoded.relationship, decoded.recipient),
+        memories: generateMemories(resolvedRelationship, resolvedRecipient),
 
-        duaTitle: getDuaLabel(decoded.relationship, decoded.subtype, decoded.senderName),
+        duaTitle: getDuaLabel(resolvedRelationship, resolvedSubtype, resolvedSenderName),
         duaSub: "",
-        duas: generateDuas(decoded.relationship),
+        duas: generateDuas(resolvedRelationship),
 
         eidiLabel: "Your Eidi",
         eidiFrom: 'With love',
-        eidiAmount: decoded.eidiAmount || "₹0",
+        eidiAmount: resolvedEidiAmount,
         eidiMsg: "",
 
         closingMain: "Eid Mubarak",
@@ -1776,12 +1797,12 @@ export function EidExperience({ onPayment }: EidExperienceProps = {}) {
   // Step 4: Select data source (prioritize decoded > demo)
   const path = window.location.pathname;
   const key = path.split('/demo/eid/')[1]?.split(/[?#]/)[0] ?? '';
-  const relationship = decoded?.relationship || key || undefined;
+  const relationship = resolvedRelationship || key || undefined;
   const baseDemo = customDemo || getDemoByKey(key) || EID_DEMOS[key];
   const d = baseDemo
     ? {
         ...baseDemo,
-        duaTitle: getDuaLabel(relationship, decoded?.subtype, decoded?.senderName),
+        duaTitle: getDuaLabel(relationship, resolvedSubtype, resolvedSenderName),
       }
     : baseDemo;
 

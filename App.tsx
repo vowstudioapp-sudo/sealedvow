@@ -599,7 +599,7 @@ const App: React.FC = () => {
   if (linkState === LoaderState.SUCCESS && sharedData?.occasion === 'eid') {
     return (
       <Suspense fallback={eidiLoadingFallback}>
-        <EidExperience />
+        <EidExperience sharedSession={sharedData} />
       </Suspense>
     );
   }
