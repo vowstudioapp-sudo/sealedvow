@@ -1763,7 +1763,7 @@ export function EidExperience({ onPayment, sharedSession }: EidExperienceProps =
         recipient: resolvedRecipient,
         envFrom: 'A message for you',
         blessing: resolvedBlessing,
-        shortBlessing: (decoded as any).shortBlessing || "",
+        shortBlessing: (decoded as any)?.shortBlessing || "",
 
         letterHeading: `Eid Mubarak — to ${resolvedRecipient}`,
         letterMeta: 'EID',
