@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreateEidiRequest } from '../../types/eidi';
+import { CreateEidiRequest, EnvelopeTheme } from '../../types/eidi';
 import { FEATURES } from '../../config/features';
 import { getActiveFestival } from '../../config/festivals';
 
@@ -186,7 +186,7 @@ export const EidiCreatePage: React.FC = () => {
       ...(relationship.trim() && { relationship: relationship.trim() }),
       ...(blessing.trim()     && { blessing: blessing.trim() }),
       ...(parsedAmount        && { amount: parsedAmount, currency }),
-      envelopeTheme: theme,
+      envelopeTheme: theme as EnvelopeTheme,
       ...(lockToEid           && { unlockAt: getEidMorningTimestamp() }),
     };
 

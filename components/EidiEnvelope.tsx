@@ -89,7 +89,7 @@ export const EidiEnvelope: React.FC<Props> = ({ eidiId }) => {
     setWords(allWords);
     setWordIdx(0);
 
-    let interval: number;
+    let interval: ReturnType<typeof setInterval>;
 
     const timer = setTimeout(() => {
       interval = setInterval(() => {

@@ -87,7 +87,18 @@ export interface CreateEidiResponse {
 }
 
 export interface LoadEidiResponse {
-  data:         EidiData;
-  locked:       boolean;             // true if unlockAt is in the future
-  lockedUntil?: number;              // Unix ms — for countdown display
+  locked: boolean;
+  lockedUntil?: number;
+
+  senderName?: string;
+  receiverName?: string;
+  relationship?: string;
+  blessing?: string;
+  blessingLanguage?: string;
+  voiceUrl?: string;
+  amount?: number;
+  currency?: string;
+  envelopeTheme?: string;
+
+  error?: string;
 }

@@ -157,6 +157,71 @@ type EidFormData = {
   receiverPhoneNumber?: string;
 };
 
+type StageResolverState = {
+  currentStage: AppStage;
+  linkState: LoaderState;
+  sharedData: CoupleData | null;
+  isReceiverLink: boolean;
+  isDemoMode: boolean;
+  isEidFlow: boolean;
+  isDevPreview: boolean;
+  preview: string | null;
+  role: string | null;
+};
+
+const resolveStage = (state: StageResolverState): AppStage => {
+  const {
+    currentStage,
+    linkState,
+    sharedData,
+    isReceiverLink,
+    isDemoMode,
+    isEidFlow,
+    isDevPreview,
+    preview,
+    role,
+  } = state;
+
+  if (isDevPreview && preview) {
+    if (preview === 'intro' || preview === 'receiver') return AppStage.PERSONAL_INTRO;
+    if (preview === 'envelope') return AppStage.ENVELOPE;
+    if (preview === 'letter' || preview === 'main') return AppStage.MAIN_EXPERIENCE;
+    return AppStage.LANDING;
+  }
+
+  if (isDemoMode) {
+    return currentStage === AppStage.LANDING
+      ? AppStage.PERSONAL_INTRO
+      : currentStage;
+  }
+
+  if (isEidFlow) {
+    return AppStage.LANDING;
+  }
+
+  if (linkState === LoaderState.SUCCESS && sharedData) {
+    return role === 'master' ? AppStage.MASTER_CONTROL : AppStage.PERSONAL_INTRO;
+  }
+
+  if (linkState === LoaderState.LOADING) {
+    return currentStage;
+  }
+
+  if (linkState === LoaderState.NO_LINK) {
+    return AppStage.LANDING;
+  }
+
+  if (linkState === LoaderState.ERROR) {
+    return AppStage.LANDING;
+  }
+
+  if (!sharedData && !isReceiverLink) {
+    return AppStage.LANDING;
+  }
+
+  return currentStage;
+};
+
 const App: React.FC = () => {
   const { state: linkState, data: sharedData, error: linkError } = useLinkLoader();
   const routeType = getRouteType();
@@ -315,54 +380,53 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Skip link loader routing when dev preview is active
-    if (import.meta.env.DEV) {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('preview')) return;
+    const params = new URLSearchParams(window.location.search);
+    const preview = import.meta.env.DEV ? params.get('preview') : null;
+    const isDevPreview = import.meta.env.DEV && !!preview;
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    const isDemoPath = path.startsWith('/demo/');
+    const isDemoEidPath = path === '/demo/eid' || /^\/demo\/eid\/[a-z-]+$/.test(path);
+    const queryParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const role = queryParams.get('role') || hashParams.get('role');
+
+    // Safety fallback: unknown /demo/* slugs should never blank-screen.
+    if (isDemoPath && !isDemoEidPath && !demoData) {
+      setIsBooting(false);
+      setIsFadingOut(false);
+      window.history.replaceState({}, '', '/');
     }
 
-    if (isEidFlow || isDemoMode) {
-      return;
-    }
-
-    // Demo mode — load hardcoded data, skip all backend
     if (isDemoMode && demoData) {
       setData(demoData);
       setIsBooting(false);
       setIsFadingOut(false);
-      safeSetStage(AppStage.PERSONAL_INTRO);
-      return;
-    }
-
-    if (linkState === LoaderState.SUCCESS && sharedData) {
+    } else if (linkState === LoaderState.SUCCESS && sharedData) {
       setData(hydrateCoupleData(sharedData));
       setIsBooting(false);
       setIsFadingOut(false);
-      
-      // Check for master role in query params (clean URLs) or hash params (legacy)
-      const queryParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const role = queryParams.get('role') || hashParams.get('role');
-      
-      if (role === 'master') {
-        safeSetStage(AppStage.MASTER_CONTROL);
-      } else {
-        safeSetStage(AppStage.PERSONAL_INTRO);
-      }
     } else if (linkState === LoaderState.NO_LINK) {
-      safeSetStage(AppStage.LANDING);
-      
       const persisted = readPersistedCoupleData();
       if (persisted) {
         setData(persisted);
       }
     } else if (linkState === LoaderState.ERROR) {
       console.error('Link loading error:', linkError);
-      safeSetStage(AppStage.LANDING);
-    } else if (linkState !== LoaderState.LOADING && !sharedData && !isReceiverLink) {
-      safeSetStage(AppStage.LANDING);
     }
-  }, [demoData, isDemoMode, isEidFlow, isReceiverLink, linkError, linkState, sharedData]);
+
+    const nextStage = resolveStage({
+      currentStage: stage,
+      linkState,
+      sharedData,
+      isReceiverLink,
+      isDemoMode,
+      isEidFlow,
+      isDevPreview,
+      preview,
+      role,
+    });
+    safeSetStage(nextStage);
+  }, [demoData, isDemoMode, isEidFlow, isReceiverLink, linkError, linkState, sharedData, stage]);
 
   useEffect(() => {
     if (linkState !== LoaderState.SUCCESS || !sharedData) return;
@@ -778,7 +842,9 @@ const App: React.FC = () => {
               theme={data.theme}
               isDemoMode={isDemoMode}
               onThemeChange={isDemoMode ? (t: Theme) => setData(prev => ({ ...prev, theme: t })) : undefined}
-              onComplete={() => safeSetStage(AppStage.ENVELOPE)}
+              onComplete={() => {
+                safeSetStage(AppStage.ENVELOPE);
+              }}
             />
           )}
 

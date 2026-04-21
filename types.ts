@@ -40,7 +40,8 @@ export type Occasion =
   | 'just-because'
   | 'long-distance'
   | 'thank-you'
-  | 'eid';
+  | 'eid'
+  | 'birthday';
 
 export type Theme =
   | 'obsidian'

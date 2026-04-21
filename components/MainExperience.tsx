@@ -84,6 +84,7 @@ const OCCASION_TITLES: Record<Occasion, string> = {
   'long-distance': "Across the Distance",
   'thank-you': "With Gratitude",
   eid: "A Blessed Gift",
+  birthday: "A Celebration of You",
 };
 
 /* ------------------------------------------------------------------ */

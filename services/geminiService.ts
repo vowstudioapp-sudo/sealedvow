@@ -54,6 +54,7 @@ export const generateLoveLetter = async (data: CoupleData): Promise<string> => {
       'long-distance': "It's quiet here without you. I keep reaching for my phone just to hear your voice.",
       'thank-you': "I don't say this enough. But thank you. For everything you do that I forget to notice.",
       eid: "Eid Mubarak. May this day bring you peace, joy, and the warmth of those you love.",
+      birthday: "Happy birthday. Another year of you in the world — and I'm grateful for every one of them.",
     };
     return fallbacks[data.occasion] || fallbacks.anniversary;
   }

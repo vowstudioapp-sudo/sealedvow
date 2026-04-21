@@ -44,5 +44,5 @@ export function isEidiRoute(type: RouteType): boolean {
 }
 
 export function isReceiverLinkType(type: RouteType): boolean {
-  return type === 'RECEIVER' || type === 'DEMO';
+  return type === 'RECEIVER';
 }
