@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'rea
 import { LandingPage } from './components/LandingPage.tsx';
 import AdminPanel from './components/AdminPanel';
 import ClaimPage from './components/ClaimPage';
+import { SignInPromptModal } from './components/SignInPromptModal.tsx';
 import { Analytics } from '@vercel/analytics/react';
 import { getRouteType, isEidiRoute, isReceiverLinkType } from './utils/routing';
 import { decodeEidData } from './utils/eidDecoder';
+import { useAuth } from './hooks/useAuth';
 
 const PreparationForm = lazy(() =>
   import('./components/PreparationForm.tsx').then(m => ({ default: m.PreparationForm }))
@@ -257,6 +259,32 @@ const App: React.FC = () => {
   const previousStageRef = useRef<AppStage | null>(null);
   const demoSeededRef = useRef(false);
 
+  // ── Sign-in prompt at Preview → Payment transition ──
+  const { user: authUser } = useAuth();
+  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  const pendingActionRef = useRef<(() => void) | null>(null);
+
+  const runOrPromptSignIn = (action: () => void) => {
+    if (authUser) {
+      action();
+    } else {
+      pendingActionRef.current = action;
+      setShowSignInPrompt(true);
+    }
+  };
+
+  const commitPendingAction = () => {
+    setShowSignInPrompt(false);
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (action) action();
+  };
+
+  const cancelPendingAction = () => {
+    pendingActionRef.current = null;
+    setShowSignInPrompt(false);
+  };
+
   const safeSetStage = (nextStage: AppStage) => {
     ensureExhaustiveStage(nextStage);
     setStage(prev => {
@@ -499,46 +527,48 @@ const App: React.FC = () => {
         <Suspense fallback={null}>
           <EidExperience
             onPayment={() => {
-              console.log('💰 App.tsx onPayment callback triggered');
+              runOrPromptSignIn(() => {
+                console.log('💰 App.tsx onPayment callback triggered');
 
-              const decoded = decodeEidData();
-              console.log('💰 Decoded data:', decoded);
+                const decoded = decodeEidData();
+                console.log('💰 Decoded data:', decoded);
 
-              if (!decoded) {
-                console.error('❌ Decoded data is null/undefined');
-                alert("Preview data missing - please return to form");
-                window.location.href = '/eid/parent-child';
-                return;
-              }
+                if (!decoded) {
+                  console.error('❌ Decoded data is null/undefined');
+                  alert("Preview data missing - please return to form");
+                  window.location.href = '/eid/parent-child';
+                  return;
+                }
 
-              console.log('💰 Creating CoupleData object...');
-              const coupleData = {
-                sessionId: `eid-${Date.now()}`,
-                recipientName: decoded.recipient || '',
-                senderName: decoded.senderName || '',
-                receiverPhoneNumber: decoded.receiverPhoneNumber || '',
-                occasion: 'eid',
-                theme: 'evergreen',
-                writingMode: decoded.mode === 'assist' ? 'assisted' : 'self',
-                finalLetter: decoded.blessing || '',
-                relationshipIntent: decoded.relationship || '',
-                sharedMoment: decoded.subtype || '',
-                timeShared: decoded.eidiAmount || '',
-                myth: '',
-                sacredLocation: undefined,
-                revealMethod: 'immediate',
-                coupons: [],
-                memoryBoard: [],
-                createdAt: new Date().toISOString(),
-                sealedAt: undefined,
-              } as CoupleData;
+                console.log('💰 Creating CoupleData object...');
+                const coupleData = {
+                  sessionId: `eid-${Date.now()}`,
+                  recipientName: decoded.recipient || '',
+                  senderName: decoded.senderName || '',
+                  receiverPhoneNumber: decoded.receiverPhoneNumber || '',
+                  occasion: 'eid',
+                  theme: 'evergreen',
+                  writingMode: decoded.mode === 'assist' ? 'assisted' : 'self',
+                  finalLetter: decoded.blessing || '',
+                  relationshipIntent: decoded.relationship || '',
+                  sharedMoment: decoded.subtype || '',
+                  timeShared: decoded.eidiAmount || '',
+                  myth: '',
+                  sacredLocation: undefined,
+                  revealMethod: 'immediate',
+                  coupons: [],
+                  memoryBoard: [],
+                  createdAt: new Date().toISOString(),
+                  sealedAt: undefined,
+                } as CoupleData;
 
-              console.log('💰 CoupleData created:', coupleData);
-              console.log('💰 Calling setData...');
-              setData(coupleData);
-              console.log('💰 Calling safeSetStage(AppStage.PAYMENT)...');
-              safeSetStage(AppStage.PAYMENT);
-              console.log('💰 Payment stage transition complete');
+                console.log('💰 CoupleData created:', coupleData);
+                console.log('💰 Calling setData...');
+                setData(coupleData);
+                console.log('💰 Calling safeSetStage(AppStage.PAYMENT)...');
+                safeSetStage(AppStage.PAYMENT);
+                console.log('💰 Payment stage transition complete');
+              });
             }}
           />
         </Suspense>
@@ -930,7 +960,7 @@ const App: React.FC = () => {
                   setIsCreatorPreview(false);
                 }}
                 onPayment={() => {
-                  safeSetStage(AppStage.PAYMENT);
+                  runOrPromptSignIn(() => safeSetStage(AppStage.PAYMENT));
                 }}
               />
             </div>
@@ -1041,6 +1071,12 @@ const App: React.FC = () => {
         </div>
       )}
       <Analytics />
+      <SignInPromptModal
+        isOpen={showSignInPrompt}
+        onClose={cancelPendingAction}
+        onContinueAsGuest={commitPendingAction}
+        onSignInSuccess={commitPendingAction}
+      />
     </div>
   );
 };
