@@ -316,9 +316,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <span className="lp-nav__brand">Sealed Vow</span>
         </div>
         <div className="lp-nav__right">
-          <button className="lp-nav__begin" onClick={handleEnter}>
-            {user ? 'Create' : 'Create Now'}
-          </button>
+          <button className="lp-nav__begin" onClick={handleEnter}>Create</button>
           {user ? (
             <UserMenu
               user={user}
@@ -342,9 +340,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <div className="lp-v-ring"><span>V</span></div>
           <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
           <div className="lp-hero__rule" />
-          <button className="lp-btn-begin" onClick={handleEnter}>
-            {user ? 'Create' : 'Create Now'}
-          </button>
+          <button className="lp-btn-begin" onClick={handleEnter}>Create</button>
         </div>
         <div className="lp-hero__bottom">
           <div className="lp-scroll-signal">

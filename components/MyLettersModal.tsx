@@ -75,7 +75,7 @@ export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }
             onCreateNew();
           }}
         >
-          + Create New
+          + Create
         </button>
         <div className="lp-modal__rule" />
 
