@@ -255,6 +255,7 @@ const App: React.FC = () => {
   const [, forceLocationUpdate] = useState(0);
 
   const previousStageRef = useRef<AppStage | null>(null);
+  const demoSeededRef = useRef(false);
 
   const safeSetStage = (nextStage: AppStage) => {
     ensureExhaustiveStage(nextStage);
@@ -398,7 +399,10 @@ const App: React.FC = () => {
     }
 
     if (isDemoMode && demoData) {
-      setData(demoData);
+      if (!demoSeededRef.current) {
+        setData(demoData);
+        demoSeededRef.current = true;
+      }
       setIsBooting(false);
       setIsFadingOut(false);
     } else if (linkState === LoaderState.SUCCESS && sharedData) {
