@@ -3,6 +3,7 @@ import { PrivacyModal } from './PrivacyModal';
 import { TermsModal } from './TermsModal';
 import { HelpModal } from './HelpModal';
 import { MyLettersModal } from './MyLettersModal';
+import { UserMenu } from './UserMenu';
 import { useAuth } from '../hooks/useAuth';
 
 interface Props {
@@ -313,26 +314,14 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         <div className="lp-nav__right">
           <button className="lp-nav__begin" onClick={handleEnter}>Begin</button>
           {user ? (
-            <>
-              <button
-                className="lp-nav__signin"
-                onClick={() => setShowMyLetters(true)}
-              >
-                My Letters
-              </button>
-              <span className="lp-nav__user" title={user.email || undefined}>
-                {user.displayName || user.email}
-              </span>
-              <button
-                className="lp-nav__signin"
-                onClick={async () => {
-                  await signOut();
-                  window.location.reload();
-                }}
-              >
-                Logout
-              </button>
-            </>
+            <UserMenu
+              user={user}
+              onOpenLetters={() => setShowMyLetters(true)}
+              onSignOut={async () => {
+                await signOut();
+                window.location.reload();
+              }}
+            />
           ) : (
             <button className="lp-nav__signin" onClick={() => setShowLogin(true)}>Sign In</button>
           )}

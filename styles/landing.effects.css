@@ -168,17 +168,119 @@
   color: rgba(242,232,213,0.9);
 }
 
-/* Signed-in user label — matches nav typography, non-interactive */
-.lp-nav__user {
+/* ══════════════════════════════════
+   USER MENU — initials disc + panel
+   Rhymes visually with .lp-nav__logo.
+══════════════════════════════════ */
+.lp-usermenu {
+  position: relative;
+  display: inline-flex;
+}
+
+.lp-usermenu__trigger {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(242,232,213,0.22);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 10px;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: rgba(242,232,213,0.72);
-  max-width: 200px;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: rgba(242,232,213,0.82);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.3s ease, color 0.3s ease, background 0.3s ease;
+}
+.lp-usermenu__trigger:hover,
+.lp-usermenu__trigger[aria-expanded="true"] {
+  border-color: rgba(242,232,213,0.5);
+  color: #F2E8D5;
+  background: rgba(242,232,213,0.04);
+}
+
+.lp-usermenu__panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  min-width: 240px;
+  padding: 18px 18px 14px;
+  background: rgba(12,19,32,0.92);
+  border: 1px solid rgba(242,232,213,0.1);
+  border-radius: 14px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 50;
+  text-align: left;
+  animation: lp-usermenuReveal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
+}
+
+@keyframes lp-usermenuReveal {
+  0%   { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.lp-usermenu__identity {
+  padding: 2px 4px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lp-usermenu__name {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 15px;
+  color: rgba(242,232,213,0.92);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lp-usermenu__email {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(207,198,178,0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-usermenu__divider {
+  height: 1px;
+  background: rgba(242,232,213,0.08);
+  margin: 6px -4px;
+}
+
+.lp-usermenu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 9px 4px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(242,232,213,0.82);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.lp-usermenu__item:hover {
+  color: #F2E8D5;
+  background: rgba(242,232,213,0.04);
+}
+.lp-usermenu__item--quiet {
+  color: rgba(207,198,178,0.55);
+}
+.lp-usermenu__item--quiet:hover {
+  color: rgba(242,232,213,0.9);
 }
 
 /* ══════════════════════════════════
