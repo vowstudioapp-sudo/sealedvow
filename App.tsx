@@ -210,7 +210,11 @@ const resolveStage = (state: StageResolverState): AppStage => {
   }
 
   if (linkState === LoaderState.NO_LINK) {
-    return AppStage.LANDING;
+    // Preserve the current stage. Creator flows (PREPARE/REFINE/PREVIEW/PAYMENT/SHARE)
+    // legitimately run under NO_LINK — they don't involve a share link. Returning
+    // LANDING unconditionally here was stomping the LETTER_CREATE → PREPARE
+    // transition and causing a render oscillation.
+    return currentStage;
   }
 
   if (linkState === LoaderState.ERROR) {
