@@ -122,7 +122,7 @@
   gap: 20px;
 }
 
-/* Begin — hidden on hero, fades in on page 2+ */
+/* Create CTA in nav — hidden on hero, fades in on page 2+ */
 .lp-nav__begin {
   font-family: 'Cormorant Garamond', Georgia, serif;
   font-size: 10px;
@@ -374,7 +374,7 @@
   animation: lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.54s both;
 }
 
-/* Buttons — Begin + Studio */
+/* Buttons — Create + Studio */
 .lp-btn-begin,
 .lp-btn-studio {
   display: inline-block;

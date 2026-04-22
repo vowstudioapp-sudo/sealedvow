@@ -39,7 +39,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     return () => clearTimeout(t);
   }, []);
 
-  /* ── Past-hero detection — shows Begin in navbar ── */
+  /* ── Past-hero detection — shows the Create CTA in navbar ── */
   useEffect(() => {
     const handleScroll = () => {
       const hero = heroRef.current;
@@ -342,7 +342,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <div className="lp-v-ring"><span>V</span></div>
           <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
           <div className="lp-hero__rule" />
-          <button className="lp-btn-begin" onClick={handleEnter}>Begin</button>
+          <button className="lp-btn-begin" onClick={handleEnter}>
+            {user ? 'Create' : 'Create Now'}
+          </button>
         </div>
         <div className="lp-hero__bottom">
           <div className="lp-scroll-signal">
