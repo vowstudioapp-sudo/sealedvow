@@ -208,6 +208,20 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       scheduleResume();
     };
 
+    // Infinite loop for manual scroll — teleport across the duplicated
+    // card set so either edge feels continuous. Skipped during auto-drift
+    // because the rAF loop already wraps itself.
+    const onScroll = () => {
+      if (isDrifting) return;
+      const half = el.scrollWidth / 2;
+      if (half <= 0) return;
+      if (el.scrollLeft <= 0) {
+        el.scrollLeft += half;
+      } else if (el.scrollLeft > half) {
+        el.scrollLeft -= half;
+      }
+    };
+
     const startTimer = window.setTimeout(() => {
       if (!isHovered) startDrift();
     }, 800);
@@ -218,6 +232,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     el.addEventListener('touchstart', onInteract, { passive: true });
     el.addEventListener('wheel', onInteract, { passive: true });
     el.addEventListener('focusin', onInteract);
+    el.addEventListener('scroll', onScroll, { passive: true });
 
     return () => {
       window.clearTimeout(startTimer);
@@ -229,6 +244,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       el.removeEventListener('touchstart', onInteract);
       el.removeEventListener('wheel', onInteract);
       el.removeEventListener('focusin', onInteract);
+      el.removeEventListener('scroll', onScroll);
     };
   }, []);
 
