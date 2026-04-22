@@ -13,6 +13,7 @@ interface Letter {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  onCreateNew: () => void;
 }
 
 function formatDate(ms: number | null): string {
@@ -24,7 +25,7 @@ function formatDate(ms: number | null): string {
   });
 }
 
-export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose }) => {
+export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }) => {
   const [letters, setLetters] = useState<Letter[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,15 @@ export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose }) => {
       <div className="lp-modal lp-modal--letters">
         <button className="lp-modal__close" onClick={onClose}>✕</button>
         <h2 className="lp-modal__title">My Letters</h2>
+        <button
+          className="lp-letters-create"
+          onClick={() => {
+            onClose();
+            onCreateNew();
+          }}
+        >
+          + Create New
+        </button>
         <div className="lp-modal__rule" />
 
         {loading && <p className="lp-modal__sub">Loading…</p>}

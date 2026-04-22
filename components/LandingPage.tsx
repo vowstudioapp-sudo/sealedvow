@@ -301,7 +301,11 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
       <TermsModal   isOpen={showTerms}   onClose={() => setShowTerms(false)} />
       <HelpModal    isOpen={showHelp}    onClose={() => setShowHelp(false)} />
-      <MyLettersModal isOpen={showMyLetters} onClose={() => setShowMyLetters(false)} />
+      <MyLettersModal
+        isOpen={showMyLetters}
+        onClose={() => setShowMyLetters(false)}
+        onCreateNew={handleEnter}
+      />
 
       {/* ══════════════════════════════════════
           NAV
@@ -312,7 +316,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <span className="lp-nav__brand">Sealed Vow</span>
         </div>
         <div className="lp-nav__right">
-          <button className="lp-nav__begin" onClick={handleEnter}>Begin</button>
+          <button className="lp-nav__begin" onClick={handleEnter}>
+            {user ? 'Create' : 'Create Now'}
+          </button>
           {user ? (
             <UserMenu
               user={user}
