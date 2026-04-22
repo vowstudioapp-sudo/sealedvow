@@ -728,6 +728,22 @@ const App: React.FC = () => {
   };
 
   const handleEnvelopeOpen = () => {
+    // Fire-and-forget open beacon for real receiver URLs only.
+    // Skip demo paths and anything without a valid 8-char session suffix
+    // (e.g., sender preview where the URL has been rewritten to '/').
+    const path = window.location.pathname;
+    if (!path.startsWith('/demo/')) {
+      const parts = path.replace(/^\//, '').replace(/\/$/, '').split('-');
+      const key = parts[parts.length - 1];
+      if (key && /^[a-z0-9]{8}$/i.test(key)) {
+        fetch('/api/letters/mark-opened', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionKey: key }),
+        }).catch(() => {});
+      }
+    }
     safeSetStage(AppStage.QUESTION);
   };
 

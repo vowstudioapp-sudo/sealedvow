@@ -1222,6 +1222,118 @@
   margin: 0 auto 36px;
 }
 
+/* ══════════════════════════════════
+   MY LETTERS MODAL — list styles
+══════════════════════════════════ */
+.lp-modal--letters {
+  max-width: 560px;
+}
+
+.lp-letters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 50vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.lp-letter-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  background: rgba(242,232,213,0.03);
+  border: 1px solid rgba(242,232,213,0.08);
+  border-radius: 12px;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+.lp-letter-item:hover {
+  background: rgba(242,232,213,0.05);
+  border-color: rgba(242,232,213,0.14);
+}
+
+.lp-letter-item__main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.lp-letter-item__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lp-letter-item__recipient {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 16px;
+  color: rgba(242,232,213,0.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-letter-item__occasion {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(207,198,178,0.5);
+}
+
+.lp-letter-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(207,198,178,0.55);
+}
+
+.lp-letter-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+.lp-letter-status--sent {
+  color: rgba(207,198,178,0.7);
+  background: rgba(242,232,213,0.06);
+}
+.lp-letter-status--opened {
+  color: rgba(230,180,80,0.9);
+  background: rgba(230,180,80,0.1);
+}
+.lp-letter-status--replied {
+  color: rgba(100,195,140,0.9);
+  background: rgba(76,175,120,0.1);
+}
+
+.lp-letter-item__view {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(242,232,213,0.82);
+  background: transparent;
+  border: 1px solid rgba(242,232,213,0.28);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.3s ease, color 0.3s ease;
+  flex-shrink: 0;
+}
+.lp-letter-item__view:hover {
+  border-color: rgba(242,232,213,0.6);
+  color: #F2E8D5;
+}
+
 .lp-btn-google {
   width: 100%;
   display: flex;

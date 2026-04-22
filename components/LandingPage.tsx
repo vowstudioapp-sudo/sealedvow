@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { PrivacyModal } from './PrivacyModal';
 import { TermsModal } from './TermsModal';
 import { HelpModal } from './HelpModal';
+import { MyLettersModal } from './MyLettersModal';
 import { useAuth } from '../hooks/useAuth';
 
 interface Props {
@@ -20,6 +21,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const [pastHero,    setPastHero]    = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
+  const [showMyLetters, setShowMyLetters] = useState(false);
 
   const { user, signInWithGoogle, signOut } = useAuth();
 
@@ -298,6 +300,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
       <TermsModal   isOpen={showTerms}   onClose={() => setShowTerms(false)} />
       <HelpModal    isOpen={showHelp}    onClose={() => setShowHelp(false)} />
+      <MyLettersModal isOpen={showMyLetters} onClose={() => setShowMyLetters(false)} />
 
       {/* ══════════════════════════════════════
           NAV
@@ -311,6 +314,12 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <button className="lp-nav__begin" onClick={handleEnter}>Begin</button>
           {user ? (
             <>
+              <button
+                className="lp-nav__signin"
+                onClick={() => setShowMyLetters(true)}
+              >
+                My Letters
+              </button>
               <span className="lp-nav__user" title={user.email || undefined}>
                 {user.displayName || user.email}
               </span>

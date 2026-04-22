@@ -11,6 +11,7 @@
 
 import crypto from 'crypto';
 import { adminDb, guardPost, rateLimit } from './lib/middleware.js';
+import { getSessionUser } from './lib/auth.js';
 
 const TIER_PRICES = {
   standard: 9900,
@@ -98,6 +99,12 @@ export default async function handler(req, res) {
     });
   }
 
+  // Resolve sender identity (optional — guests are still supported).
+  // When present, we mirror the letter to users/{uid}/letters/{sessionKey}
+  // so it shows up in the sender's dashboard.
+  const sessionUser = await getSessionUser(req);
+  const senderUid = sessionUser?.uid || null;
+
   const {
     razorpay_order_id,
     razorpay_payment_id,
@@ -182,6 +189,7 @@ export default async function handler(req, res) {
         paymentMode: 'founder',
         paidAmount: 0,
         tier: validTier,
+        ...(senderUid ? { senderUid } : {}),
       };
 
       updates[`payments/${founderId}`] = {
@@ -193,6 +201,13 @@ export default async function handler(req, res) {
         sessionKey,
         verifiedAt: now,
       };
+
+      if (senderUid) {
+        updates[`users/${senderUid}/letters/${sessionKey}`] = {
+          sessionKey,
+          createdAt: Date.now(),
+        };
+      }
 
       await adminDb.ref().update(updates);
       await tokenRef.remove().catch(() => {});
@@ -360,6 +375,7 @@ export default async function handler(req, res) {
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
       tier: orderTier,
+      ...(senderUid ? { senderUid } : {}),
     };
 
     updates[`payments/${razorpay_payment_id}`] = {
@@ -373,6 +389,13 @@ export default async function handler(req, res) {
     };
 
     updates[`orders/${razorpay_order_id}/status`] = 'paid';
+
+    if (senderUid) {
+      updates[`users/${senderUid}/letters/${sessionKey}`] = {
+        sessionKey,
+        createdAt: Date.now(),
+      };
+    }
 
     await adminDb.ref().update(updates);
 

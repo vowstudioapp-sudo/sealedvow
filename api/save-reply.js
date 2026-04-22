@@ -6,16 +6,9 @@
 // ============================================================================
 
 import { adminDb, guardPost, rateLimit } from './lib/middleware.js';
-import { getSessionUser } from './lib/auth.js';
 
 export default async function handler(req, res) {
   if (guardPost(req, res)) return;
-
-  // ── AUTH ──
-  const user = await getSessionUser(req);
-  if (!user) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
 
   // ── RATE LIMITING ──
   const { limited } = await rateLimit(req, {
@@ -66,6 +59,20 @@ export default async function handler(req, res) {
 
     if (!result.committed || !result.snapshot.val()) {
       return res.status(400).json({ error: "Reply is unavailable for this session." });
+    }
+
+    // Mirror repliedAt to the sender's dashboard entry, if this letter was
+    // created by a logged-in user. Best-effort; a failure here must not
+    // undo the reply itself.
+    const senderUid = result.snapshot.val().senderUid;
+    if (senderUid) {
+      try {
+        await adminDb
+          .ref(`users/${senderUid}/letters/${sessionKey}/repliedAt`)
+          .set(Date.now());
+      } catch (mirrorErr) {
+        console.error('[SaveReply] Mirror repliedAt failed:', mirrorErr.message);
+      }
     }
 
     return res.status(200).json({ saved: true });
