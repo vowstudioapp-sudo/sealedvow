@@ -8,17 +8,17 @@ export interface DemoEntry {
 export const DEMO_DATA: Record<string, CoupleData> = {
 
   // ═══════════════════════════════════════════════════════════
-  // 1. ANNIVERSARY — Pallav → Pragya
+  // 1. ANNIVERSARY — Karan → Richa
   // ═══════════════════════════════════════════════════════════
   anniversary: {
-    senderName: 'Pallav',
-    recipientName: 'Pragya',
+    senderName: 'Karan',
+    recipientName: 'Richa',
     occasion: 'anniversary',
     theme: 'velvet',
     writingMode: 'assisted',
     timeShared: '4 years together',
     relationshipIntent: 'The person I chose, and keep choosing.',
-    sharedMoment: 'That one rainy evening in Jaipur when the power went out and we talked till 3am by candlelight.',
+    sharedMoment: 'That evening overlooking the sea in Goa...',
     myth: 'Four years. One promise kept every single day.',
     userImageUrl: 'https://images.unsplash.com/photo-1529634597503-139d3726fed5?w=800&q=80',
     memoryBoard: [
@@ -29,7 +29,7 @@ export const DEMO_DATA: Record<string, CoupleData> = {
       { url: 'https://images.unsplash.com/photo-1474552226712-ac0f0961a954?w=600&q=80', caption: 'The fort where we promised to keep showing up', angle: -6, xOffset: -10, yOffset: 50 },
       { url: 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=600&q=80', caption: 'Year three. Still laughing at the same jokes.', angle: 9, xOffset: 60, yOffset: 0 },
     ],
-    finalLetter: `Pragya,
+    finalLetter: `Richa,
 
 Four years ago, I didn't know what I was getting into. I just knew I didn't want to leave.
 
@@ -37,23 +37,23 @@ You've seen the worst version of me — the anxious one, the overthinking one, t
 
 I don't say it enough: you changed how I see mornings. Before you, they were just alarms and traffic. Now they're the first few seconds where I reach over and know you're there.
 
-I still think about that rainy night in Jaipur. No electricity. Just candles and your voice and the kind of quiet that makes you say things you've been holding in for months. That was the night I knew this wasn't temporary.
+I still think about that night in Goa. No noise but the waves. Just the salt in the air and your voice and the kind of quiet that makes you say things you've been holding in for months. That was the night I knew this wasn't temporary.
 
 I'm not perfect. But I'm yours. That's the only title I care about.
 
 Happy anniversary. Not because the calendar says so — but because every day with you feels like one.
 
 Always,
-Pallav`,
+Karan`,
     musicType: 'youtube',
     musicUrl: 'https://www.youtube.com/watch?v=450p7goxZqg',
     sacredLocation: {
-      placeName: 'Nahargarh Fort, Jaipur',
+      placeName: 'Chapora Fort, Goa',
       description: 'Where we watched the city light up below us and promised to keep showing up.',
-      googleMapsUri: 'https://maps.google.com/?q=Nahargarh+Fort+Jaipur',
-      latLng: { lat: 26.9376, lng: 75.8154 },
+      googleMapsUri: 'https://maps.google.com/?q=15.6046,73.7369',
+      latLng: { lat: 15.6046, lng: 73.7369 },
     },
-    locationMemory: 'The fort where we sat on that wall and you told me what love actually means to you.',
+    locationMemory: 'That fort where we sat watching the waves...',
     coupons: [
       { id: 'c1', title: 'One Uninterrupted Sunday', description: 'No phone. No plans. Just us and nowhere to be.', icon: '☀️', isOpen: false },
       { id: 'c2', title: 'Your Favorite Dinner, Made By Me', description: 'I will cook. You will judge. Deal.', icon: '🍽️', isOpen: false },
