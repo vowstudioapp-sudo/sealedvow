@@ -6,9 +6,16 @@
 // ============================================================================
 
 import { adminDb, guardPost, rateLimit } from './lib/middleware.js';
+import { getSessionUser } from './lib/auth.js';
 
 export default async function handler(req, res) {
   if (guardPost(req, res)) return;
+
+  // ── AUTH ──
+  const user = await getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
 
   // ── RATE LIMITING ──
   const { limited } = await rateLimit(req, {
