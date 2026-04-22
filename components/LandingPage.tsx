@@ -225,7 +225,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       if (half <= 0) return;
       if (el.scrollLeft <= 0) {
         el.scrollLeft += half;
-      } else if (el.scrollLeft > half) {
+      } else if (el.scrollLeft >= el.scrollWidth - el.clientWidth - 1) {
         el.scrollLeft -= half;
       }
     };
