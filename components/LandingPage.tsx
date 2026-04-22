@@ -339,6 +339,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         <div className="lp-hero__center">
           <div className="lp-v-ring"><span>V</span></div>
           <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
+          <p className="lp-hero__kicker">Sealed. Private. Opened once.</p>
           <div className="lp-hero__rule" />
           <button className="lp-btn-begin" onClick={handleEnter}>Create</button>
         </div>
