@@ -435,7 +435,9 @@
   opacity: 1;
 }
 
-/* Rail mask — native scroll container with snap */
+/* Rail mask — native scroll container with snap.
+   Edge fade uses mask-image so cards themselves fade to transparent
+   at the viewport edges (no colored overlay → no tint band on cards). */
 .lp-rail__mask {
   position: relative;
   overflow-x: auto;
@@ -444,6 +446,20 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 60px,
+    black calc(100% - 60px),
+    transparent 100%
+  );
+          mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 60px,
+    black calc(100% - 60px),
+    transparent 100%
+  );
 }
 
 .lp-rail__mask::-webkit-scrollbar { display: none; }
@@ -452,24 +468,6 @@
    snap re-engages the moment the user touches/scrolls the rail. */
 .lp-rail__mask.is-drifting {
   scroll-snap-type: none;
-}
-.lp-rail__mask::before,
-.lp-rail__mask::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 100px;
-  z-index: 3;
-  pointer-events: none;
-}
-.lp-rail__mask::before {
-  left: 0;
-  background: linear-gradient(to right, #0c1320, transparent);
-}
-.lp-rail__mask::after {
-  right: 0;
-  background: linear-gradient(to left, #0c1320, transparent);
 }
 
 /* ── Card ── */
