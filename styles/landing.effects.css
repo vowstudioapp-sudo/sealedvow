@@ -168,6 +168,19 @@
   color: rgba(242,232,213,0.9);
 }
 
+/* Signed-in user label — matches nav typography, non-interactive */
+.lp-nav__user {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(242,232,213,0.72);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ══════════════════════════════════
    HERO
 ══════════════════════════════════ */

@@ -21,7 +21,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
 
-  const { signInWithGoogle } = useAuth();
+  const { user, signInWithGoogle, signOut } = useAuth();
 
   const intervalRef  = useRef<number | null>(null);
   const heroRef      = useRef<HTMLElement | null>(null);
@@ -309,7 +309,24 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         </div>
         <div className="lp-nav__right">
           <button className="lp-nav__begin" onClick={handleEnter}>Begin</button>
-          <button className="lp-nav__signin" onClick={() => setShowLogin(true)}>Sign In</button>
+          {user ? (
+            <>
+              <span className="lp-nav__user" title={user.email || undefined}>
+                {user.displayName || user.email}
+              </span>
+              <button
+                className="lp-nav__signin"
+                onClick={async () => {
+                  await signOut();
+                  window.location.reload();
+                }}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button className="lp-nav__signin" onClick={() => setShowLogin(true)}>Sign In</button>
+          )}
         </div>
       </nav>
 
