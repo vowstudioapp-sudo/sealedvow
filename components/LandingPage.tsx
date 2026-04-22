@@ -23,6 +23,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const demoRef      = useRef<HTMLElement | null>(null);
   const glowRef      = useRef<HTMLDivElement | null>(null);
+  const railMaskRef  = useRef<HTMLDivElement | null>(null);
 
   /* ── Entrance reveal ── */
   useEffect(() => {
@@ -137,6 +138,100 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     };
   }, [isVisible]);
 
+  /* ── Rail auto-drift — slow editorial scroll that yields to the user ── */
+  useEffect(() => {
+    const el = railMaskRef.current;
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const DRIFT_PX_PER_SEC = 25;
+    const IDLE_MS = 2500;
+
+    let rafId = 0;
+    let resumeTimer: number | null = null;
+    let isHovered = false;
+    let isDrifting = false;
+    let prevTs = 0;
+
+    const stopDrift = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = 0;
+      isDrifting = false;
+      el.classList.remove('is-drifting');
+    };
+
+    const startDrift = () => {
+      if (isDrifting || isHovered) return;
+      isDrifting = true;
+      el.classList.add('is-drifting');
+      prevTs = performance.now();
+      const tick = (now: number) => {
+        const dt = now - prevTs;
+        prevTs = now;
+        const half = el.scrollWidth / 2;
+        if (half > 0) {
+          let next = el.scrollLeft + (DRIFT_PX_PER_SEC * dt) / 1000;
+          if (next >= half) next -= half;
+          el.scrollLeft = next;
+        }
+        rafId = requestAnimationFrame(tick);
+      };
+      rafId = requestAnimationFrame(tick);
+    };
+
+    const clearResume = () => {
+      if (resumeTimer !== null) {
+        window.clearTimeout(resumeTimer);
+        resumeTimer = null;
+      }
+    };
+
+    const scheduleResume = () => {
+      clearResume();
+      resumeTimer = window.setTimeout(() => {
+        resumeTimer = null;
+        if (!isHovered) startDrift();
+      }, IDLE_MS);
+    };
+
+    const onEnter = () => {
+      isHovered = true;
+      clearResume();
+      stopDrift();
+    };
+    const onLeave = () => {
+      isHovered = false;
+      scheduleResume();
+    };
+    const onInteract = () => {
+      stopDrift();
+      scheduleResume();
+    };
+
+    const startTimer = window.setTimeout(() => {
+      if (!isHovered) startDrift();
+    }, 800);
+
+    el.addEventListener('mouseenter', onEnter);
+    el.addEventListener('mouseleave', onLeave);
+    el.addEventListener('pointerdown', onInteract, { passive: true });
+    el.addEventListener('touchstart', onInteract, { passive: true });
+    el.addEventListener('wheel', onInteract, { passive: true });
+    el.addEventListener('focusin', onInteract);
+
+    return () => {
+      window.clearTimeout(startTimer);
+      clearResume();
+      stopDrift();
+      el.removeEventListener('mouseenter', onEnter);
+      el.removeEventListener('mouseleave', onLeave);
+      el.removeEventListener('pointerdown', onInteract);
+      el.removeEventListener('touchstart', onInteract);
+      el.removeEventListener('wheel', onInteract);
+      el.removeEventListener('focusin', onInteract);
+    };
+  }, []);
+
   /* ── Parallax glow behind cards ── */
   useEffect(() => {
     const section = demoRef.current;
@@ -227,7 +322,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         </div>
 
         <div className="lp-rail lp-fade">
-          <div className="lp-rail__mask">
+          <div className="lp-rail__mask" ref={railMaskRef}>
             <div className="lp-rail__track">
 
               {/* ── Card set 1 ── */}
