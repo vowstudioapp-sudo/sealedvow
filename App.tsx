@@ -202,7 +202,15 @@ const resolveStage = (state: StageResolverState): AppStage => {
   }
 
   if (linkState === LoaderState.SUCCESS && sharedData) {
-    return role === 'master' ? AppStage.MASTER_CONTROL : AppStage.PERSONAL_INTRO;
+    if (role === 'master') return AppStage.MASTER_CONTROL;
+    // Only transition into PERSONAL_INTRO from LANDING (initial entry). Once the
+    // receiver has advanced to ENVELOPE/QUESTION/MAIN_EXPERIENCE/REPLY_COMPOSE,
+    // preserve currentStage — otherwise this branch re-fires on every stage
+    // change (stage is in Effect 411's deps) and yanks the user back to
+    // PERSONAL_INTRO, producing the "name keeps flashing" loop.
+    return currentStage === AppStage.LANDING
+      ? AppStage.PERSONAL_INTRO
+      : currentStage;
   }
 
   if (linkState === LoaderState.LOADING) {
