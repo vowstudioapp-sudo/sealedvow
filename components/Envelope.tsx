@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Theme } from '../types';
+import { AtmosphericShell } from './AtmosphericShell';
 
 /* ------------------------------------------------------------------ */
 /* CONFIGURATION (single source of truth)                               */
@@ -165,7 +166,8 @@ export const Envelope: React.FC<Props> = ({
   /* ------------------------------------------------------------------ */
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] px-4">
+    <AtmosphericShell>
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-4">
       {/* Envelope */}
       <div
         role="button"
@@ -255,7 +257,7 @@ export const Envelope: React.FC<Props> = ({
       {/* CTA */}
       {phase === 'idle' && (
         <div className="mt-16 text-center">
-          <p 
+          <p
             className="text-xs uppercase tracking-widest"
             style={{ color: styles.subtext, opacity: 0.9 }}
           >
@@ -263,6 +265,7 @@ export const Envelope: React.FC<Props> = ({
           </p>
         </div>
       )}
-    </div>
+      </div>
+    </AtmosphericShell>
   );
 };

@@ -10,6 +10,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useAudioNarration } from '../../hooks/useAudioNarration';
+import { AtmosphericShell } from '../AtmosphericShell';
 
 const MAX_PARAGRAPH_CHARS = 180;
 
@@ -80,7 +81,8 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
 
   /* ── Render ── */
   return (
-    <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center snap-start p-4 md:p-8">
+    <AtmosphericShell>
+      <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center snap-start p-4 md:p-8">
       <div
         className="main-experience-letter-card"
         onClick={advanceParagraph}
@@ -163,6 +165,7 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
           Read Again
         </button>
       )}
-    </section>
+      </section>
+    </AtmosphericShell>
   );
 };

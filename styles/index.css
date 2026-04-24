@@ -9,10 +9,84 @@
    body {
     font-family: 'Quicksand', sans-serif;
     background-color: #050505;
+    background-image: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      transparent 50%,
+      rgba(0, 0, 0, 0.05) 100%
+    );
     color: #2D2424;
     overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
     transition: background-color 2.5s ease-out;
+  }
+
+  /* ================================================================
+     SEALED VOW — ATMOSPHERIC SURFACE (opt-in)
+     Film-still texture for emotional scenes only. Never apply to
+     forms, inputs, composers, or payment surfaces.
+     ================================================================ */
+
+  :root {
+    --sv-surface-navy-1: #1B2942;
+    --sv-surface-navy-2: #0F1828;
+    --sv-surface-navy-3: #050A12;
+    --sv-glow-gold:      rgba(212, 175, 55, 0.06);
+    --sv-glow-crimson:   rgba(136,  24, 40, 0.08);
+  }
+
+  .sv-surface-dark {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 20%, var(--sv-glow-gold),    transparent 70%),
+      radial-gradient(ellipse 90% 70% at 20% 90%, var(--sv-glow-crimson), transparent 75%),
+      linear-gradient(180deg,
+        var(--sv-surface-navy-1) 0%,
+        var(--sv-surface-navy-2) 60%,
+        var(--sv-surface-navy-3) 100%);
+  }
+
+  /* Content sits above the texture layers. Exclude grain/vignette
+     so they stay at z-index 0. */
+  .sv-surface-dark > *:not(.sv-grain):not(.sv-vignette) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Scoped grain — position:absolute (not fixed) so the texture is
+     bounded by the shell, not leaked to surrounding content on
+     long-scroll pages. isolation:isolate on the parent contains the
+     mix-blend-mode. */
+  .sv-grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    /* Visual QA range: 0.06–0.08. Tune on real mobile. */
+    opacity: 0.07;
+    mix-blend-mode: screen;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    background-size: 200px 200px;
+  }
+
+  .sv-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45) 100%);
+  }
+
+  /* Accessibility — users who request high contrast or reduced
+     transparency get a flat surface, no grain, no glow. */
+  @media (prefers-contrast: more),
+         (prefers-reduced-transparency: reduce) {
+    .sv-surface-dark {
+      background: var(--sv-surface-navy-3);
+    }
+    .sv-grain, .sv-vignette { display: none; }
   }
   
   /* Font utilities (used across multiple components) */

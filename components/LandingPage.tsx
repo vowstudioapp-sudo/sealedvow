@@ -4,6 +4,7 @@ import { TermsModal } from './TermsModal';
 import { HelpModal } from './HelpModal';
 import { MyLettersModal } from './MyLettersModal';
 import { UserMenu } from './UserMenu';
+import { AtmosphericShell } from './AtmosphericShell';
 import { useAuth } from '../hooks/useAuth';
 
 interface Props {
@@ -335,21 +336,23 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       {/* ══════════════════════════════════════
           HERO
       ══════════════════════════════════════ */}
-      <section className="lp-hero" ref={heroRef}>
-        <div className="lp-hero__center">
-          <div className="lp-v-ring"><span>V</span></div>
-          <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
-          <p className="lp-hero__kicker">Sealed. Private. Opened once.</p>
-          <div className="lp-hero__rule" />
-          <button className="lp-btn-begin" onClick={handleEnter}>Create</button>
-        </div>
-        <div className="lp-hero__bottom">
-          <div className="lp-scroll-signal">
-            <span>Scroll</span>
-            <div className="lp-scroll-line" />
+      <AtmosphericShell>
+        <section className="lp-hero" ref={heroRef}>
+          <div className="lp-hero__center">
+            <div className="lp-v-ring"><span>V</span></div>
+            <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
+            <p className="lp-hero__kicker">Sealed. Private. Opened once.</p>
+            <div className="lp-hero__rule" />
+            <button className="lp-btn-begin" onClick={handleEnter}>Create</button>
           </div>
-        </div>
-      </section>
+          <div className="lp-hero__bottom">
+            <div className="lp-scroll-signal">
+              <span>Scroll</span>
+              <div className="lp-scroll-line" />
+            </div>
+          </div>
+        </section>
+      </AtmosphericShell>
 
 
       {/* ══════════════════════════════════════
