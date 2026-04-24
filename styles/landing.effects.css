@@ -22,38 +22,6 @@
   padding-top: 0;
 }
 
-/* Grain texture */
-.landing-v2::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.015;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 200px;
-}
-
-/* Drifting ambient light */
-.landing-v2::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 70% 50% at 30% 20%, rgba(255,255,255,0.028), transparent),
-    radial-gradient(ellipse 60% 40% at 70% 75%, rgba(255,255,255,0.018), transparent);
-  animation: lp-driftLight 18s ease-in-out infinite alternate;
-}
-
-@keyframes lp-driftLight {
-  0%   { opacity: 0.6; transform: translate(0,0) scale(1); }
-  33%  { opacity: 1;   transform: translate(3%,2%) scale(1.04); }
-  66%  { opacity: 0.7; transform: translate(-2%,4%) scale(0.97); }
-  100% { opacity: 1;   transform: translate(2%,-2%) scale(1.02); }
-}
-
 /* ══════════════════════════════════
    NAV — full-width bar
 ══════════════════════════════════ */
@@ -336,14 +304,6 @@
   position: relative;
 }
 
-.lp-hero__center::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 45%, rgba(255,255,255,0.04), transparent 65%);
-  pointer-events: none;
-}
-
 /* V ring */
 .lp-v-ring {
   width: 64px;
@@ -356,22 +316,6 @@
   margin-bottom: 60px;
   animation: lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.2s both;
   position: relative;
-}
-
-.lp-v-ring::after {
-  content: "";
-  position: absolute;
-  inset: -25px;
-  background: radial-gradient(circle, rgba(255,205,130,0.14), transparent 70%);
-  filter: blur(30px);
-  z-index: -1;
-  opacity: 1;
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-
-.lp-v-ring:hover::after {
-  opacity: 1.2;
-  transform: scale(1.08);
 }
 
 .lp-v-ring span {
@@ -548,25 +492,6 @@
   background: var(--sv-bg-base);
   border-top: 1px solid var(--sv-line-gold);
   overflow: hidden;
-}
-
-/* Parallax glow layer — moves subtly with cursor */
-.lp-demo-cards__glow {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 140%;
-  height: 140%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(120,160,255,0.1),
-    rgba(100,140,220,0.04) 40%,
-    transparent 60%
-  );
-  pointer-events: none;
-  z-index: 0;
-  transition: transform 0.6s ease-out;
 }
 
 /* Heading */
@@ -920,18 +845,6 @@
   background: #0c1320;
   position: relative;
   overflow: hidden;
-}
-
-.lp-demo::before {
-  content: '';
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(231,217,183,0.04) 0%, transparent 70%);
-  pointer-events: none;
 }
 
 .lp-demo__eyebrow {

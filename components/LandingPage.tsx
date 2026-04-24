@@ -31,7 +31,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const heroRef      = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const demoRef      = useRef<HTMLElement | null>(null);
-  const glowRef      = useRef<HTMLDivElement | null>(null);
   const railMaskRef  = useRef<HTMLDivElement | null>(null);
 
   /* ── Entrance reveal ── */
@@ -257,35 +256,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     };
   }, []);
 
-  /* ── Parallax glow behind cards ── */
-  useEffect(() => {
-    const section = demoRef.current;
-    const glow = glowRef.current;
-    if (!section || !glow) return;
-
-    const MAX_MOVE = 15;
-
-    const handleMove = (e: MouseEvent) => {
-      const rect = section.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;  // -0.5 to 0.5
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      const moveX = x * MAX_MOVE * 2;
-      const moveY = y * MAX_MOVE * 2;
-      glow.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
-    };
-
-    const handleLeave = () => {
-      glow.style.transform = 'translate(-50%, -50%)';
-    };
-
-    section.addEventListener('mousemove', handleMove);
-    section.addEventListener('mouseleave', handleLeave);
-    return () => {
-      section.removeEventListener('mousemove', handleMove);
-      section.removeEventListener('mouseleave', handleLeave);
-    };
-  }, [isVisible]);
-
   const handleEnter = () => {
     window.location.href = "/create";
   };
@@ -359,7 +329,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           DEMO CARDS — directly after hero
       ══════════════════════════════════════ */}
       <section className="lp-demo-cards" ref={demoRef}>
-        <div className="lp-demo-cards__glow" ref={glowRef} />
         <div className="lp-demo-cards__heading lp-fade">
           <p className="lp-demo-cards__title">Preview the experience</p>
           <p className="lp-demo-cards__sub">See how your letter arrives</p>
