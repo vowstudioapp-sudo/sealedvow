@@ -368,9 +368,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
               {/* ── Card set 1 ── */}
               {/* Anniversary */}
-              <a className="lp-card lp-card--anniversary" href="/demo/anniversary">
+              <a className="lp-card lp-card--anniversary" style={{ ['--card-accent' as any]: '#C8645A' }} href="/demo/anniversary">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
                     <line x1="8" y1="40" x2="20" y2="30"/><line x1="40" y1="40" x2="28" y2="30"/>
                     <circle cx="24" cy="12" r="4"/><path d="M20 12c0-4 4-8 4-8s4 4 4 8"/>
@@ -382,9 +382,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </a>
 
               {/* Birthday */}
-              <a className="lp-card lp-card--birthday" href="/demo/birthday">
+              <a className="lp-card lp-card--birthday" style={{ ['--card-accent' as any]: '#E6B450' }} href="/demo/birthday">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="8" y="22" width="32" height="18" rx="3"/><rect x="12" y="16" width="24" height="6" rx="2"/>
                     <line x1="24" y1="16" x2="24" y2="40"/><path d="M24 10c0-3 2-5 0-7"/>
                     <circle cx="24" cy="13" r="1.5" fill="rgba(242,232,213,0.35)" stroke="none"/>
@@ -396,9 +396,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </a>
 
               {/* Thank You */}
-              <a className="lp-card lp-card--thankyou" href="/demo/thankyou">
+              <a className="lp-card lp-card--thankyou" style={{ ['--card-accent' as any]: '#C9849A' }} href="/demo/thankyou">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M24 42c-8-6-16-12-16-22a10 10 0 0 1 16-8 10 10 0 0 1 16 8c0 10-8 16-16 22z"/>
                     <path d="M20 22l3 3 6-6"/>
                   </svg>
@@ -409,9 +409,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </a>
 
               {/* Eid */}
-              <a className="lp-card lp-card--eid" href="/demo/eid">
+              <a className="lp-card lp-card--eid" style={{ ['--card-accent' as any]: '#4CAF78' }} href="/demo/eid">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
                     <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
                     <circle cx="36" cy="10" r="2.5"/>
@@ -424,9 +424,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </a>
 
               {/* Just Because */}
-              <a className="lp-card lp-card--justbecause" href="/demo/justbecause">
+              <a className="lp-card lp-card--justbecause" style={{ ['--card-accent' as any]: '#8C7AE6' }} href="/demo/justbecause">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M24 8v32"/><path d="M16 16c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
                     <circle cx="24" cy="24" r="14"/>
                     <path d="M14 24h20"/><path d="M18 18l12 12"/><path d="M30 18l-12 12"/>
@@ -438,9 +438,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </a>
 
               {/* Apology */}
-              <a className="lp-card lp-card--apology" href="/demo/apology">
+              <a className="lp-card lp-card--apology" style={{ ['--card-accent' as any]: '#E8E4EC' }} href="/demo/apology">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M16 28c-4 0-8-3-8-8s4-8 8-8c2 0 4 1 5 2"/>
                     <path d="M32 28c4 0 8-3 8-8s-4-8-8-8c-2 0-4 1-5 2"/>
                     <path d="M20 14c2-2 5-2 8 0"/>
@@ -453,9 +453,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </a>
 
               {/* ── Card set 2 (duplicate for seamless loop) ── */}
-              <a className="lp-card lp-card--anniversary" href="/demo/anniversary" aria-hidden="true">
+              <a className="lp-card lp-card--anniversary" style={{ ['--card-accent' as any]: '#C8645A' }} href="/demo/anniversary" aria-hidden="true">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
                     <line x1="8" y1="40" x2="20" y2="30"/><line x1="40" y1="40" x2="28" y2="30"/>
                     <circle cx="24" cy="12" r="4"/><path d="M20 12c0-4 4-8 4-8s4 4 4 8"/>
@@ -466,9 +466,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              <a className="lp-card lp-card--birthday" href="/demo/birthday" aria-hidden="true">
+              <a className="lp-card lp-card--birthday" style={{ ['--card-accent' as any]: '#E6B450' }} href="/demo/birthday" aria-hidden="true">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="8" y="22" width="32" height="18" rx="3"/><rect x="12" y="16" width="24" height="6" rx="2"/>
                     <line x1="24" y1="16" x2="24" y2="40"/><path d="M24 10c0-3 2-5 0-7"/>
                     <circle cx="24" cy="13" r="1.5" fill="rgba(242,232,213,0.35)" stroke="none"/>
@@ -479,9 +479,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              <a className="lp-card lp-card--thankyou" href="/demo/thankyou" aria-hidden="true">
+              <a className="lp-card lp-card--thankyou" style={{ ['--card-accent' as any]: '#C9849A' }} href="/demo/thankyou" aria-hidden="true">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M24 42c-8-6-16-12-16-22a10 10 0 0 1 16-8 10 10 0 0 1 16 8c0 10-8 16-16 22z"/>
                     <path d="M20 22l3 3 6-6"/>
                   </svg>
@@ -491,9 +491,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              <a className="lp-card lp-card--eid" href="/demo/eid" aria-hidden="true">
+              <a className="lp-card lp-card--eid" style={{ ['--card-accent' as any]: '#4CAF78' }} href="/demo/eid" aria-hidden="true">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
                     <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
                     <circle cx="36" cy="10" r="2.5"/>
@@ -505,9 +505,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              <a className="lp-card lp-card--justbecause" href="/demo/justbecause" aria-hidden="true">
+              <a className="lp-card lp-card--justbecause" style={{ ['--card-accent' as any]: '#8C7AE6' }} href="/demo/justbecause" aria-hidden="true">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M24 8v32"/><path d="M16 16c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
                     <circle cx="24" cy="24" r="14"/>
                     <path d="M14 24h20"/><path d="M18 18l12 12"/><path d="M30 18l-12 12"/>
@@ -518,9 +518,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              <a className="lp-card lp-card--apology" href="/demo/apology" aria-hidden="true">
+              <a className="lp-card lp-card--apology" style={{ ['--card-accent' as any]: '#E8E4EC' }} href="/demo/apology" aria-hidden="true">
                 <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="rgba(242,232,213,0.55)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M16 28c-4 0-8-3-8-8s4-8 8-8c2 0 4 1 5 2"/>
                     <path d="M32 28c4 0 8-3 8-8s-4-8-8-8c-2 0-4 1-5 2"/>
                     <path d="M20 14c2-2 5-2 8 0"/>
