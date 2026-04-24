@@ -1066,11 +1066,11 @@
 }
 
 .lp-s5__price-anchor {
-  font-size: 12px;
+  font-size: 13px;
   font-style: normal;
-  font-weight: 400;
-  color: rgba(207,198,178,0.58);
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  color: rgba(241,231,218,0.72);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 14px;
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
