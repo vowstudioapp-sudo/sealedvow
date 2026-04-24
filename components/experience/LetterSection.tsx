@@ -148,7 +148,7 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
           )}
 
           {currentParagraph < letterParagraphs.length - 1 && (
-            <div className="mt-12 animate-pulse opacity-60 text-[9px] uppercase tracking-widest" style={{ color: theme.gold }}>
+            <div className="mt-12 animate-pulse opacity-60 text-[11px] uppercase tracking-widest" style={{ color: theme.gold }}>
               Tap to continue
             </div>
           )}
@@ -158,7 +158,7 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
       {currentParagraph === letterParagraphs.length - 1 && (
         <button
           onClick={resetParagraph}
-          className="absolute top-10 right-10 text-[8px] uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity border-b border-white/20 pb-1 z-20"
+          className="absolute top-10 right-10 text-[11px] uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity border-b border-white/20 pb-1 z-20"
         >
           Read Again
         </button>

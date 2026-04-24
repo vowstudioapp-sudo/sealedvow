@@ -146,7 +146,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
 
         <button
           onClick={onClose}
-          className="mt-12 text-[8px] uppercase tracking-[0.4em] text-white/15 hover:text-white/30 transition-colors"
+          className="mt-12 text-[8px] uppercase tracking-[0.4em] text-white/55 hover:text-white/80 transition-colors"
           style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}
         >
           Return
@@ -175,7 +175,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
       </p>
 
       <p
-        className="text-[9px] uppercase tracking-[0.3em] text-white/20 mb-8"
+        className="text-[9px] uppercase tracking-[0.3em] text-white/50 mb-8"
         style={{ animation: 'closureReveal 0.6s ease-out 0.6s both' }}
       >
         One message. Make it count.
@@ -198,7 +198,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
       />
 
       <p
-        className="mt-2 text-[8px] text-white/15 tracking-wide self-end max-w-md w-full text-right"
+        className="mt-2 text-[8px] text-white/55 tracking-wide self-end max-w-md w-full text-right"
         style={{ animation: 'closureReveal 0.6s ease-out 1s both' }}
       >
         {replyText.length}/500
@@ -240,7 +240,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
 
         <button
           onClick={onClose}
-          className="text-[8px] uppercase tracking-[0.4em] text-white/15 hover:text-white/30 transition-colors"
+          className="text-[8px] uppercase tracking-[0.4em] text-white/55 hover:text-white/80 transition-colors"
         >
           Not now
         </button>

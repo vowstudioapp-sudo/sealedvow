@@ -130,7 +130,7 @@ body::before {
 .lp-nav__brand {
   font-family: 'Cormorant Garamond', Georgia, serif;
   font-size: 10px;
-  letter-spacing: 0.45em;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
   color: rgba(242,232,213,0.72);
   font-weight: 400;
@@ -1255,7 +1255,7 @@ body::before {
   color: var(--lp-text-main);
 }
 .lp-footer__subscribe-input::placeholder {
-  color: rgba(242,232,213,0.35);
+  color: rgba(242,232,213,0.52);
 }
 
 .lp-footer__subscribe-btn {
