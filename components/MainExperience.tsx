@@ -982,7 +982,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 className="w-full py-4 text-[10px] font-bold uppercase tracking-[0.4em] rounded-full transition-all duration-300 shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
                 style={{ backgroundColor: '#722F37', color: '#FFFFFF', letterSpacing: '0.4em' }}
               >
-                Seal & Deliver
+                Send letter
               </button>
             )}
           </div>

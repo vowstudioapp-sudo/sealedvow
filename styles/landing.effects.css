@@ -1061,6 +1061,28 @@
   font-weight: 400;
   color: rgba(207,198,178,0.78);
   letter-spacing: 0.06em;
+  margin-bottom: 10px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+.lp-s5__price-anchor {
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  color: rgba(207,198,178,0.58);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.lp-s5__freemium {
+  font-size: 13.5px;
+  font-style: normal;
+  font-weight: 400;
+  color: rgba(207,198,178,0.78);
+  letter-spacing: 0.04em;
+  line-height: 1.5;
   margin-bottom: 84px;
   font-family: 'Cormorant Garamond', Georgia, serif;
 }

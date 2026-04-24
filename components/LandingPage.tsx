@@ -331,6 +331,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         <div className="lp-fade">
           <p className="lp-s5__headline">When the moment deserves<br />more than a message.</p>
           <p className="lp-s5__sub">ONE LETTER • ONE PERSON</p>
+          <p className="lp-s5__price-anchor">₹249 per letter</p>
+          <p className="lp-s5__freemium">Write for free. Send it when it matters.</p>
         </div>
       </section>
 

@@ -220,21 +220,16 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
           <div className="w-12 h-12 rounded-full bg-luxury-wine/30 border-2 border-luxury-gold/50 flex items-center justify-center mx-auto mb-3">
             <img src="/favicon.svg" alt="VOW" className="w-7 h-7" />
           </div>
-          <h2 className="text-[9px] uppercase tracking-[0.4em] text-luxury-gold font-bold mb-1">Finalize Your Gift</h2>
-          <h1 className="text-2xl md:text-3xl font-serif-elegant italic text-white">Seal your letter</h1>
+          <h2 className="text-[9px] uppercase tracking-[0.4em] text-luxury-gold font-bold mb-1">Send letter</h2>
+          <h1 className="text-2xl md:text-3xl font-serif-elegant italic text-white">Ready when it matters.</h1>
         </div>
 
         <div className="p-4 md:p-5">
 
-          {/* Single-price card */}
-          <div className="mb-5 p-4 rounded-lg border-2 border-[#D4AF37] bg-[#D4AF37]/5">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-serif-elegant italic text-luxury-ink text-base">{PRODUCT_NAME}</p>
-                <p className="text-[9px] text-luxury-stone/60 mt-0.5 tracking-wide">{PRODUCT_TAGLINE}</p>
-              </div>
-              <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">₹{isEidFlow ? LETTER_PRICE + eidiAmount : LETTER_PRICE}</p>
-            </div>
+          {/* Send-step context */}
+          <div className="mb-5 text-center">
+            <p className="font-serif-elegant italic text-luxury-ink text-base">{PRODUCT_NAME}</p>
+            <p className="text-[10px] text-luxury-stone/70 mt-1 tracking-wide">{PRODUCT_TAGLINE}</p>
           </div>
 
           {isEidFlow && (
@@ -282,7 +277,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
               ) : !scriptLoaded ? (
                 <span>Loading Payment...</span>
               ) : (
-                <span>Seal for ₹{isEidFlow ? totalPayable : LETTER_PRICE}</span>
+                <span>Send letter • ₹{isEidFlow ? totalPayable : LETTER_PRICE}</span>
               )}
             </button>
 
