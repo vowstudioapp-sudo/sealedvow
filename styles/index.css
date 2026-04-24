@@ -9,12 +9,6 @@
    body {
     font-family: 'Quicksand', sans-serif;
     background-color: #050505;
-    background-image: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.02) 0%,
-      transparent 50%,
-      rgba(0, 0, 0, 0.05) 100%
-    );
     color: #2D2424;
     overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
@@ -29,7 +23,7 @@
 
   :root {
     /* Plum + black cherry palette (names kept as navy-* for trivial revert) */
-    --sv-surface-navy-1: #24182C;   /* surface  — lightest plum, peak */
+    --sv-surface-navy-1: #2E1F38;   /* surface  — lightest plum, peak (widened for Android dither) */
     --sv-surface-navy-2: #1A1220;   /* base     — mid plum */
     --sv-surface-navy-3: #120A16;   /* section  — deepest, black cherry */
     --sv-glow-gold:      rgba(212, 175, 55, 0.06);
@@ -90,9 +84,15 @@
        lets dark noise pixels darken and light pixels lighten — bidirectional
        grain. Screen blend (previous) only lightened, which was suppressed on
        dark backdrops. */
-    opacity: 0.12;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.45' numOctaves='1' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
     background-size: 200px 200px;
+  }
+
+  @media (max-width: 768px) {
+    .sv-grain {
+      opacity: 0.008;
+    }
   }
 
   .sv-vignette {
@@ -233,28 +233,7 @@
     - Kept global by design
     - Replace with pure CSS grain later if external assets are banned
   */
-  .film-grain {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 50;
-    opacity: 0.04;
-    background-image:
-      repeating-linear-gradient(
-        0deg,
-        rgba(255, 255, 255, 0.03),
-        rgba(255, 255, 255, 0.03) 1px,
-        transparent 1px,
-        transparent 2px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.02),
-        rgba(255, 255, 255, 0.02) 1px,
-        transparent 1px,
-        transparent 2px
-      );
-  }
+  .film-grain { display: none; }
   
   /* ================================================================
      ACCESSIBILITY (Always Last)
