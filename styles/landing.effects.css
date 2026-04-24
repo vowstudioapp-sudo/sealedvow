@@ -15,10 +15,7 @@
 .landing-v2 {
   font-family: 'Cormorant Garamond', Georgia, serif;
   -webkit-font-smoothing: antialiased;
-  background:
-    radial-gradient(ellipse 70% 50% at 30% 20%, rgba(255,255,255,0.028), transparent),
-    radial-gradient(ellipse 60% 40% at 70% 75%, rgba(255,255,255,0.018), transparent),
-    radial-gradient(ellipse at 50% 25%, #2c3f6c 0%, #1b2942 40%, #0f1828 70%, #050a12 100%);
+  background: var(--sv-bg-base);
   color: var(--lp-text-main);
   overflow-x: hidden;
   min-height: 100vh;
@@ -75,9 +72,9 @@
 
   z-index: 500;
 
-  background: rgba(12,18,30,0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(26, 18, 32, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 
   border-bottom: 1px solid rgba(255,255,255,0.06);
 
@@ -548,7 +545,8 @@
 .lp-demo-cards {
   position: relative;
   padding: 120px 0 160px;
-  background: #0c1320;
+  background: var(--sv-bg-base);
+  border-top: 1px solid var(--sv-line-gold);
   overflow: hidden;
 }
 
@@ -664,8 +662,8 @@
   scroll-snap-align: center;
   width: 260px;
   height: 320px;
-  background: #111a28;
-  border: 1px solid rgba(242,232,213,0.07);
+  background: var(--sv-bg-card);
+  border: 1px solid var(--sv-line-soft);
   border-radius: 18px;
   display: flex;
   flex-direction: column;
@@ -865,11 +863,13 @@
   padding: 120px 48px;
   text-align: center;
   position: relative;
+  background: var(--sv-bg-deep);
+  border-top: 1px solid var(--sv-line-gold);
 }
 
-.lp-section--s3 { background: #0c1320; }
-.lp-section--s4 { background: #08101c; }
-.lp-section--s5 { background: #0c1320; }
+.lp-section--s3 { background: var(--sv-bg-base); }
+.lp-section--s4 { background: var(--sv-bg-deep); }
+.lp-section--s5 { background: var(--sv-bg-base); }
 
 .lp-section__num {
   font-size: 8px;
@@ -1184,7 +1184,8 @@
    FOOTER
 ══════════════════════════════════ */
 .lp-footer {
-  background: #04070d;
+  background: var(--sv-bg-deep);
+  border-top: 1px solid var(--sv-line-gold);
   padding: 64px 64px 0;
 }
 

@@ -28,11 +28,33 @@
      ================================================================ */
 
   :root {
-    --sv-surface-navy-1: #1B2942;
-    --sv-surface-navy-2: #0F1828;
-    --sv-surface-navy-3: #050A12;
+    /* Plum + black cherry palette (names kept as navy-* for trivial revert) */
+    --sv-surface-navy-1: #24182C;   /* surface  — lightest plum, peak */
+    --sv-surface-navy-2: #1A1220;   /* base     — mid plum */
+    --sv-surface-navy-3: #120A16;   /* section  — deepest, black cherry */
     --sv-glow-gold:      rgba(212, 175, 55, 0.06);
-    --sv-glow-crimson:   rgba(136,  24, 40, 0.08);
+    --sv-glow-crimson:   rgba(154,  36, 53, 0.12);
+
+    /* Semantic surface tokens — Tier 1/2 (dark) + Tier 3 (ivory writing) */
+    --sv-bg-base:        #1A1220;   /* 60% — primary section body */
+    --sv-bg-deep:        #120A16;   /* 20% — nav, footer, transition anchors */
+    --sv-bg-card:        #24182C;   /* 10% — cards, modals, surfaces on base */
+    --sv-bg-ivory:       #F4ECDC;   /* writing surfaces — composer, forms, payment */
+
+    /* Ink */
+    --sv-ink:            #F1E7DA;
+    --sv-ink-soft:       rgba(241, 231, 218, 0.72);
+    --sv-ink-dim:        rgba(241, 231, 218, 0.52);
+    --sv-ink-on-ivory:   #1A1220;
+
+    /* Accents — strict budget: crimson for wordmark + wax seal only; gold as hairline */
+    --sv-crimson:        #9A2435;
+    --sv-gold:           #D4AF37;
+
+    /* Lines */
+    --sv-line-soft:      rgba(241, 231, 218, 0.08);
+    --sv-line-medium:    rgba(241, 231, 218, 0.14);
+    --sv-line-gold:      rgba(212, 175, 55, 0.18);
   }
 
   .sv-surface-dark {
@@ -43,7 +65,7 @@
       radial-gradient(ellipse 90% 70% at 20% 90%, var(--sv-glow-crimson), transparent 75%),
       linear-gradient(180deg,
         var(--sv-surface-navy-2) 0%,
-        #162238 35%,
+        var(--sv-surface-navy-1) 35%,
         var(--sv-surface-navy-2) 65%,
         var(--sv-surface-navy-3) 100%);
   }
