@@ -309,15 +309,18 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       />
 
       {/* ══════════════════════════════════════
+          HERO
+      ══════════════════════════════════════ */}
+      {/* ══════════════════════════════════════
           NAV
       ══════════════════════════════════════ */}
       <nav className={`lp-nav ${pastHero ? 'lp-nav--past-hero' : ''}`}>
-        <div className="lp-nav__left">
-          <div className="lp-nav__logo">V</div>
-          <span className="lp-nav__brand">Sealed Vow</span>
-        </div>
+        <a href="/" className="lp-nav__left lp-nav__wordmark" aria-label="Sealed Vow — home">
+          <span className="lp-nav__wordmark-sealed">Sealed</span>
+          <span className="lp-nav__wordmark-vow">Vow</span>
+        </a>
         <div className="lp-nav__right">
-          <button className="lp-nav__begin" onClick={handleEnter}>Create</button>
+          <button className="lp-nav__begin" onClick={handleEnter}>Seal your letter</button>
           {user ? (
             <UserMenu
               user={user}
@@ -328,14 +331,11 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               }}
             />
           ) : (
-            <button className="lp-nav__signin" onClick={() => setShowLogin(true)}>Sign In</button>
+            <button className="lp-nav__signin" onClick={() => setShowLogin(true)}>Sign in</button>
           )}
         </div>
       </nav>
 
-      {/* ══════════════════════════════════════
-          HERO
-      ══════════════════════════════════════ */}
       <AtmosphericShell>
         <section className="lp-hero" ref={heroRef}>
           <div className="lp-hero__center">

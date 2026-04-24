@@ -9,8 +9,8 @@ import React from 'react';
  */
 export const AtmosphericShell: React.FC<React.PropsWithChildren> = ({ children }) => (
   <div className="sv-surface-dark">
-    <div className="sv-grain" aria-hidden="true" />
     <div className="sv-vignette" aria-hidden="true" />
+    <div className="sv-grain" aria-hidden="true" />
     {children}
   </div>
 );
