@@ -1149,6 +1149,15 @@ body::before {
   font-style: italic;
   color: rgba(207,198,178,0.68);
   letter-spacing: 0.08em;
+  margin-bottom: 16px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+.lp-s5__price {
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(242,232,213,0.52);
   margin-bottom: 68px;
   font-family: 'Cormorant Garamond', Georgia, serif;
 }

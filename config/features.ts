@@ -6,9 +6,6 @@
 
 export const FEATURES = Object.freeze({
 
-  // ── Existing ──────────────────────────────
-  replyTierEnabled: false,
-
   // ── Eidi MVP (Eid 2026) ───────────────────
   eidiEnabled: true,              // Master switch — show/hide all Eidi entry points
 

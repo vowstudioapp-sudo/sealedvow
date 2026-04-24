@@ -58,16 +58,15 @@ async function generateUniqueCode(namePrefix = 'FOUNDER', maxAttempts = 5) {
   throw new Error(`Failed to generate unique code after ${maxAttempts} attempts`);
 }
 
-function createCodeRecord(code, tier, expiryHours) {
+function createCodeRecord(code, expiryHours) {
   const now = Date.now();
   const expiresAt = now + (expiryHours * 60 * 60 * 1000);
-  
+
   return {
     maxUses: 1,
     used: 0,
     active: true,
     expiresAt,
-    tier,
     redeemedAt: null,
     createdAt: new Date().toISOString(),
   };
@@ -102,11 +101,9 @@ export default async function handler(req, res) {
   }
 
   // ── VALIDATE INPUT ──
-  const { names, count = 1, tier = 'reply', expiryHours = 48 } = req.body || {};
-
-  if (tier !== 'standard' && tier !== 'reply') {
-    return res.status(400).json({ error: 'Invalid tier. Must be "standard" or "reply".' });
-  }
+  // Note: `tier` param is accepted for backward compatibility but ignored.
+  // Single-price model — all founder codes grant identical access.
+  const { names, count = 1, expiryHours = 48 } = req.body || {};
 
   if (!names || !Array.isArray(names) || names.length === 0) {
     if (typeof count !== 'number' || count < 1 || count > 100) {
@@ -146,14 +143,14 @@ export default async function handler(req, res) {
       const code = await generateUniqueCode(namePrefix);
       codes.push(code);
       
-      const record = createCodeRecord(code, tier, expiryHours);
+      const record = createCodeRecord(code, expiryHours);
       updates[`founderCodes/${code}`] = record;
     }
 
     await adminDb.ref().update(updates);
 
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
-    console.log(`[Admin] Generated ${codes.length} founder code(s) | tier=${tier} | expiry=${expiryHours}h | ip=${ip} | codes=${codes.join(',')}`);
+    console.log(`[Admin] Generated ${codes.length} founder code(s) | expiry=${expiryHours}h | ip=${ip} | codes=${codes.join(',')}`);
 
     return res.status(200).json({
       success: true,

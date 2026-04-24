@@ -139,7 +139,7 @@ export interface CoupleData {
   updatedAt?: string;        // ISO timestamp
   sealedAt?: string;         // ISO timestamp — set at payment verification
   previewExpiresAt?: string; // ISO timestamp
-  replyEnabled?: boolean;    // Sender chose "With Reply" tier
+  replyEnabled?: boolean;    // Whether the receiver can send a one-time reply
 
   // -------------------------------------------------------------------------
   // CONTENT

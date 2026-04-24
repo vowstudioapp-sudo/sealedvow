@@ -1,20 +1,14 @@
 // ============================================================================
 // RAZORPAY ORDER CREATION + FOUNDER ACCESS (HARDENED)
 // Transaction-based single-use codes. Generic error messages. No info leaks.
+// Single-price model: every paid letter is ₹249.
 // ============================================================================
 
 import crypto from 'crypto';
 import { adminDb, kv, guardPost, getClientIP, rateLimit } from './lib/middleware.js';
 
-const TIER_PRICES = {
-  standard: 9900,
-  reply: 14900,
-};
-
-const TIER_PRODUCTS = {
-  standard: 'sealedvow_standard',
-  reply: 'sealedvow_reply',
-};
+const PRICE_PAISE = 24900;  // ₹249 — single price for every letter
+const PRODUCT = 'sealedvow';
 
 async function founderTransaction(code) {
   const ref = adminDb.ref('founderCodes/' + code);
@@ -34,7 +28,7 @@ async function founderTransaction(code) {
   });
 
   if (result.committed && result.snapshot.val()) {
-    return { valid: true, tier: result.snapshot.val().tier || 'reply' };
+    return { valid: true };
   }
 
   return { valid: false };
@@ -79,10 +73,9 @@ export default async function handler(req, res) {
     });
   }
 
-  let { tier = 'standard', founderCode, customAmountPaise } = req.body || {};
-
-  // Input hygiene: ensure tier is always a string before validation
-  if (typeof tier !== 'string') tier = 'standard';
+  // Accept `tier` field silently for backward compatibility with any legacy
+  // client in the wild, but do not use it anywhere. Single-price model.
+  const { founderCode, customAmountPaise } = req.body || {};
 
   // ════════════════════════════════════════════════════════════
   // PATH A: FOUNDER CODE
@@ -112,14 +105,12 @@ export default async function handler(req, res) {
     // Generate a one-time token for verify-payment to consume.
     const tokenBytes = crypto.randomBytes(16).toString('hex');
     await adminDb.ref('founderTokens/' + tokenBytes).set({
-      tier: result.tier,
       createdAt: Date.now(),
       consumed: false,
     });
 
     return res.status(200).json({
       founderApproved: true,
-      tier: result.tier,
       founderToken: tokenBytes,
     });
   }
@@ -135,15 +126,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Payment configuration error.' });
   }
 
-  const validTier = TIER_PRICES[tier] ? tier : 'standard';
-  const baseAmount = TIER_PRICES[validTier];
   const parsedCustomAmount = Number(customAmountPaise);
   const hasValidCustomAmount =
     Number.isInteger(parsedCustomAmount) &&
-    parsedCustomAmount >= baseAmount &&
+    parsedCustomAmount >= PRICE_PAISE &&
     parsedCustomAmount <= 50000000; // 5,00,000 INR upper bound safety
-  const amount = hasValidCustomAmount ? parsedCustomAmount : baseAmount;
-  const product = TIER_PRODUCTS[validTier];
+  const amount = hasValidCustomAmount ? parsedCustomAmount : PRICE_PAISE;
 
   try {
     const orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
@@ -156,7 +144,7 @@ export default async function handler(req, res) {
         amount,
         currency: 'INR',
         receipt: `rcpt_${Date.now()}`,
-        notes: { product, tier: validTier },
+        notes: { product: PRODUCT },
       }),
     });
 
@@ -169,23 +157,23 @@ export default async function handler(req, res) {
     const order = await orderResponse.json();
 
     // Persist order record BEFORE returning orderId to client.
-      // verify-payment.js hard-depends on this record existing with amount + tier.
-      // If this write fails, returning the orderId would create an unverifiable payment.
-      try {
-        await adminDb.ref('orders/' + order.id).set({
-          amount,
-          tier: validTier,
-          currency: 'INR',
-          status: 'created',
-          createdAt: new Date().toISOString(),
-        });
-      } catch (dbErr) {
-        console.error('[Razorpay] CRITICAL: Failed to persist order record:', dbErr);
-        // Order exists in Razorpay but not in our DB.
-        // Do NOT return orderId — client cannot complete verification without it.
-        // User has not been charged yet (order created ≠ payment captured).
-        return res.status(500).json({ error: 'Order setup failed. Please retry.' });
-      }
+    // verify-payment.js hard-depends on this record existing with an amount.
+    // If this write fails, returning the orderId would create an unverifiable
+    // payment.
+    try {
+      await adminDb.ref('orders/' + order.id).set({
+        amount,
+        currency: 'INR',
+        status: 'created',
+        createdAt: new Date().toISOString(),
+      });
+    } catch (dbErr) {
+      console.error('[Razorpay] CRITICAL: Failed to persist order record:', dbErr);
+      // Order exists in Razorpay but not in our DB.
+      // Do NOT return orderId — client cannot complete verification without it.
+      // User has not been charged yet (order created ≠ payment captured).
+      return res.status(500).json({ error: 'Order setup failed. Please retry.' });
+    }
 
     return res.status(200).json({
       orderId: order.id,

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
-import { FEATURES } from '../config/features';
 
 interface PaymentResult {
   replyEnabled: boolean;
@@ -14,34 +13,10 @@ interface Props {
   onBack: () => void;
 }
 
-type Tier = 'standard' | 'reply';
-
-const TIERS: Record<Tier, { name: string; price: number; tagline: string; features: string[] }> = {
-  standard: {
-    name: 'Sealed Vow',
-    price: 99,
-    tagline: 'A private letter, sealed in time.',
-    features: [
-      'Personalized Sealed Letter',
-      'Interactive Envelope Experience',
-      'Memory Board Gallery',
-      'Audio Narration',
-      'Private Shareable Link',
-      'One-Time Letter Generation',
-    ],
-  },
-  reply: {
-    name: 'Sealed Vow · With Reply',
-    price: 149,
-    tagline: 'Let them seal something back.',
-    features: [
-      'Everything in Sealed Vow',
-      'Receiver Can Seal a Reply',
-      'Reply Notification to You',
-      'Two-Way Sealed Moment',
-    ],
-  },
-};
+// Single price for every sealed letter. Reply is included by default.
+const LETTER_PRICE = 249;
+const PRODUCT_NAME = 'Sealed Vow';
+const PRODUCT_TAGLINE = 'A private letter, sealed in time.';
 
 function parseAmountFromText(value?: string): number {
   if (!value) return 0;
@@ -64,13 +39,10 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack }) => {
-  const [selectedTier, setSelectedTier] = useState<Tier>('standard');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const paymentInProgressRef = useRef(false);
-
-  const isReplyEnabled = FEATURES.replyTierEnabled;
 
   // Founder access
   const [founderCode, setFounderCode] = useState('');
@@ -80,17 +52,9 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
 
   useEffect(() => { loadRazorpayScript().then(setScriptLoaded); }, []);
 
-  useEffect(() => {
-    if (!isReplyEnabled && selectedTier === 'reply') {
-      setSelectedTier('standard');
-    }
-  }, [isReplyEnabled]);
-
-  const effectiveTier = isReplyEnabled ? selectedTier : 'standard';
-  const tier = TIERS[effectiveTier];
   const isEidFlow = data.occasion === 'eid';
   const eidiAmount = isEidFlow ? parseAmountFromText(data.timeShared) : 0;
-  const totalPayable = tier.price + eidiAmount;
+  const totalPayable = LETTER_PRICE + eidiAmount;
   const totalPayablePaise = totalPayable * 100;
 
   // ── Founder code handler ──
@@ -126,7 +90,6 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
           paymentMode: 'founder',
           founderToken: orderData.founderToken,
           coupleData: data,
-          tier: orderData.tier || 'reply',
         }),
       });
 
@@ -165,7 +128,6 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tier: effectiveTier,
           customAmountPaise: isEidFlow ? totalPayablePaise : undefined,
         }),
       });
@@ -195,7 +157,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         amount,
         currency,
         name: 'Sealed Vow',
-        description: tier.name,
+        description: PRODUCT_NAME,
         order_id: orderId,
         prefill: { name: data.senderName || '' },
         theme: { color: '#722F37' },
@@ -209,7 +171,6 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
                 coupleData: data,
-                tier: effectiveTier,
               }),
             });
 
@@ -260,53 +221,20 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
             <img src="/favicon.svg" alt="VOW" className="w-7 h-7" />
           </div>
           <h2 className="text-[9px] uppercase tracking-[0.4em] text-luxury-gold font-bold mb-1">Finalize Your Gift</h2>
-          <h1 className="text-2xl md:text-3xl font-serif-elegant italic text-white">Choose Your Seal</h1>
+          <h1 className="text-2xl md:text-3xl font-serif-elegant italic text-white">Seal your letter</h1>
         </div>
 
         <div className="p-4 md:p-5">
 
-          {/* Tier Selection */}
-          <div className="mb-5 space-y-2">
-            {(Object.entries(TIERS) as [Tier, typeof TIERS['standard']][]).map(([key, t]) => {
-              const isDisabled = key === 'reply' && !isReplyEnabled;
-              return (
-                <button
-                  key={key}
-                  onClick={() => !isDisabled && setSelectedTier(key)}
-                  disabled={isDisabled}
-                  className={`w-full text-left p-4 rounded-lg border-2 transition-all duration-200 relative ${
-                    selectedTier === key && !isDisabled
-                      ? 'border-[#D4AF37] bg-[#D4AF37]/5'
-                      : 'border-[#D4C5A5]/40 hover:border-[#D4C5A5]/70'
-                  } ${isDisabled ? 'opacity-70 cursor-not-allowed hover:border-[#D4C5A5]/40' : ''}`}
-                >
-                  {key === 'reply' && !isReplyEnabled && (
-                    <span className="absolute -top-2.5 right-4 bg-[#D4AF37] text-[#1C1917] text-[7px] uppercase tracking-[0.2em] font-bold px-2.5 py-0.5 rounded-full">
-                      Coming Soon
-                    </span>
-                  )}
-                  {key === 'reply' && isReplyEnabled && (
-                    <span className="absolute -top-2.5 right-4 bg-[#D4AF37] text-[#1C1917] text-[7px] uppercase tracking-[0.2em] font-bold px-2.5 py-0.5 rounded-full">
-                      Recommended
-                    </span>
-                  )}
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-serif-elegant italic text-luxury-ink text-base">{t.name}</p>
-                      <p className="text-[9px] text-luxury-stone/60 mt-0.5 tracking-wide">{t.tagline}</p>
-                      {key === 'reply' && !isReplyEnabled && (
-                        <p className="text-[9px] text-luxury-stone/60 mt-1 tracking-wide italic">
-                          Two-way sealed experience.
-                        </p>
-                      )}
-                    </div>
-                    {!isDisabled && (
-                      <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">₹{isEidFlow ? t.price + eidiAmount : t.price}</p>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+          {/* Single-price card */}
+          <div className="mb-5 p-4 rounded-lg border-2 border-[#D4AF37] bg-[#D4AF37]/5">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-serif-elegant italic text-luxury-ink text-base">{PRODUCT_NAME}</p>
+                <p className="text-[9px] text-luxury-stone/60 mt-0.5 tracking-wide">{PRODUCT_TAGLINE}</p>
+              </div>
+              <p className="text-2xl font-bold text-luxury-ink ml-4 flex-shrink-0">₹{isEidFlow ? LETTER_PRICE + eidiAmount : LETTER_PRICE}</p>
+            </div>
           </div>
 
           {isEidFlow && (
@@ -317,7 +245,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
               </div>
               <div className="flex items-center justify-between border-b border-[#D4C5A5]/40 pb-2">
                 <span>Platform charges</span>
-                <span>₹{tier.price}</span>
+                <span>₹{LETTER_PRICE}</span>
               </div>
               <div className="flex items-center justify-between pt-1 text-luxury-ink">
                 <span>Total payable</span>
@@ -354,7 +282,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
               ) : !scriptLoaded ? (
                 <span>Loading Payment...</span>
               ) : (
-                <span>Seal for ₹{isEidFlow ? totalPayable : tier.price}</span>
+                <span>Seal for ₹{isEidFlow ? totalPayable : LETTER_PRICE}</span>
               )}
             </button>
 
