@@ -31,7 +31,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const heroRef      = useRef<HTMLElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const demoRef      = useRef<HTMLElement | null>(null);
-  const railMaskRef  = useRef<HTMLDivElement | null>(null);
 
   /* ── Entrance reveal ── */
   useEffect(() => {
@@ -107,155 +106,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     return () => { document.body.style.overflow = ''; };
   }, [showLogin]);
 
-  /* ── 3D card tilt + cursor light ── */
-  useEffect(() => {
-    const cards = document.querySelectorAll<HTMLElement>('.lp-card');
-    const MAX_TILT = 6;
-
-    const handleMove = (card: HTMLElement, e: MouseEvent) => {
-      const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const rotateX = Math.max(-MAX_TILT, Math.min(MAX_TILT, -(y - centerY) / 18));
-      const rotateY = Math.max(-MAX_TILT, Math.min(MAX_TILT, (x - centerX) / 18));
-      card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-12px) scale(1.03)`;
-      card.style.setProperty('--x', `${x}px`);
-      card.style.setProperty('--y', `${y}px`);
-    };
-
-    const handleLeave = (card: HTMLElement) => {
-      card.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0) scale(1)';
-    };
-
-    const listeners: Array<{ card: HTMLElement; move: (e: MouseEvent) => void; leave: () => void }> = [];
-    cards.forEach(card => {
-      const move = (e: MouseEvent) => handleMove(card, e);
-      const leave = () => handleLeave(card);
-      card.addEventListener('mousemove', move);
-      card.addEventListener('mouseleave', leave);
-      listeners.push({ card, move, leave });
-    });
-
-    return () => {
-      listeners.forEach(({ card, move, leave }) => {
-        card.removeEventListener('mousemove', move);
-        card.removeEventListener('mouseleave', leave);
-      });
-    };
-  }, [isVisible]);
-
-  /* ── Rail auto-drift — slow editorial scroll that yields to the user ── */
-  useEffect(() => {
-    const el = railMaskRef.current;
-    if (!el) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    const DRIFT_PX_PER_SEC = 25;
-    const IDLE_MS = 2500;
-
-    let rafId = 0;
-    let resumeTimer: number | null = null;
-    let isHovered = false;
-    let isDrifting = false;
-    let prevTs = 0;
-
-    const stopDrift = () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = 0;
-      isDrifting = false;
-      el.classList.remove('is-drifting');
-    };
-
-    const startDrift = () => {
-      if (isDrifting || isHovered) return;
-      isDrifting = true;
-      el.classList.add('is-drifting');
-      prevTs = performance.now();
-      const tick = (now: number) => {
-        const dt = now - prevTs;
-        prevTs = now;
-        const half = el.scrollWidth / 2;
-        if (half > 0) {
-          let next = el.scrollLeft + (DRIFT_PX_PER_SEC * dt) / 1000;
-          if (next >= half) next -= half;
-          el.scrollLeft = next;
-        }
-        rafId = requestAnimationFrame(tick);
-      };
-      rafId = requestAnimationFrame(tick);
-    };
-
-    const clearResume = () => {
-      if (resumeTimer !== null) {
-        window.clearTimeout(resumeTimer);
-        resumeTimer = null;
-      }
-    };
-
-    const scheduleResume = () => {
-      clearResume();
-      resumeTimer = window.setTimeout(() => {
-        resumeTimer = null;
-        if (!isHovered) startDrift();
-      }, IDLE_MS);
-    };
-
-    const onEnter = () => {
-      isHovered = true;
-      clearResume();
-      stopDrift();
-    };
-    const onLeave = () => {
-      isHovered = false;
-      scheduleResume();
-    };
-    const onInteract = () => {
-      stopDrift();
-      scheduleResume();
-    };
-
-    // Infinite loop for manual scroll — teleport across the duplicated
-    // card set so either edge feels continuous. Skipped during auto-drift
-    // because the rAF loop already wraps itself.
-    const onScroll = () => {
-      if (isDrifting) return;
-      const half = el.scrollWidth / 2;
-      if (half <= 0) return;
-      if (el.scrollLeft <= 0) {
-        el.scrollLeft += half;
-      } else if (el.scrollLeft >= el.scrollWidth - el.clientWidth - 1) {
-        el.scrollLeft -= half;
-      }
-    };
-
-    const startTimer = window.setTimeout(() => {
-      if (!isHovered) startDrift();
-    }, 800);
-
-    el.addEventListener('mouseenter', onEnter);
-    el.addEventListener('mouseleave', onLeave);
-    el.addEventListener('pointerdown', onInteract, { passive: true });
-    el.addEventListener('touchstart', onInteract, { passive: true });
-    el.addEventListener('wheel', onInteract, { passive: true });
-    el.addEventListener('focusin', onInteract);
-    el.addEventListener('scroll', onScroll, { passive: true });
-
-    return () => {
-      window.clearTimeout(startTimer);
-      clearResume();
-      stopDrift();
-      el.removeEventListener('mouseenter', onEnter);
-      el.removeEventListener('mouseleave', onLeave);
-      el.removeEventListener('pointerdown', onInteract);
-      el.removeEventListener('touchstart', onInteract);
-      el.removeEventListener('wheel', onInteract);
-      el.removeEventListener('focusin', onInteract);
-      el.removeEventListener('scroll', onScroll);
-    };
-  }, []);
-
   const handleEnter = () => {
     window.location.href = "/create";
   };
@@ -286,7 +136,10 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       ══════════════════════════════════════ */}
       <nav className={`lp-nav ${pastHero ? 'lp-nav--past-hero' : ''}`}>
         <a href="/" className="lp-nav__left lp-nav__wordmark" aria-label="Sealed Vow — home">
-          <span className="lp-nav__wordmark-sealed">Sealed</span>
+          <span className="lp-nav__wordmark-sealed">
+            <span className="lp-nav__wordmark-sealed-first">S</span>
+            <span className="lp-nav__wordmark-sealed-rest">ealed</span>
+          </span>
           <span className="lp-nav__wordmark-vow">Vow</span>
         </a>
         <div className="lp-nav__right">
@@ -311,7 +164,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <div className="lp-hero__center">
             <div className="lp-v-ring"><span>V</span></div>
             <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
-            <p className="lp-hero__kicker">Sealed. Private. Opened once.</p>
+            <p className="lp-hero__kicker">Sealed. Private.</p>
+            <p className="lp-hero__clarity">Write a private letter. Share it through a secure link.</p>
             <div className="lp-hero__rule" />
             <button className="lp-btn-begin" onClick={handleEnter}>Create</button>
           </div>
@@ -329,18 +183,17 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           DEMO CARDS — directly after hero
       ══════════════════════════════════════ */}
       <section className="lp-demo-cards" ref={demoRef}>
-        <div className="lp-demo-cards__heading lp-fade">
+        <div className="lp-demo-cards__heading">
           <p className="lp-demo-cards__title">Preview the experience</p>
           <p className="lp-demo-cards__sub">See how your letter arrives</p>
         </div>
 
         <div className="lp-rail lp-fade">
-          <div className="lp-rail__mask" ref={railMaskRef}>
+          <div className="lp-rail__mask">
             <div className="lp-rail__track">
 
-              {/* ── Card set 1 ── */}
               {/* Anniversary */}
-              <a className="lp-card lp-card--anniversary" style={{ ['--card-accent' as any]: '#C8645A' }} href="/demo/anniversary">
+              <a className="lp-card lp-card--anniversary" style={{ ['--card-accent' as any]: '#C95A4A' }} href="/demo/anniversary">
                 <div className="lp-card__icon">
                   <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
@@ -368,7 +221,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </a>
 
               {/* Thank You */}
-              <a className="lp-card lp-card--thankyou" style={{ ['--card-accent' as any]: '#C9849A' }} href="/demo/thankyou">
+              <a className="lp-card lp-card--thankyou" style={{ ['--card-accent' as any]: '#D89BA8' }} href="/demo/thankyou">
                 <div className="lp-card__icon">
                   <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M24 42c-8-6-16-12-16-22a10 10 0 0 1 16-8 10 10 0 0 1 16 8c0 10-8 16-16 22z"/>
@@ -396,7 +249,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </a>
 
               {/* Just Because */}
-              <a className="lp-card lp-card--justbecause" style={{ ['--card-accent' as any]: '#8C7AE6' }} href="/demo/justbecause">
+              <a className="lp-card lp-card--justbecause" style={{ ['--card-accent' as any]: '#7A6AE6' }} href="/demo/justbecause">
                 <div className="lp-card__icon">
                   <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M24 8v32"/><path d="M16 16c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
@@ -424,86 +277,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              {/* ── Card set 2 (duplicate for seamless loop) ── */}
-              <a className="lp-card lp-card--anniversary" style={{ ['--card-accent' as any]: '#C8645A' }} href="/demo/anniversary" aria-hidden="true">
-                <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
-                    <line x1="8" y1="40" x2="20" y2="30"/><line x1="40" y1="40" x2="28" y2="30"/>
-                    <circle cx="24" cy="12" r="4"/><path d="M20 12c0-4 4-8 4-8s4 4 4 8"/>
-                  </svg>
-                </div>
-                <span className="lp-card__title">Anniversary</span>
-                <span className="lp-card__desc">Sealed just for you</span>
-                <span className="lp-card__hint">Preview →</span>
-              </a>
-
-              <a className="lp-card lp-card--birthday" style={{ ['--card-accent' as any]: '#E6B450' }} href="/demo/birthday" aria-hidden="true">
-                <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="8" y="22" width="32" height="18" rx="3"/><rect x="12" y="16" width="24" height="6" rx="2"/>
-                    <line x1="24" y1="16" x2="24" y2="40"/><path d="M24 10c0-3 2-5 0-7"/>
-                    <circle cx="24" cy="13" r="1.5" fill="rgba(242,232,213,0.35)" stroke="none"/>
-                  </svg>
-                </div>
-                <span className="lp-card__title">Birthday</span>
-                <span className="lp-card__desc">Someone left you this</span>
-                <span className="lp-card__hint">Preview →</span>
-              </a>
-
-              <a className="lp-card lp-card--thankyou" style={{ ['--card-accent' as any]: '#C9849A' }} href="/demo/thankyou" aria-hidden="true">
-                <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M24 42c-8-6-16-12-16-22a10 10 0 0 1 16-8 10 10 0 0 1 16 8c0 10-8 16-16 22z"/>
-                    <path d="M20 22l3 3 6-6"/>
-                  </svg>
-                </div>
-                <span className="lp-card__title">Thank You</span>
-                <span className="lp-card__desc">Words they deserve</span>
-                <span className="lp-card__hint">Preview →</span>
-              </a>
-
-              <a className="lp-card lp-card--eid" style={{ ['--card-accent' as any]: '#4CAF78' }} href="/demo/eid" aria-hidden="true">
-                <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
-                    <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
-                    <circle cx="36" cy="10" r="2.5"/>
-                    <path d="M36 6v-2M36 16v-2M40 10h2M32 10h-2M39 7l1-1M33 13l-1 1M39 13l1 1M33 7l-1-1"/>
-                  </svg>
-                </div>
-                <span className="lp-card__title">Eid</span>
-                <span className="lp-card__desc">Open a sealed eidi</span>
-                <span className="lp-card__hint">Preview →</span>
-              </a>
-
-              <a className="lp-card lp-card--justbecause" style={{ ['--card-accent' as any]: '#8C7AE6' }} href="/demo/justbecause" aria-hidden="true">
-                <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M24 8v32"/><path d="M16 16c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
-                    <circle cx="24" cy="24" r="14"/>
-                    <path d="M14 24h20"/><path d="M18 18l12 12"/><path d="M30 18l-12 12"/>
-                  </svg>
-                </div>
-                <span className="lp-card__title">Just Because</span>
-                <span className="lp-card__desc">No reason needed</span>
-                <span className="lp-card__hint">Preview →</span>
-              </a>
-
-              <a className="lp-card lp-card--apology" style={{ ['--card-accent' as any]: '#E8E4EC' }} href="/demo/apology" aria-hidden="true">
-                <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 28c-4 0-8-3-8-8s4-8 8-8c2 0 4 1 5 2"/>
-                    <path d="M32 28c4 0 8-3 8-8s-4-8-8-8c-2 0-4 1-5 2"/>
-                    <path d="M20 14c2-2 5-2 8 0"/>
-                    <path d="M14 30l-2 10 6-4 6 4-2-10"/><path d="M26 30l-2 10 6-4 6 4-2-10"/>
-                  </svg>
-                </div>
-                <span className="lp-card__title">Apology</span>
-                <span className="lp-card__desc">Read what they wrote</span>
-                <span className="lp-card__hint">Preview →</span>
-              </a>
-
             </div>
           </div>
         </div>
@@ -514,7 +287,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           SECTION 2 — PROBLEM
       ══════════════════════════════════════ */}
       <section className="lp-section">
-        <p className="lp-section__num lp-fade">02</p>
         <div className="lp-fade">
           <p className="lp-s2__headline">Some things shouldn't<br />disappear in a chat history.</p>
           <p className="lp-s2__sub">Write them properly.</p>
@@ -526,15 +298,12 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           SECTION 3 — THE MAGIC
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s3">
-        <p className="lp-section__num lp-fade">03</p>
         <div className="lp-s3__block lp-fade">
           <span className="lp-s3__connector">A letter written</span>
           <span className="lp-s3__statement">for one person.</span>
           <span className="lp-s3__connector">Sealed until</span>
           <span className="lp-s3__statement">they open it.</span>
           <div className="lp-s3__rule" />
-          <span className="lp-s3__connector">Gone from</span>
-          <span className="lp-s3__statement">everywhere else.</span>
           <p className="lp-s3__close">Only the person you choose<br />can ever read it.</p>
         </div>
       </section>
@@ -544,7 +313,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           SECTION 4 — PRIVACY
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s4">
-        <p className="lp-section__num lp-fade">04</p>
         <div className="lp-fade">
           <p className="lp-s4__main">Private by design.</p>
           <div className="lp-s4__list">
@@ -560,11 +328,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           SECTION 5 — FINAL CTA
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s5">
-        <p className="lp-section__num lp-fade">05</p>
         <div className="lp-fade">
           <p className="lp-s5__headline">When the moment deserves<br />more than a message.</p>
-          <p className="lp-s5__sub">One letter. One person. Forever sealed.</p>
-          <p className="lp-s5__price">One letter · ₹249</p>
+          <p className="lp-s5__sub">ONE LETTER • ONE PERSON</p>
         </div>
       </section>
 
