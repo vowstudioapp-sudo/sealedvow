@@ -9,16 +9,59 @@
 
 import crypto from "crypto";
 import { Redis } from "@upstash/redis";
+import admin from 'firebase-admin';
+import { getSessionUser } from './lib/auth.js';
+import { rateLimit } from './lib/middleware.js';
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    }),
+    databaseURL: process.env.FIREBASE_DB_URL
+  });
+}
 
 const kv = new Redis({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
 
-import * as gemini from '../lib/ai/providers/geminiProvider.js';
-import * as openai from '../lib/ai/providers/openaiProvider.js';
+import * as _gemini from '../lib/ai/providers/geminiProvider.js';
+import * as _openai from '../lib/ai/providers/openaiProvider.js';
 import { validateLetter, validateBasicText, cleanOutput, GLOBAL_FORBIDDEN } from '../lib/ai/validator.js';
 import { buildLetterPrompt, buildMythPrompt, buildProphecyPrompt } from './lib/prompt-templates.js';
+
+// ===============================
+// PER-REQUEST AI CALL GUARD
+// Module-scoped counter is reset at the top of every handler invocation.
+// Vercel serverless invokes one request per container instance at a time,
+// so this is safe across warm reuses.
+// ===============================
+let aiCallCount = 0;
+const MAX_AI_CALLS = 8;
+
+function guardAICall() {
+  if (aiCallCount >= MAX_AI_CALLS) {
+    throw new Error('AI call limit exceeded per request');
+  }
+  aiCallCount++;
+}
+
+// Wrapped provider namespaces — existing handlers call gemini.generateText etc.
+// and automatically route through the guard without handler modification.
+const gemini = {
+  generateText:            (...args) => { guardAICall(); return _gemini.generateText(...args); },
+  generateImage:           (...args) => { guardAICall(); return _gemini.generateImage(...args); },
+  generateAudio:           (...args) => { guardAICall(); return _gemini.generateAudio(...args); },
+  generateTextWithSearch:  (...args) => { guardAICall(); return _gemini.generateTextWithSearch(...args); },
+};
+
+const openai = {
+  generateText: (...args) => { guardAICall(); return _openai.generateText(...args); },
+};
 
 // ===============================
 // ALLOWED ACTIONS
@@ -79,11 +122,33 @@ async function withTimeout(promise, ms = 8000) {
   ]);
 }
 
+async function safeKV(fn, fallback = null) {
+  try {
+    return await fn();
+  } catch {
+    return fallback;
+  }
+}
+
+function isSafeObject(obj, depth = 0) {
+  if (depth > 3) return false;
+  if (typeof obj !== 'object' || obj === null) return true;
+  return Object.values(obj).every(v => isSafeObject(v, depth + 1));
+}
+
+function isReasonableSize(obj) {
+  try {
+    return JSON.stringify(obj).length < 10000;
+  } catch {
+    return false;
+  }
+}
+
 // ===============================
 // ACTION HANDLERS
 // ===============================
 
-async function handleLoveLetter(payload) {
+async function handleLoveLetter(payload, userUid) {
   // Build prompt server-side from coupleData if not pre-built
   let { prompt, enforcement } = payload;
   if (!prompt && payload.coupleData) {
@@ -97,87 +162,109 @@ async function handleLoveLetter(payload) {
     .update(prompt)
     .digest("hex");
 
-  const cacheKey = `ai_result:${promptHash}`;
-  const lockKey = `ai_lock:${promptHash}`;
+  const cacheKey = `ai_result:${userUid}:${promptHash}`;
+  const lockKey = `ai_lock:${userUid}:${promptHash}`;
+  const recentKey = `ai_recent:${userUid}:${promptHash}`;
 
   // Check cache first
-  const cached = await kv.get(cacheKey);
+  const cached = await safeKV(() => kv.get(cacheKey));
   if (cached) {
     console.log("[AI Cache] returning cached result");
     return typeof cached === "string" ? JSON.parse(cached) : cached;
   }
 
-  // Acquire generation lock
-  const lock = await kv.set(lockKey, "1", { nx: true, ex: 30 });
-
-  // If another request is generating the same prompt
-  if (!lock) {
-    await new Promise(r => setTimeout(r, 500));
-    const cachedRetry = await kv.get(cacheKey);
-    if (cachedRetry) {
-      console.log("[AI Cache] reused concurrent result");
-      return typeof cachedRetry === "string" ? JSON.parse(cachedRetry) : cachedRetry;
-    }
+  const recent = await safeKV(() => kv.get(recentKey));
+  if (recent) {
+    return { text: recent };
   }
 
-  // ── GENERATE → VALIDATE → RETRY LOOP (Gemini) ──
-  const generate = async (attempt = 1) => {
-    let fullPrompt = prompt;
-    if (attempt === 2) fullPrompt += '\n\nCRITICAL: Previous output violated constraints. Write MORE SIMPLY. Shorter sentences. No metaphors. No markdown.';
-    if (attempt === 3) fullPrompt += '\n\nFINAL ATTEMPT. Write like a normal person texting. Ultra simple. Short sentences. No fancy words.';
+  let lockAcquired = false;
+  try {
+    const lock = await safeKV(() => kv.set(lockKey, "1", { nx: true, ex: 30 }));
+    lockAcquired = !!lock;
 
-    const temp = Math.max(0.5, 0.75 - (attempt - 1) * 0.12);
-    const raw = await withTimeout(
-      gemini.generateText(fullPrompt, { temperature: temp })
-    );
-    const text = cleanOutput(raw);
-    const check = validateLetter(text, enforcement);
-
-    console.log(`[Letter] Gemini attempt ${attempt}: ${check.stats.wordCount} words, ${check.stats.paragraphCount}p, avg ${check.stats.avgSentenceLength}w/s, violations: ${check.violations.join(', ') || 'none'}`);
-
-    if (!check.valid && attempt < 3) {
-      console.log(`[Letter] Retry triggered attempt ${attempt + 1} — violations: ${check.violations.join(', ')}`);
-      return generate(attempt + 1);
+    // If another request is generating the same prompt
+    if (!lock) {
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 400));
+        const cachedRetry = await safeKV(() => kv.get(cacheKey));
+        if (cachedRetry) {
+          console.log("[AI Cache] reused concurrent result");
+          return typeof cachedRetry === "string" ? JSON.parse(cachedRetry) : cachedRetry;
+        }
+      }
+      // DO NOT generate again — signal concurrent-generation to the route handler
+      // so it can return a proper 409 + retryAfter (not a 200 with placeholder
+      // text that the UI would render as the user's actual letter).
+      const err = new Error('CONCURRENT_GENERATION');
+      err.code = 'CONCURRENT_GENERATION';
+      throw err;
     }
-    return { text, check };
-  };
 
-  let { text, check } = await generate();
+    // ── GENERATE → VALIDATE → RETRY LOOP (Gemini) ──
+    const generate = async (attempt = 1) => {
+      let fullPrompt = prompt;
+      if (attempt === 2) fullPrompt += '\n\nCRITICAL: Previous output violated constraints. Write MORE SIMPLY. Shorter sentences. No metaphors. No markdown.';
+      if (attempt === 3) fullPrompt += '\n\nFINAL ATTEMPT. Write like a normal person texting. Ultra simple. Short sentences. No fancy words.';
 
-  // ── SIMPLIFIER PASS ──
-  if (check.violations.length > 0 && text.length > 0) {
-    try {
-      const simplified = cleanOutput(
-        await withTimeout(
-          gemini.generateText(
-            `Rewrite this letter more simply. Break long sentences into shorter ones. Remove decorative language. Keep specific details.\n\n${text}`,
-            { temperature: 0.4 }
-          )
-        )
+      const temp = Math.max(0.5, 0.75 - (attempt - 1) * 0.12);
+      const raw = await withTimeout(
+        gemini.generateText(fullPrompt, { temperature: temp })
       );
-      const simplifiedCheck = validateLetter(simplified, enforcement);
-      if (check.violations.length > 0 && simplifiedCheck.violations.length === 0) {
-        text = simplified;
-        console.log(`[Letter] Simplifier improved: avg ${check.stats.avgSentenceLength} → ${simplifiedCheck.stats.avgSentenceLength} w/s`);
+      const text = cleanOutput(raw);
+      const check = validateLetter(text, enforcement);
+
+      console.log(`[Letter] Gemini attempt ${attempt}: ${check.stats.wordCount} words, ${check.stats.paragraphCount}p, avg ${check.stats.avgSentenceLength}w/s, violations: ${check.violations.join(', ') || 'none'}`);
+
+      if (!check.valid && attempt < 3) {
+        console.log(`[Letter] Retry triggered attempt ${attempt + 1} — violations: ${check.violations.join(', ')}`);
+        return generate(attempt + 1);
+      }
+      return { text, check };
+    };
+
+    let { text, check } = await generate();
+
+    // ── SIMPLIFIER PASS ──
+    if (check.violations.length > 0 && text.length > 0) {
+      try {
+        const simplified = cleanOutput(
+          await withTimeout(
+            gemini.generateText(
+              `Rewrite this letter more simply. Break long sentences into shorter ones. Remove decorative language. Keep specific details.\n\n${text}`,
+              { temperature: 0.4 }
+            )
+          )
+        );
+        const simplifiedCheck = validateLetter(simplified, enforcement);
+        if (check.violations.length > 0 && simplifiedCheck.violations.length === 0) {
+          text = simplified;
+          console.log(`[Letter] Simplifier improved: avg ${check.stats.avgSentenceLength} → ${simplifiedCheck.stats.avgSentenceLength} w/s`);
+        }
+      } catch (e) {
+        console.log('[Letter] Simplifier pass failed, using original');
+      }
+    }
+
+    const result = { text: text || null };
+
+    try {
+      await safeKV(() => kv.set(cacheKey, result, { ex: 3600 }));
+      if (result.text) {
+        await safeKV(() => kv.set(recentKey, result.text, { ex: 30 }));
       }
     } catch (e) {
-      console.log('[Letter] Simplifier pass failed, using original');
+      console.warn("[AI Cache] failed to store result:", e.message);
+    }
+
+    return result;
+  } finally {
+    if (lockAcquired) {
+      try {
+        await safeKV(() => kv.del(lockKey));
+      } catch {}
     }
   }
-
-  const result = { text: text || null };
-
-  try {
-    await kv.set(cacheKey, result, { ex: 3600 });
-  } catch (e) {
-    console.warn("[AI Cache] failed to store result:", e.message);
-  }
-
-  try {
-    await kv.del(lockKey);
-  } catch {}
-
-  return result;
 }
 
 function buildEidLetterPrompt(payload = {}) {
@@ -328,6 +415,9 @@ async function handleSacredLocation(payload) {
 }
 
 async function handleAudioLetter(payload) {
+  if (!payload.text || payload.text.length > 2000) {
+    throw new Error('Invalid audio text length');
+  }
   const audio = await gemini.generateAudio(payload.text);
   return { audio };
 }
@@ -342,7 +432,10 @@ async function fallbackLoveLetter(payload) {
     ({ prompt, enforcement } = buildLetterPrompt(payload.coupleData));
   }
   if (!prompt) return null;
-  const raw = await openai.generateText(prompt, { temperature: 0.7, maxTokens: 400 });
+  const raw = await withTimeout(
+    openai.generateText(prompt, { temperature: 0.7, maxTokens: 400 }),
+    8000
+  );
   if (!raw) return null;
 
   const text = cleanOutput(raw);
@@ -359,7 +452,10 @@ async function fallbackLoveLetter(payload) {
 async function fallbackCoupleMyth(payload) {
   const prompt = payload.prompt || (payload.coupleData ? buildMythPrompt(payload.coupleData) : null);
   if (!prompt) return null;
-  const raw = await openai.generateText(prompt, { temperature: 0.8, maxTokens: 100 });
+  const raw = await withTimeout(
+    openai.generateText(prompt, { temperature: 0.8, maxTokens: 100 }),
+    8000
+  );
   if (!raw) return null;
   const text = cleanOutput(raw);
   return validateBasicText(text) ? { text } : null;
@@ -367,16 +463,22 @@ async function fallbackCoupleMyth(payload) {
 
 async function fallbackEidLetter(payload) {
   const prompt = buildEidLetterPrompt(payload);
-  const raw = await openai.generateText(prompt, { temperature: 0.85, maxTokens: 350 });
+  const raw = await withTimeout(
+    openai.generateText(prompt, { temperature: 0.85, maxTokens: 350 }),
+    8000
+  );
   if (!raw) return null;
   return { letter: cleanOutput(raw) };
 }
 
 async function fallbackFutureProphecy(payload) {
   const basePrompt = payload.prompt || buildProphecyPrompt();
-  const raw = await openai.generateText(
-    basePrompt + '\n\nRespond ONLY with a valid JSON array of strings. No markdown.',
-    { temperature: 0.8, maxTokens: 200 }
+  const raw = await withTimeout(
+    openai.generateText(
+      basePrompt + '\n\nRespond ONLY with a valid JSON array of strings. No markdown.',
+      { temperature: 0.8, maxTokens: 200 }
+    ),
+    8000
   );
   if (!raw) return null;
   try {
@@ -391,9 +493,12 @@ async function fallbackFutureProphecy(payload) {
 async function fallbackSacredLocation(payload) {
   const { memory, manualLink } = payload;
   if (manualLink) {
-    const desc = await openai.generateText(
-      `Write a 1 sentence poetic description of "${memory}" as a romantic setting.`,
-      { maxTokens: 60 }
+    const desc = await withTimeout(
+      openai.generateText(
+        `Write a 1 sentence poetic description of "${memory}" as a romantic setting.`,
+        { maxTokens: 60 }
+      ),
+      8000
     );
     return { location: { placeName: memory, googleMapsUri: manualLink, description: desc || "A coordinate etched in time." } };
   }
@@ -443,45 +548,135 @@ export default async function handler(req, res) {
   res.setHeader('Vary', 'Origin');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
+
+  // ── GLOBAL KILL SWITCH ──
+  // Flip process.env.AI_DISABLED=true to instantly disable every AI call
+  // without redeploying (safety valve for cost runaway / provider incident).
+  if (process.env.AI_DISABLED === 'true') {
+    return res.status(503).json({ ok: false, error: 'AI temporarily disabled' });
+  }
+
+  // ── RESET PER-REQUEST AI CALL COUNTER ──
+  aiCallCount = 0;
 
   if (!req.headers['content-type']?.includes('application/json')) {
-    return res.status(415).json({ error: 'Unsupported Media Type' });
+    return res.status(415).json({ ok: false, error: 'Unsupported Media Type' });
   }
+
+  const sessionUser = await getSessionUser(req);
+  req.user = sessionUser;
+  if (!req.user || !req.user.uid) {
+    return res.status(401).json({ ok: false, error: 'Authentication required' });
+  }
+
+  const { action, payload } = req.body || {};
+  const userUid = req.user.uid;
+  const sessionId = typeof req.body?.sessionId === 'string'
+    ? req.body.sessionId
+    : typeof payload?.sessionId === 'string'
+    ? payload.sessionId
+    : null;
+  const type = payload?.type;
+  const prompt = payload?.prompt;
+  void type;
+
+  // Session is optional pre-payment. When provided, enforce ownership only.
+  // Pre-payment AI generation (PreparationForm/RefineStage) hits this route
+  // before shared/{sessionId} exists, so we no longer require it. Auth gate
+  // is the session cookie above (req.user.uid).
+  if (sessionId) {
+    const sessionSnap = await admin.database().ref(`shared/${sessionId}`).get();
+
+    if (sessionSnap.exists()) {
+      const session = sessionSnap.val() || {};
+
+      if (session.senderUid !== req.user.uid) {
+        return res.status(403).json({ ok: false, error: 'Unauthorized access to this session' });
+      }
+    }
+  }
+
+  // ── EXPENSIVE-ACTION DAILY LIMIT (image/audio — 3 per day per user) ──
+  const EXPENSIVE_ACTIONS = ['generateValentineImage', 'generateAudioLetter'];
+  if (EXPENSIVE_ACTIONS.includes(req.body?.action)) {
+    const { limited: expensiveLimited } = await rateLimit(req, {
+      keyPrefix: `ai_expensive_${req.user.uid}`,
+      windowSeconds: 86400,
+      max: 3,
+    });
+    if (expensiveLimited) {
+      return res.status(429).json({ ok: false, error: 'Daily limit reached for this feature' });
+    }
+  }
+
+  // ── PROMPT VALIDATION ──
+  // Accept either a pre-built prompt or structured coupleData (handlers build
+  // the prompt themselves). Length check only applies when prompt is present.
+  const hasPrompt = typeof prompt === 'string' && prompt.length > 0;
+  const hasCoupleData = typeof payload?.coupleData === 'object' && payload.coupleData !== null;
+
+  if (!hasPrompt && !hasCoupleData) {
+    return res.status(400).json({ ok: false, error: 'Missing input for AI generation' });
+  }
+
+  if (hasPrompt && prompt.length > 2000) {
+    return res.status(400).json({ ok: false, error: 'Prompt too long' });
+  }
+
+  if (payload?.coupleData && !isSafeObject(payload.coupleData)) {
+    return res.status(400).json({ ok: false, error: 'Invalid input structure' });
+  }
+
+  if (payload?.coupleData && !isReasonableSize(payload.coupleData)) {
+    return res.status(400).json({ ok: false, error: 'Input too large' });
+  }
+
+  const safePayload = {
+    prompt: typeof payload?.prompt === 'string' ? payload.prompt : undefined,
+    coupleData: typeof payload?.coupleData === 'object' ? payload.coupleData : undefined,
+    type: payload?.type,
+    sessionId,
+  };
+
+  // ── PER-UID RATE LIMIT (fail-closed + tracked rollback) ──
+  // Why fail-closed: previous fallback of `1` silently disabled the rate
+  // limit during KV outages, allowing unbounded AI cost during incidents.
+  // Why `incremented` flag: we only roll back the quota if the increment
+  // actually succeeded — guards against negative counters when KV is unstable.
+  const RATE_LIMIT_MAX = 10;
+  const RATE_LIMIT_WINDOW_SECONDS = 3600;
+  const successRateKey = `ai_rate_success:${req.user.uid}`;
+
+  let incremented = false;
+
+  const updatedCount = await safeKV(() => kv.incr(successRateKey), null);
+
+  if (updatedCount === null) {
+    return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
+  }
+
+  incremented = true;
+
+  if (updatedCount === 1) {
+    await safeKV(() => kv.expire(successRateKey, RATE_LIMIT_WINDOW_SECONDS));
+  }
+
+  if (updatedCount > RATE_LIMIT_MAX) {
+    return res.status(429).json({ ok: false, error: 'AI usage limit reached.' });
+  }
+
+  console.log('[AI] Request', { uid: req.user.uid, sessionId });
 
   console.log('PROD ENV CHECK:', {
     GEMINI: !!process.env.GEMINI_API_KEY,
     OPENAI: !!process.env.OPENAI_API_KEY,
   });
 
-  const { action, payload } = req.body || {};
   console.log('ACTION RECEIVED:', req.body?.action);
 
   if (!action || !ALLOWED_ACTIONS.includes(action)) {
-    return res.status(400).json({ error: 'Invalid action' });
-  }
-
-  // ── DISTRIBUTED RATE LIMITING ──
-  try {
-    const ip = getClientIP(req);
-    const key = `ai_rate:${action}:${ip || 'anon'}`;
-
-    const current = await kv.incr(key);
-
-    if (current === 1) {
-      await kv.expire(key, RATE_LIMIT_WINDOW);
-    }
-
-    if (current > MAX_REQUESTS) {
-      return res.status(429).json({
-        error: "Too many AI requests. Please wait a minute."
-      });
-    }
-
-  } catch (kvError) {
-    // ⚠️ INTENTIONAL SOFT-FAIL — matches middleware.js pattern.
-    // If Redis is unavailable, degrade rate limiting but never block AI generation.
-    console.warn("[RateLimit] KV unavailable (ai_rate):", kvError.message);
+    return res.status(400).json({ ok: false, error: 'Invalid action' });
   }
 
   // ── PAYLOAD SIZE CAP (cost protection) ──
@@ -490,38 +685,78 @@ export default async function handler(req, res) {
 
     // 50KB maximum request payload
     if (rawSize > 50000) {
-      return res.status(400).json({ error: "Payload too large." });
+      return res.status(400).json({ ok: false, error: "Payload too large." });
     }
   } catch {
-    return res.status(400).json({ error: "Invalid payload." });
+    return res.status(400).json({ ok: false, error: "Invalid payload." });
   }
 
   if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'Server configuration error.' });
+    return res.status(500).json({ ok: false, error: 'Server configuration error.' });
   }
 
-  // ── PRIMARY: Gemini ──
+  // ── PRIMARY: Gemini (with handler-level timeout) ──
   try {
-    const result = await PRIMARY_HANDLERS[action](payload);
-    return res.status(200).json(result);
+    const timeoutError = new Error('HANDLER_TIMEOUT');
+    timeoutError.code = 'HANDLER_TIMEOUT';
+
+    const result = await Promise.race([
+      PRIMARY_HANDLERS[action](safePayload, userUid),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(timeoutError), 15000)
+      )
+    ]);
+    return res.status(200).json({ ok: true, data: result });
   } catch (primaryError) {
+    console.error('[AI] Error', primaryError.message);
     console.error(`[API] ${action} failed (Gemini):`, primaryError.message);
+
+    // Timeout short-circuit: do NOT attempt fallback. Timeout could be caused
+    // by Redis/Firebase/CPU and not Gemini itself, so calling OpenAI would
+    // double cost and latency without fixing the root cause.
+    if (primaryError.code === 'HANDLER_TIMEOUT') {
+      if (incremented) await safeKV(() => kv.decr(successRateKey));
+
+      return res.status(504).json({
+        ok: false,
+        error: 'TIMEOUT'
+      });
+    }
+
+    // Concurrent-generation short-circuit: surface a proper 409 instead of
+    // attempting a fallback (the user is mid-generation already).
+    if (primaryError.code === 'CONCURRENT_GENERATION') {
+      if (incremented) await safeKV(() => kv.decr(successRateKey));
+
+      return res.status(409).json({
+        ok: false,
+        error: 'CONCURRENT_GENERATION',
+        retryAfter: 5
+      });
+    }
 
     // ── FALLBACK: OpenAI (text actions only) ──
     if (TEXT_ACTIONS.includes(action) && process.env.OPENAI_API_KEY && FALLBACK_HANDLERS[action]) {
       console.log(`[Fallback] Attempting OpenAI for ${action}...`);
       try {
         console.log('TRY OPENAI');
-        const fallbackResult = await FALLBACK_HANDLERS[action](payload);
+        const fallbackResult = await FALLBACK_HANDLERS[action](safePayload, userUid);
         if (fallbackResult) {
           console.log(`[Fallback] OpenAI succeeded for ${action}`);
-          return res.status(200).json(fallbackResult);
+          return res.status(200).json({ ok: true, data: fallbackResult });
         }
       } catch (fallbackError) {
+        console.error('[AI] Error', fallbackError.message);
         console.error(`[Fallback] OpenAI also failed for ${action}:`, fallbackError.message);
       }
     }
 
-    return res.status(500).json({ error: 'AI generation failed. Please try again.' });
+    // Both primary and fallback failed — refund the quota since the user got
+    // nothing for it. Only roll back if the increment actually succeeded.
+    if (incremented) {
+      await safeKV(() => kv.decr(successRateKey));
+    }
+
+    return res.status(500).json({ ok: false, error: 'AI generation failed. Please try again.' });
   }
 }

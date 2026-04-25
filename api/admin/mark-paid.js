@@ -1,17 +1,5 @@
-import admin from 'firebase-admin';
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    }),
-    databaseURL: process.env.FIREBASE_DB_URL
-  });
-}
-
-const db = admin.database();
+import crypto from 'crypto';
+import { db } from '../lib/firebaseAdmin';
 
 export default async function handler(req, res) {
   // ✅ METHOD CHECK
@@ -20,8 +8,19 @@ export default async function handler(req, res) {
   }
 
   // ✅ AUTH CHECK
-  const auth = req.headers.authorization;
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
+  const authHeader = req.headers.authorization || '';
+
+  const token = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : '';
+
+  const expected = Buffer.from(process.env.ADMIN_SECRET || '');
+  const actual = Buffer.from(token);
+
+  if (
+    expected.length !== actual.length ||
+    !crypto.timingSafeEqual(expected, actual)
+  ) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

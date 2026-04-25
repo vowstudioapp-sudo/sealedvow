@@ -48,11 +48,11 @@ const PersonalIntro = lazy(() =>
   import('./components/PersonalIntro.tsx').then(m => ({ default: m.PersonalIntro }))
 );
 const EidiCreatePage = lazy(() =>
-  import('./pages/eidi/_create_backup.tsx').then(m => ({ default: m.EidiCreatePage }))
+  import('./pages/eidi/create.tsx').then(m => ({ default: m.EidiCreatePage }))
 );
 
 const EidiReceiverPage = lazy(() =>
-  import('./pages/eidi/_receiver_backup.tsx').then(m => ({ default: m.EidiReceiverPage }))
+  import('./pages/eidi/receiver.tsx').then(m => ({ default: m.EidiReceiverPage }))
 );
 
 

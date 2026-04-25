@@ -43,7 +43,7 @@ export default function ClaimPage() {
     setError('');
 
     try {
-      const res = await fetch('http://127.0.0.1:3001/api/claim-eidi', {
+      const res = await fetch('/api/claim-eidi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

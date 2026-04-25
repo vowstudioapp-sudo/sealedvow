@@ -97,10 +97,38 @@ export default async function handler(req, res) {
   try {
     const { sessionId, file, type, index } = req.body || {};
 
+    if (!req.user || !req.user.uid) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     // ── VALIDATE INPUTS ──
 
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'Missing sessionId' });
+    }
+
     if (!validateSessionId(sessionId)) {
-      return res.status(400).json({ error: 'Invalid session ID.' });
+      return res.status(400).json({ error: 'Invalid session format' });
+    }
+
+    const sessionSnap = await admin.database().ref(`shared/${sessionId}`).get();
+    if (!sessionSnap.exists()) {
+      return res.status(401).json({ error: 'Invalid session' });
+    }
+
+    const session = sessionSnap.val() || {};
+
+    if (!session.senderUid || session.senderUid !== req.user.uid) {
+      return res.status(403).json({ error: 'Unauthorized upload' });
+    }
+
+    const MAX_UPLOADS = 20;
+    const countRef = admin.database().ref(`shared/${sessionId}/uploadCount`);
+    const currentCountSnap = await countRef.get();
+    const currentCount = currentCountSnap.val() || 0;
+
+    if (currentCount >= MAX_UPLOADS) {
+      return res.status(429).json({ error: 'Upload limit reached' });
     }
 
     if (!type || !ALLOWED_TYPES.includes(type)) {
@@ -137,11 +165,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `File too large. Maximum ${maxMB}MB for ${type}.` });
     }
 
-    // NOTE: No database session check here. The shared/ record only exists
-    // after payment verification. During preparation (when uploads happen),
-    // the sessionId is a client-generated UUID used purely as a storage namespace.
-    // Rate limiting + format validation prevents abuse.
-
     // ── BUILD STORAGE PATH ──
 
     const ext = getExtension(mimeType);
@@ -174,11 +197,25 @@ export default async function handler(req, res) {
       },
     });
 
-    // Make file publicly readable
-    await fileRef.makePublic();
+    const result = await countRef.transaction(count => {
+      if ((count || 0) >= MAX_UPLOADS) {
+        return; // abort
+      }
+      return (count || 0) + 1;
+    });
 
-    // Get public URL via Firebase method
-    const url = fileRef.publicUrl();
+    if (!result.committed) {
+      // Upload succeeded but quota exceeded — edge case
+      // We still return success, but log it for monitoring
+      console.warn('[UploadMedia] Upload exceeded limit after race condition', {
+        sessionId,
+      });
+    }
+
+    const [url] = await fileRef.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
+    });
 
     return res.status(200).json({ url, success: true });
 
