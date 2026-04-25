@@ -260,7 +260,15 @@ const App: React.FC = () => {
   
   const [stage, setStage] = useState<AppStage>(AppStage.LANDING);
   const [data, setData] = useState<CoupleData | null>(null);
-  const [isBooting, setIsBooting] = useState(true);
+  const [isBooting, setIsBooting] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      if (sessionStorage.getItem('hasSeenBoot') === '1') return false;
+    } catch {}
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    // Full boot only on the landing root. Skip for /create and any in-app route.
+    return path === '/';
+  });
   const [isFadingOut, setIsFadingOut] = useState(false);
   
   const [isCreatorPreview, setIsCreatorPreview] = useState(false);
@@ -596,17 +604,20 @@ const App: React.FC = () => {
   }
 
   useEffect(() => {
-    // Skip boot animation entirely for receiver links
+    // Skip boot animation for receiver links and any route where it was suppressed at init.
     if (isReceiverLink) return;
+    if (!isBooting) return;
 
-    const fadeTimer = setTimeout(() => setIsFadingOut(true), 2200);
-    const endTimer = setTimeout(() => setIsBooting(false), 3000);
+    try { sessionStorage.setItem('hasSeenBoot', '1'); } catch {}
+
+    const fadeTimer = setTimeout(() => setIsFadingOut(true), 1100);
+    const endTimer = setTimeout(() => setIsBooting(false), 1500);
 
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(endTimer);
     };
-  }, [isReceiverLink]);
+  }, [isReceiverLink, isBooting]);
 
   useEffect(() => {
     let timeoutId: number | null = null;
@@ -798,44 +809,61 @@ const App: React.FC = () => {
   };
 
   const bootScreen = (
-    <div className={`boot-screen-container ${isFadingOut ? 'fade-out' : ''}`}>
-      <div className="relative flex flex-col items-center">
-        <div className="mb-12 relative w-32 h-32 flex items-center justify-center animate-boot-logo">
-           <div className="absolute inset-0 border-[0.5px] rounded-full" style={{ borderColor: 'rgba(198,168,90,0.35)' }}></div>
-           <div className="absolute inset-2 border-[0.5px] rounded-full" style={{ borderColor: 'rgba(198,168,90,0.2)' }}></div>
-           <span 
-             className="text-5xl font-serif-elegant italic select-none"
-             style={{ 
-               color: '#C6A85A', 
-               letterSpacing: '-0.03em',
-               textShadow: '0 0 12px rgba(198,168,90,0.25)',
-             }}
-           >V</span>
-        </div>
-        
-        <div className="overflow-hidden mb-4 text-center">
-          <h1 
-            className="text-[13px] font-bold uppercase animate-boot-text"
-            style={{ 
-              color: '#C6A85A', 
-              letterSpacing: '1em',
-              textShadow: '0 0 12px rgba(198,168,90,0.25)',
-            }}
-          >
-            VOW
-          </h1>
-          <p 
-            className="text-[7px] uppercase mt-3 animate-boot-line"
-            style={{ 
-              color: 'rgba(198,168,90,0.6)',
-              letterSpacing: '0.7em',
-            }}
-          >
-            Sealed Moment
-          </p>
-        </div>
-        
-        <div className="animate-boot-line" style={{ height: '0.5px', backgroundColor: 'rgba(198,168,90,0.6)' }}></div>
+    <div
+      className={`boot-screen-container ${isFadingOut ? 'fade-out' : ''}`}
+      style={{
+        background:
+          'radial-gradient(ellipse 720px 480px at 50% 50%, rgba(154, 36, 53, 0.07) 0%, rgba(154, 36, 53, 0) 70%), var(--sv-bg-base, #1A1220)',
+        transition: 'opacity 400ms ease-out',
+      }}
+    >
+      <div
+        className="flex flex-col items-center justify-center text-center"
+        style={{ padding: '0 24px' }}
+      >
+        <h1
+          className="lp-nav__wordmark animate-boot-mark select-none"
+          aria-label="Sealed Vow"
+          style={{
+            fontSize: 'clamp(51px, 11vw, 66px)',
+            margin: 0,
+            opacity: 0,
+          }}
+        >
+          <span className="lp-nav__wordmark-sealed">
+            <span className="lp-nav__wordmark-sealed-first">S</span>
+            <span className="lp-nav__wordmark-sealed-rest">ealed</span>
+          </span>
+          <span className="lp-nav__wordmark-vow">Vow</span>
+        </h1>
+
+        <p
+          className="animate-boot-sub font-serif-elegant italic"
+          style={{
+            color: 'rgba(242, 237, 228, 0.85)',
+            fontSize: 'clamp(18px, 3.75vw, 20px)',
+            fontWeight: 500,
+            letterSpacing: '0.05em',
+            lineHeight: 1.4,
+            marginTop: '32px',
+            marginBottom: 0,
+            maxWidth: '32ch',
+            opacity: 0,
+          }}
+        >
+          Letters take a moment to fold.
+        </p>
+
+        <div
+          className="animate-boot-anchor"
+          style={{
+            marginTop: '22px',
+            width: '72px',
+            height: '1px',
+            background: 'rgba(241, 231, 218, 0.62)',
+            opacity: 0,
+          }}
+        />
       </div>
     </div>
   );
@@ -1020,29 +1048,23 @@ const App: React.FC = () => {
         }
         .animate-fade-in { animation: fade-in 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         
-        @keyframes boot-logo {
-          0% { transform: scale(0.8); opacity: 0; }
-          20% { transform: scale(1); opacity: 1; }
-          80% { transform: scale(1); opacity: 1; }
-          100% { transform: scale(1.1); opacity: 0; }
+        @keyframes boot-mark {
+          0%   { opacity: 0; transform: translateY(4px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
-        .animate-boot-logo { animation: boot-logo 2.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .animate-boot-mark { animation: boot-mark 600ms ease-out 0ms forwards; }
 
-        @keyframes boot-text {
-          0% { opacity: 0; letter-spacing: 0em; }
-          40% { opacity: 1; letter-spacing: 1em; }
-          80% { opacity: 1; letter-spacing: 1em; }
-          100% { opacity: 0; letter-spacing: 1.2em; }
+        @keyframes boot-sub {
+          0%   { opacity: 0; transform: translateY(4px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
-        .animate-boot-text { animation: boot-text 2.5s ease-out forwards; }
-        
-        @keyframes boot-line {
-          0% { width: 0; opacity: 0; }
-          40% { width: 100px; opacity: 1; }
-          80% { width: 100px; opacity: 0.5; }
-          100% { width: 0; opacity: 0; }
+        .animate-boot-sub { animation: boot-sub 600ms ease-out 100ms forwards; }
+
+        @keyframes boot-anchor {
+          0%   { opacity: 0; }
+          100% { opacity: 1; }
         }
-        .animate-boot-line { animation: boot-line 2.5s ease-in-out forwards; }
+        .animate-boot-anchor { animation: boot-anchor 400ms ease-out 300ms forwards; }
       `}</style>
 
       {/* Dev Theme Switcher — only in preview mode */}
