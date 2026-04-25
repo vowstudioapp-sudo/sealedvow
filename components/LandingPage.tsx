@@ -162,12 +162,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       <AtmosphericShell>
         <section className="lp-hero" ref={heroRef}>
           <div className="lp-hero__center">
-            <div className="lp-v-ring"><span>V</span></div>
             <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
-            <p className="lp-hero__kicker">Sealed. Private.</p>
-            <p className="lp-hero__clarity">Write a private letter. Share it through a secure link.</p>
-            <div className="lp-hero__rule" />
-            <button className="lp-btn-begin" onClick={handleEnter}>Create</button>
+            <p className="lp-hero__clarity">Write in private. Seal it. Share it through a secure link.</p>
+            <button className="lp-btn-begin" onClick={handleEnter}>CREATE YOUR LETTER</button>
           </div>
           <div className="lp-hero__bottom">
             <div className="lp-scroll-signal">
@@ -184,8 +181,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       ══════════════════════════════════════ */}
       <section className="lp-demo-cards" ref={demoRef}>
         <div className="lp-demo-cards__heading">
-          <p className="lp-demo-cards__title">Preview the experience</p>
-          <p className="lp-demo-cards__sub">See how your letter arrives</p>
+          <p className="lp-demo-cards__kicker">Preview the experience</p>
+          <p className="lp-demo-cards__title">For the moments that matter.</p>
+          <p className="lp-demo-cards__sub">Choose one to see how it arrives.</p>
         </div>
 
         <div className="lp-rail lp-fade">
@@ -196,13 +194,13 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               <a className="lp-card lp-card--anniversary" style={{ ['--card-accent' as any]: '#C95A4A' }} href="/demo/anniversary">
                 <div className="lp-card__icon">
                   <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M8 18l16 14 16-14"/><rect x="8" y="18" width="32" height="22" rx="2"/>
-                    <line x1="8" y1="40" x2="20" y2="30"/><line x1="40" y1="40" x2="28" y2="30"/>
-                    <circle cx="24" cy="12" r="4"/><path d="M20 12c0-4 4-8 4-8s4 4 4 8"/>
+                    <circle cx="19" cy="24" r="8"/>
+                    <circle cx="29" cy="24" r="8"/>
+                    <path d="M23 24h2"/>
                   </svg>
                 </div>
                 <span className="lp-card__title">Anniversary</span>
-                <span className="lp-card__desc">Sealed just for you</span>
+                <span className="lp-card__desc">A moment kept, not sent.</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
@@ -216,7 +214,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   </svg>
                 </div>
                 <span className="lp-card__title">Birthday</span>
-                <span className="lp-card__desc">Someone left you this</span>
+                <span className="lp-card__desc">A surprise waiting to be opened.</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
@@ -229,7 +227,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   </svg>
                 </div>
                 <span className="lp-card__title">Thank You</span>
-                <span className="lp-card__desc">Words they deserve</span>
+                <span className="lp-card__desc">What you couldn't say out loud.</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
@@ -244,7 +242,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   </svg>
                 </div>
                 <span className="lp-card__title">Eid</span>
-                <span className="lp-card__desc">Open a sealed eidi</span>
+                <span className="lp-card__desc">A gift, held until it's opened.</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
@@ -258,7 +256,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   </svg>
                 </div>
                 <span className="lp-card__title">Just Because</span>
-                <span className="lp-card__desc">No reason needed</span>
+                <span className="lp-card__desc">Some things don't need a reason.</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
@@ -273,7 +271,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   </svg>
                 </div>
                 <span className="lp-card__title">Apology</span>
-                <span className="lp-card__desc">Read what they wrote</span>
+                <span className="lp-card__desc">What I should have said sooner.</span>
                 <span className="lp-card__hint">Preview →</span>
               </a>
 

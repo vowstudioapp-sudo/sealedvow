@@ -357,7 +357,7 @@
   color: rgba(242,232,213,0.92);
   line-height: 1.06;
   letter-spacing: 0.015em;
-  margin-bottom: 12px;
+  margin-bottom: 24px;
   animation:
     lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.38s both,
     heroBreath 6s ease-in-out 2s infinite;
@@ -376,21 +376,36 @@
 
 .lp-hero__clarity {
   font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: clamp(15px, 2vw, 18px);
+  font-size: clamp(16.2px, 2.16vw, 19.44px);
   font-style: normal;
   font-weight: 400;
   letter-spacing: 0.02em;
   line-height: 1.5;
-  color: rgba(242,232,213,0.82);
+  color: rgba(242,232,213,0.92);
   max-width: 620px;
-  margin: 0 0 34px;
+  margin: 0 0 20px;
+}
+
+.lp-hero__benefit-pill {
+  display: inline-block;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(242,232,213,0.84);
+  border: 1px solid rgba(242,232,213,0.2);
+  background: rgba(242,232,213,0.06);
+  border-radius: 999px;
+  padding: 8px 16px;
+  margin: -8px auto 18px;
+  animation: lp-fadeIn 0.6s ease 0.58s both;
 }
 
 .lp-hero__rule {
   width: 80px;
   height: 1px;
   background: rgba(242,232,213,0.28);
-  margin: 0 auto 40px;
+  margin: 0 auto 18px;
   position: relative;
   animation: lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.54s both;
 }
@@ -419,7 +434,7 @@
   letter-spacing: 0.32em;
   text-transform: uppercase;
   padding: 16px 52px;
-  border-radius: 50px;
+  border-radius: 16px;
   text-decoration: none;
   background: linear-gradient(to right, rgba(242,232,213,0.13) 50%, transparent 50%);
   background-size: 200% 100%;
@@ -434,6 +449,24 @@
   animation: lp-rise 1.4s cubic-bezier(0.16,1,0.3,1) 0.68s both;
 }
 
+.lp-btn-begin {
+  font-size: 11.55px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  color: #F4ECDC;
+  border: none;
+  background: #9A2435;
+  background-image: none;
+  margin-top: 4px;
+  transform: scale(1);
+  will-change: transform;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
 .lp-btn-begin:hover,
 .lp-btn-studio:hover {
   background-position: left center;
@@ -443,8 +476,14 @@
 
 /* Primary CTA gets the warm-hover reward; studio (secondary) stays quiet. */
 .lp-btn-begin:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 40px rgba(230,180,100,0.22);
+  transform: translateY(-3px) scale(1.06);
+  background-color: #B0293E;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.32);
+}
+
+.lp-btn-begin:active {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.28);
 }
 
 /* Progress bar */
@@ -535,8 +574,20 @@
   margin-bottom: 56px;
 }
 
+.lp-demo-cards__kicker {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--sv-crimson);
+  opacity: 1;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
 .lp-demo-cards__title {
-  font-size: clamp(26px, 4vw, 40px);
+  font-size: clamp(29px, 4.4vw, 44px);
   font-style: italic;
   font-weight: 300;
   color: rgba(242,232,213,0.82);
@@ -550,7 +601,7 @@
   font-style: italic;
   font-weight: 500;
   line-height: 1.45;
-  color: var(--sv-ink-soft);
+  color: rgba(242,232,213,0.88);
   letter-spacing: 0.06em;
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
@@ -723,13 +774,13 @@
 
 /* Description */
 .lp-card__desc {
-  font-size: 13.5px;
+  font-size: 15.5px;
   font-style: normal;
   font-weight: 400;
-  color: rgba(241, 231, 218, 0.72);
-  letter-spacing: 0.04em;
+  color: rgba(242,232,213,0.92);
+  letter-spacing: 0.01em;
   text-align: center;
-  line-height: 1.5;
+  line-height: 1.6;
   font-family: 'Cormorant Garamond', Georgia, serif;
   transition: color 0.4s ease;
 }
@@ -1593,8 +1644,8 @@
    ANIMATIONS
 ══════════════════════════════════ */
 @keyframes lp-rise {
-  from { opacity: 0; transform: translateY(22px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes lp-breathe {
