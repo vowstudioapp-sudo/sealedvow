@@ -15,6 +15,7 @@ dist-ssr
 # Environment
 .env
 .env.local
+.env*.local
 
 # Firebase
 .firebase
@@ -24,6 +25,7 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+.cursor/
 .DS_Store
 *.suo
 *.ntvs*
@@ -31,12 +33,13 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
-.env*.local
 
 *.backup
+
 # Local analysis files
 *_ANALYSIS.md
 *_REVIEW.md
+*_AUDIT_REPORT.md
 
 # Codebase exports
 *.zip
@@ -45,7 +48,8 @@ dist-ssr
 *.gz
 *.7z
 *.rar
+
 # OS temp files
 Thumbs.db
 *.tmp
-*.temp.cursor/
+*.temp
