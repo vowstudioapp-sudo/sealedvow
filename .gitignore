@@ -48,4 +48,4 @@ dist-ssr
 # OS temp files
 Thumbs.db
 *.tmp
-*.temp
+*.temp.cursor/
