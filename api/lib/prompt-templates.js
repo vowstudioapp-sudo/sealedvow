@@ -61,6 +61,17 @@ const OCCASION_CONTRACTS = {
       forbidden: ['romantic escalation', 'love declarations unless relevant', 'flowery adjectives', 'you are my everything', 'I do not deserve you'],
       tone: 'sincere, simple, direct. Like thanking someone who actually helped you.',
     },
+    'birthday': {
+      structure: `
+        Paragraph 1: Acknowledge the birthday in a personal way. Avoid generic wishes.
+        Paragraph 2: Mention a specific trait, habit, or shared memory.
+        Paragraph 3: A grounded wish for the year ahead. Keep it real, not dramatic.`,
+      wordRange: [120, 150],
+      paragraphs: 3,
+      mustInclude: ['a specific personal detail', 'a grounded birthday wish'],
+      forbidden: ['many many happy returns', 'stay blessed', 'generic birthday wishes', 'formal tone', 'overly poetic language'],
+      tone: 'warm, personal, grounded. Like a real message, not a greeting card.',
+    },
   };
   
   const BRAND_LOCK = `
