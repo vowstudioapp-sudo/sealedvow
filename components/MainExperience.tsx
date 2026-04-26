@@ -235,7 +235,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
   const sectionCount = useMemo(() => {
     let count = 2; // Hero + Letter always present
-    if (data.userImageUrl || data.aiImageUrl) count++;
+    if (data.userImageUrl) count++;
     if (data.memoryBoard?.length) count++;
     if (data.sacredLocation) count++;
     // Locked sections only count when unlocked (or no location to gate them)
@@ -246,7 +246,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     return count;
   }, [
     data.userImageUrl,
-    data.aiImageUrl,
     data.memoryBoard?.length,
     data.sacredLocation,
     data.coupons?.length,
@@ -385,19 +384,19 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       </section>
 
       {/* SECTION: Image */}
-      {(data.userImageUrl || data.aiImageUrl) && (
+      {data.userImageUrl && (
         <PaperSurface
           theme={data.theme || 'obsidian'}
           as="section"
           className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start overflow-hidden"
         >
           <div className="main-experience-image-blur">
-            <img src={data.userImageUrl || data.aiImageUrl} className="w-full h-full object-cover" alt="Background" loading="lazy" />
+            <img src={data.userImageUrl} className="w-full h-full object-cover" alt="Background" loading="lazy" />
           </div>
           <div className="main-experience-polaroid">
             <div className="main-experience-polaroid-img">
               <img 
-                src={data.userImageUrl || data.aiImageUrl} 
+                src={data.userImageUrl}
                 className="w-full h-full object-cover"
                 style={{ animation: 'kenBurns 12s ease-in-out infinite alternate', willChange: 'transform' }}
                 loading="lazy"

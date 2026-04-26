@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
-import { generateLoveLetter, generateCoupleMyth, generateCoupleImage, generateCinematicVideo, generateSacredLocation, generateFutureProphecy } from '../services/geminiService';
+import { generateLoveLetter, generateCoupleMyth, generateCinematicVideo, generateSacredLocation } from '../services/geminiService';
 
 interface Props {
   data: CoupleData;
@@ -17,27 +17,6 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
   // Separate progress for drafting phase
   const [draftingProgress, setDraftingProgress] = useState(0);
   const hasGeneratedRef = useRef(false);
-
-  // Helper to compress AI images so they fit in the URL
-  const compressBase64 = (base64Str: string): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = base64Str;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        // Aggressive compression for URL safety
-        const maxWidth = 500; 
-        const scale = maxWidth / img.width;
-        canvas.width = maxWidth;
-        canvas.height = img.height * scale;
-        
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.5));
-      };
-      img.onerror = () => resolve(base64Str); // Fallback
-    });
-  };
 
   useEffect(() => {
     if (
@@ -97,16 +76,9 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
       try {
         enrichedData.myth = await generateCoupleMyth({ ...data, finalLetter: letter });
       } catch (e) { console.warn("Myth failed", e); }
-      setProgress(20);
+      setProgress(33);
 
-      // 2. Future Prophecy (Fast Text)
-      setPackageStatus("Envisioning the future...");
-      try {
-        await generateFutureProphecy(data);
-      } catch (e) { console.warn("Prophecy failed", e); }
-      setProgress(40);
-
-      // 3. Sacred Location (Medium Search)
+      // 2. Sacred Location (Medium Search)
       if (data.locationMemory) {
           setPackageStatus("Finding your sacred coordinate...");
           try {
@@ -114,19 +86,9 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
              if (res) enrichedData.sacredLocation = res;
           } catch (e) { console.warn("Location failed", e); }
       }
-      setProgress(60);
+      setProgress(66);
 
-      // 4. Main Image (Slow Image) - Only if needed
-      if (!data.userImageUrl) {
-          setPackageStatus("Painting a memory...");
-          try {
-             const res = await generateCoupleImage(`A quiet, private moment of two people, candid and intimate photography.`);
-             if (res) enrichedData.aiImageUrl = await compressBase64(res);
-          } catch (e) { console.warn("Image failed", e); }
-      }
-      setProgress(80);
-
-      // 5. Video (Very Slow) - Only if specifically requested
+      // 3. Video (Very Slow) - Only if specifically requested
       if (data.videoSource === 'veo') {
           setPackageStatus("Dreaming in cinema (Veo AI - this takes a moment)...");
           try {

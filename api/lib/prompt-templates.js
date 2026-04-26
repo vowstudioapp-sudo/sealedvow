@@ -182,12 +182,3 @@ const OCCASION_CONTRACTS = {
     Style: Ancient, inscription-like, museum plaque.`;
   }
   
-  /**
-   * Builds the future prophecy prompt server-side.
-   */
-  export function buildProphecyPrompt() {
-    return `Write 3 very short (5-8 words) poetic captions about the future of a couple.
-    Vibe: Cinematic, hopeful, quiet luxury.
-    Format: JSON array of strings.
-    Example: ["Walking the quiet streets of Kyoto", "Building a home in the mountains", "Growing old in the golden light"]`;
-  }

@@ -74,28 +74,6 @@ export const generateCoupleMyth = async (data: CoupleData): Promise<string> => {
   }
 };
 
-export const generateFutureProphecy = async (data: CoupleData): Promise<string[]> => {
-  try {
-    const result = await callAPI('generateFutureProphecy', {
-      coupleData: { occasion: data.occasion },
-    });
-    return result.items;
-  } catch (error) {
-    return ["The Quiet Morning", "The Great Adventure", "The Golden Years"];
-  }
-};
-
-export const generateCoupleImage = async (visualPrompt: string): Promise<string | null> => {
-  try {
-    const result = await callAPI('generateValentineImage', {
-      prompt: visualPrompt + " Natural, intimate, unposed photography. Candid moment, soft natural light, warm film grain. No studio lighting."
-    });
-    return result.image;
-  } catch (error) {
-    return null;
-  }
-};
-
 export const generateCinematicVideo = async (data: CoupleData): Promise<string | null> => {
   console.warn('[Gemini] Video generation is disabled for launch.');
   return null;

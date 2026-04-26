@@ -32,7 +32,7 @@ const kv = new Redis({
 import * as _gemini from '../lib/ai/providers/geminiProvider.js';
 import * as _openai from '../lib/ai/providers/openaiProvider.js';
 import { validateLetter, validateBasicText, cleanOutput, GLOBAL_FORBIDDEN } from '../lib/ai/validator.js';
-import { buildLetterPrompt, buildMythPrompt, buildProphecyPrompt } from './lib/prompt-templates.js';
+import { buildLetterPrompt, buildMythPrompt } from './lib/prompt-templates.js';
 
 // ===============================
 // PER-REQUEST AI CALL GUARD
@@ -70,14 +70,12 @@ const ALLOWED_ACTIONS = [
   'generateLoveLetter',
   'generateEidLetter',
   'generateCoupleMyth',
-  'generateFutureProphecy',
-  'generateValentineImage',
   'generateSacredLocation',
   'generateAudioLetter',
 ];
 
 // Actions that can fall back to OpenAI (text-only)
-const TEXT_ACTIONS = ['generateLoveLetter', 'generateEidLetter', 'generateCoupleMyth', 'generateFutureProphecy', 'generateSacredLocation'];
+const TEXT_ACTIONS = ['generateLoveLetter', 'generateEidLetter', 'generateCoupleMyth', 'generateSacredLocation'];
 
 // ===============================
 // DISTRIBUTED RATE LIMITING (Redis/Vercel KV)
@@ -314,25 +312,6 @@ async function handleCoupleMyth(payload) {
   return { text: raw || null };
 }
 
-async function handleFutureProphecy(payload) {
-  const prompt = payload.prompt || buildProphecyPrompt();
-  const raw = await gemini.generateText(prompt, { jsonMode: true });
-  let items = [];
-
-  try {
-    items = JSON.parse(raw || '[]');
-  } catch {
-    items = [];
-  }
-
-  return { items: Array.isArray(items) ? items : [] };
-}
-
-async function handleValentineImage(payload) {
-  const image = await gemini.generateImage(payload.prompt);
-  return { image };
-}
-
 async function handleSacredLocation(payload) {
   const { memory, manualLink } = payload;
 
@@ -434,25 +413,6 @@ async function fallbackEidLetter(payload) {
   return { letter: cleanOutput(raw) };
 }
 
-async function fallbackFutureProphecy(payload) {
-  const basePrompt = payload.prompt || buildProphecyPrompt();
-  const raw = await withTimeout(
-    openai.generateText(
-      basePrompt + '\n\nRespond ONLY with a valid JSON array of strings. No markdown.',
-      { temperature: 0.8, maxTokens: 200 }
-    ),
-    8000
-  );
-  if (!raw) return null;
-  try {
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const items = JSON.parse(clean);
-    return { items: Array.isArray(items) ? items : [] };
-  } catch {
-    return { items: [] };
-  }
-}
-
 async function fallbackSacredLocation(payload) {
   const { memory, manualLink } = payload;
   if (manualLink) {
@@ -483,8 +443,6 @@ const PRIMARY_HANDLERS = {
   generateLoveLetter: handleLoveLetter,
   generateEidLetter: handleEidLetter,
   generateCoupleMyth: handleCoupleMyth,
-  generateFutureProphecy: handleFutureProphecy,
-  generateValentineImage: handleValentineImage,
   generateSacredLocation: handleSacredLocation,
   generateAudioLetter: handleAudioLetter,
 };
@@ -493,7 +451,6 @@ const FALLBACK_HANDLERS = {
   generateLoveLetter: fallbackLoveLetter,
   generateEidLetter: fallbackEidLetter,
   generateCoupleMyth: fallbackCoupleMyth,
-  generateFutureProphecy: fallbackFutureProphecy,
   generateSacredLocation: fallbackSacredLocation,
 };
 
@@ -558,8 +515,8 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── EXPENSIVE-ACTION DAILY LIMIT (image/audio — 3 per day per user) ──
-  const EXPENSIVE_ACTIONS = ['generateValentineImage', 'generateAudioLetter'];
+  // ── EXPENSIVE-ACTION DAILY LIMIT (audio — 3 per day per user) ──
+  const EXPENSIVE_ACTIONS = ['generateAudioLetter'];
   if (EXPENSIVE_ACTIONS.includes(req.body?.action)) {
     const { limited: expensiveLimited } = await rateLimit(req, {
       keyPrefix: `ai_expensive_${actorKey}`,
