@@ -167,7 +167,7 @@ export const Envelope: React.FC<Props> = ({
 
   return (
     <AtmosphericShell>
-      <div className="flex flex-col items-center justify-center min-h-[100dvh] px-4">
+      <div className="w-full flex flex-col items-center justify-center min-h-[100dvh] px-4">
       {/* Envelope */}
       <div
         role="button"
