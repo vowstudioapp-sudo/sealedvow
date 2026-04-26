@@ -700,7 +700,7 @@ export default async function handler(req, res) {
     const result = await Promise.race([
       PRIMARY_HANDLERS[action](safePayload, userUid),
       new Promise((_, reject) =>
-        setTimeout(() => reject(timeoutError), 15000)
+        setTimeout(() => reject(timeoutError), 25000)
       )
     ]);
     return res.status(200).json({ ok: true, data: result });
