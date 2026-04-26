@@ -14,6 +14,7 @@
 
 import admin from 'firebase-admin';
 import { guardPost, rateLimit } from './lib/middleware.js';
+import { getSessionUser } from './lib/auth.js';
 
 // ── LAZY BUCKET INITIALIZATION ──
 // Initialized inside handler, not at module level, to ensure Firebase Admin
@@ -96,9 +97,12 @@ export default async function handler(req, res) {
 
   try {
     const { sessionId, file, type, index } = req.body || {};
-
-    if (!req.user || !req.user.uid) {
-      return res.status(401).json({ error: 'Authentication required' });
+    let uploadedByUid = null;
+    try {
+      const sessionUser = await getSessionUser(req);
+      uploadedByUid = sessionUser?.uid || null;
+    } catch {
+      // swallow errors — upload must not fail due to auth
     }
 
     // ── VALIDATE INPUTS ──
@@ -111,23 +115,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid session format' });
     }
 
-    const sessionSnap = await admin.database().ref(`shared/${sessionId}`).get();
-    if (!sessionSnap.exists()) {
-      return res.status(401).json({ error: 'Invalid session' });
-    }
-
-    const session = sessionSnap.val() || {};
-
-    if (!session.senderUid || session.senderUid !== req.user.uid) {
-      return res.status(403).json({ error: 'Unauthorized upload' });
-    }
-
     const MAX_UPLOADS = 20;
-    const countRef = admin.database().ref(`shared/${sessionId}/uploadCount`);
-    const currentCountSnap = await countRef.get();
-    const currentCount = currentCountSnap.val() || 0;
-
-    if (currentCount >= MAX_UPLOADS) {
+    const countRef = admin.database().ref(`prepQuota/${sessionId}/uploadCount`);
+    const txnResult = await countRef.transaction((current) => {
+      if (current === null) return 1;
+      if (current >= MAX_UPLOADS) return; // abort
+      return current + 1;
+    });
+    if (!txnResult.committed) {
       return res.status(429).json({ error: 'Upload limit reached' });
     }
 
@@ -191,26 +186,12 @@ export default async function handler(req, res) {
         contentType: mimeType,
         metadata: {
           sessionId,
+          ...(uploadedByUid ? { uploadedByUid } : {}),
           uploadType: type,
           uploadedAt: new Date().toISOString(),
         },
       },
     });
-
-    const result = await countRef.transaction(count => {
-      if ((count || 0) >= MAX_UPLOADS) {
-        return; // abort
-      }
-      return (count || 0) + 1;
-    });
-
-    if (!result.committed) {
-      // Upload succeeded but quota exceeded — edge case
-      // We still return success, but log it for monitoring
-      console.warn('[UploadMedia] Upload exceeded limit after race condition', {
-        sessionId,
-      });
-    }
 
     const [url] = await fileRef.getSignedUrl({
       action: 'read',
