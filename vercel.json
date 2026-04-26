@@ -7,7 +7,7 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     {
-      "source": "/((?!@vite|@react-refresh|@fs/|@id/|node_modules/|src/|assets/).*)",
+      "source": "/((?!api/|@vite|@react-refresh|@fs/|@id/|node_modules/|src/|assets/|styles/|.*\\.).*)",
       "destination": "/index.html"
     }
   ],
