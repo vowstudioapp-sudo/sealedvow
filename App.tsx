@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { LandingPage } from './components/LandingPage.tsx';
+import { PreparationForm } from './components/PreparationForm';
 import AdminPanel from './components/AdminPanel';
 import ClaimPage from './components/ClaimPage';
 import { SignInPromptModal } from './components/SignInPromptModal.tsx';
 import { Analytics } from '@vercel/analytics/react';
-import { getRouteType, isEidiRoute, isReceiverLinkType } from './utils/routing';
+import { getRouteType, initialStageForRoute, isEidiRoute, isReceiverLinkType } from './utils/routing';
 import { decodeEidData } from './utils/eidDecoder';
 import { useAuth } from './hooks/useAuth';
-
-const PreparationForm = lazy(() =>
-  import('./components/PreparationForm.tsx').then(m => ({ default: m.PreparationForm }))
-);
 
 const RefineStage = lazy(() =>
   import('./components/RefineStage.tsx').then(m => ({ default: m.RefineStage }))
@@ -264,7 +261,9 @@ const App: React.FC = () => {
   }, []);
   const isDemoMode = !!demoData;
   
-  const [stage, setStage] = useState<AppStage>(AppStage.LANDING);
+  const [stage, setStage] = useState<AppStage>(() =>
+    initialStageForRoute(getRouteType())
+  );
   const [data, setData] = useState<CoupleData | null>(null);
 
   const experienceData = useMemo(() => {
@@ -341,16 +340,19 @@ const App: React.FC = () => {
   useEffect(() => {
     const onPopState = () => {
       forceLocationUpdate(k => k + 1);
+      setStage(prev => {
+        const rt = getRouteType();
+        if (rt === 'LETTER_CREATE') {
+          if (prev === AppStage.LANDING) return AppStage.PREPARE;
+          return prev;
+        }
+        const target = initialStageForRoute(rt);
+        return prev === AppStage.LANDING ? target : prev;
+      });
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
-
-  useEffect(() => {
-    if (routeType === 'LETTER_CREATE' && stage === AppStage.LANDING) {
-      safeSetStage(AppStage.PREPARE);
-    }
-  }, [routeType, stage]);
 
   // DEV PREVIEW — ?preview=receiver|intro|envelope (→ seal card)|letter
   useEffect(() => {
@@ -484,7 +486,7 @@ const App: React.FC = () => {
     }
 
     if (linkState !== LoaderState.IDLE) {
-      const nextStage = resolveStage({
+      let nextStage = resolveStage({
         currentStage: stage,
         linkState,
         sharedData,
@@ -495,9 +497,22 @@ const App: React.FC = () => {
         preview,
         role,
       });
+      if (routeType === 'LETTER_CREATE' && nextStage === AppStage.LANDING) {
+        nextStage = AppStage.PREPARE;
+      }
       safeSetStage(nextStage);
     }
-  }, [demoData, isDemoMode, isEidFlow, isReceiverLink, linkError, linkState, sharedData, stage]);
+  }, [
+    demoData,
+    isDemoMode,
+    isEidFlow,
+    isReceiverLink,
+    linkError,
+    linkState,
+    routeType,
+    sharedData,
+    stage,
+  ]);
 
   useEffect(() => {
     if (linkState !== LoaderState.SUCCESS || !sharedData) return;
@@ -518,6 +533,141 @@ const App: React.FC = () => {
 
     window.sessionStorage.removeItem('eidDecodedData');
   }, [linkState, sharedData]);
+
+  // ── HOISTED: hooks must run before any conditional return ────────────
+  // Originally these lived below the `if (hasEidPayload)` early-return
+  // block and the EIDI render returns. Rules of Hooks require every hook
+  // to run on every render; moving them above the first conditional
+  // return eliminates the hook-count mismatch.
+
+  useEffect(() => {
+    // Skip boot animation for receiver links and any route where it was suppressed at init.
+    if (isReceiverLink) return;
+    if (!isBooting) return;
+
+    try { sessionStorage.setItem('hasSeenBoot', '1'); } catch {}
+
+    const fadeTimer = setTimeout(() => setIsFadingOut(true), 1100);
+    const endTimer = setTimeout(() => setIsBooting(false), 1500);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(endTimer);
+    };
+  }, [isReceiverLink, isBooting]);
+
+  useEffect(() => {
+    let timeoutId: number | null = null;
+
+    const applyColor = (color: string) => {
+      document.body.style.backgroundColor = color;
+    };
+
+    switch (stage) {
+      case AppStage.LANDING:
+      case AppStage.MASTER_CONTROL:
+      case AppStage.PERSONAL_INTRO: {
+        document.body.style.transition = 'background-color 0.5s ease';
+        applyColor('#000000');
+        break;
+      }
+      case AppStage.PREPARE: {
+        document.body.style.transition = 'background-color 2.5s ease-out';
+        applyColor(STUDIO_BG_COLOR);
+        break;
+      }
+      case AppStage.ENVELOPE: {
+        if (!experienceData) {
+          applyColor('#050505');
+          break;
+        }
+
+        if (previousStageRef.current === AppStage.REFINE) {
+          document.body.style.transition = 'background-color 2s ease-in-out';
+          applyColor('#000000');
+          timeoutId = window.setTimeout(() => {
+            applyColor(THEME_BG_COLORS[experienceData.theme]);
+          }, 600);
+        } else if (previousStageRef.current === AppStage.SHARE) {
+          applyColor(THEME_BG_COLORS[experienceData.theme]);
+        } else {
+          applyColor(THEME_BG_COLORS[experienceData.theme]);
+        }
+        break;
+      }
+      case AppStage.REFINE: {
+        if (previousStageRef.current === AppStage.MAIN_EXPERIENCE) {
+          applyColor(STUDIO_BG_COLOR);
+        }
+        break;
+      }
+      case AppStage.PAYMENT: {
+        if (previousStageRef.current === AppStage.MAIN_EXPERIENCE) {
+          applyColor(STUDIO_BG_COLOR);
+        }
+        break;
+      }
+      case AppStage.MAIN_EXPERIENCE: {
+        if (previousStageRef.current === AppStage.PAYMENT && experienceData) {
+          applyColor(THEME_BG_COLORS[experienceData.theme]);
+        }
+        break;
+      }
+      case AppStage.SHARE: {
+        if (previousStageRef.current === AppStage.PAYMENT) {
+          applyColor(STUDIO_BG_COLOR);
+        }
+        break;
+      }
+      case AppStage.QUESTION: {
+        if (experienceData) {
+          document.body.style.transition = 'background-color 0.5s ease';
+          applyColor(THEME_BG_COLORS[experienceData.theme]);
+        }
+        break;
+      }
+      case AppStage.SOULMATE_SYNC:
+      case AppStage.PREVIEW: {
+        break;
+      }
+      default: {
+        assertNever(stage as never);
+      }
+    }
+
+    return () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [stage, experienceData]);
+
+  const receiverOpenedBeaconSentRef = useRef(false);
+  useEffect(() => {
+    if (stage !== AppStage.QUESTION || !isReceiverLink || !experienceData || isDemoMode) {
+      return;
+    }
+    if (receiverOpenedBeaconSentRef.current) return;
+    const path = window.location.pathname;
+    if (path.startsWith('/demo/')) return;
+    const parts = path.replace(/^\//, '').replace(/\/$/, '').split('-');
+    const key = parts[parts.length - 1];
+    if (!key || !/^[a-z0-9]{8}$/i.test(key)) return;
+    receiverOpenedBeaconSentRef.current = true;
+    fetch('/api/letters/mark-opened', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionKey: key }),
+    }).catch(() => {});
+  }, [stage, isReceiverLink, experienceData, isDemoMode]);
+
+  useEffect(() => {
+    if (!isReceiverLink || isCreatorPreview) return;
+    if (stage !== AppStage.ENVELOPE) return;
+    safeSetStage(AppStage.QUESTION);
+  }, [isReceiverLink, isCreatorPreview, stage]);
+  // ── /HOISTED ────────────────────────────────────────────────────────
 
   if (hasEidPayload) {
     if (isCreatorEidPreview) {
@@ -621,108 +771,6 @@ const App: React.FC = () => {
       </Suspense>
     );
   }
-
-  useEffect(() => {
-    // Skip boot animation for receiver links and any route where it was suppressed at init.
-    if (isReceiverLink) return;
-    if (!isBooting) return;
-
-    try { sessionStorage.setItem('hasSeenBoot', '1'); } catch {}
-
-    const fadeTimer = setTimeout(() => setIsFadingOut(true), 1100);
-    const endTimer = setTimeout(() => setIsBooting(false), 1500);
-
-    return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(endTimer);
-    };
-  }, [isReceiverLink, isBooting]);
-
-  useEffect(() => {
-    let timeoutId: number | null = null;
-
-    const applyColor = (color: string) => {
-      document.body.style.backgroundColor = color;
-    };
-
-    switch (stage) {
-      case AppStage.LANDING:
-      case AppStage.MASTER_CONTROL:
-      case AppStage.PERSONAL_INTRO: {
-        document.body.style.transition = 'background-color 0.5s ease';
-        applyColor('#000000');
-        break;
-      }
-      case AppStage.PREPARE: {
-        document.body.style.transition = 'background-color 2.5s ease-out';
-        applyColor(STUDIO_BG_COLOR);
-        break;
-      }
-      case AppStage.ENVELOPE: {
-        if (!experienceData) {
-          applyColor('#050505');
-          break;
-        }
-
-        if (previousStageRef.current === AppStage.REFINE) {
-          document.body.style.transition = 'background-color 2s ease-in-out';
-          applyColor('#000000');
-          timeoutId = window.setTimeout(() => {
-            applyColor(THEME_BG_COLORS[experienceData.theme]);
-          }, 600);
-        } else if (previousStageRef.current === AppStage.SHARE) {
-          applyColor(THEME_BG_COLORS[experienceData.theme]);
-        } else {
-          applyColor(THEME_BG_COLORS[experienceData.theme]);
-        }
-        break;
-      }
-      case AppStage.REFINE: {
-        if (previousStageRef.current === AppStage.MAIN_EXPERIENCE) {
-          applyColor(STUDIO_BG_COLOR);
-        }
-        break;
-      }
-      case AppStage.PAYMENT: {
-        if (previousStageRef.current === AppStage.MAIN_EXPERIENCE) {
-          applyColor(STUDIO_BG_COLOR);
-        }
-        break;
-      }
-      case AppStage.MAIN_EXPERIENCE: {
-        if (previousStageRef.current === AppStage.PAYMENT && experienceData) {
-          applyColor(THEME_BG_COLORS[experienceData.theme]);
-        }
-        break;
-      }
-      case AppStage.SHARE: {
-        if (previousStageRef.current === AppStage.PAYMENT) {
-          applyColor(STUDIO_BG_COLOR);
-        }
-        break;
-      }
-      case AppStage.QUESTION: {
-        if (experienceData) {
-          document.body.style.transition = 'background-color 0.5s ease';
-          applyColor(THEME_BG_COLORS[experienceData.theme]);
-        }
-        break;
-      }
-      case AppStage.SOULMATE_SYNC:
-      case AppStage.PREVIEW: {
-        break;
-      }
-      default: {
-        assertNever(stage as never);
-      }
-    }
-
-    return () => {
-      if (timeoutId !== null) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [stage, experienceData]);
 
   // ── EIDI EARLY RETURNS — isolated from main stage engine ──────────
   const eidiLoadingFallback = (
@@ -833,32 +881,6 @@ const App: React.FC = () => {
     }
   };
 
-  const receiverOpenedBeaconSentRef = useRef(false);
-  useEffect(() => {
-    if (stage !== AppStage.QUESTION || !isReceiverLink || !experienceData || isDemoMode) {
-      return;
-    }
-    if (receiverOpenedBeaconSentRef.current) return;
-    const path = window.location.pathname;
-    if (path.startsWith('/demo/')) return;
-    const parts = path.replace(/^\//, '').replace(/\/$/, '').split('-');
-    const key = parts[parts.length - 1];
-    if (!key || !/^[a-z0-9]{8}$/i.test(key)) return;
-    receiverOpenedBeaconSentRef.current = true;
-    fetch('/api/letters/mark-opened', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionKey: key }),
-    }).catch(() => {});
-  }, [stage, isReceiverLink, experienceData, isDemoMode]);
-
-  useEffect(() => {
-    if (!isReceiverLink || isCreatorPreview) return;
-    if (stage !== AppStage.ENVELOPE) return;
-    safeSetStage(AppStage.QUESTION);
-  }, [isReceiverLink, isCreatorPreview, stage]);
-
   const bootScreen = (
     <div
       className={`boot-screen-container ${isFadingOut ? 'fade-out' : ''}`}
@@ -936,11 +958,19 @@ const App: React.FC = () => {
         fallback={
           <div
             className="min-h-screen flex items-center justify-center"
-            style={{ backgroundColor: '#0C0A09' }}
+            style={{ background: 'var(--sv-bg-base, #1A1220)' }}
           >
-            <div
-              className="w-8 h-8 border border-[#D4AF37]/30 rounded-full animate-spin border-t-[#D4AF37]"
-            />
+            <h1
+              className="lp-nav__wordmark select-none"
+              aria-label="Sealed Vow"
+              style={{ fontSize: 'clamp(40px, 8vw, 56px)', margin: 0 }}
+            >
+              <span className="lp-nav__wordmark-sealed">
+                <span className="lp-nav__wordmark-sealed-first">S</span>
+                <span className="lp-nav__wordmark-sealed-rest">ealed</span>
+              </span>
+              <span className="lp-nav__wordmark-vow">Vow</span>
+            </h1>
           </div>
         }
       >

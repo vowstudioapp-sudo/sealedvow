@@ -4,6 +4,8 @@
 // Add new routes here — nowhere else.
 // ─────────────────────────────────────────────────────────────────────
 
+import { AppStage } from '../types';
+
 export type RouteType =
   | 'EIDI_CREATE'
   | 'EIDI_RECEIVER'
@@ -45,4 +47,14 @@ export function isEidiRoute(type: RouteType): boolean {
 
 export function isReceiverLinkType(type: RouteType): boolean {
   return type === 'RECEIVER';
+}
+
+// Single source of truth for route → initial stage mapping.
+// Used by App.tsx's useState initializer (hard refresh) and popstate
+// handler (soft nav) to make /letter/create deterministically enter
+// PREPARE without going through LANDING first.
+export function initialStageForRoute(routeType: RouteType): AppStage {
+  return routeType === 'LETTER_CREATE'
+    ? AppStage.PREPARE
+    : AppStage.LANDING;
 }
