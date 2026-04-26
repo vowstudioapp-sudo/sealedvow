@@ -200,13 +200,14 @@ async function handleLoveLetter(payload, userUid) {
       throw err;
     }
 
-    // ── SINGLE GEMINI CALL ──
+    // ── SINGLE OPENAI CALL ──
     const raw = await withTimeout(
-      gemini.generateText(prompt, { temperature: 0.75 })
+      openai.generateText(prompt, { temperature: 0.7, maxTokens: 600 }),
+      8000
     );
     let text = cleanOutput(raw) || null;
     const check = text ? validateLetter(text, enforcement) : { violations: [], stats: {} };
-    console.log(`[Letter] Gemini single attempt: ${text ? check.stats.wordCount : 0} words, violations: ${check.violations?.join(', ') || 'none'}`);
+    console.log(`[Letter] OpenAI single attempt: ${text ? check.stats.wordCount : 0} words, violations: ${check.violations?.join(', ') || 'none'}`);
 
     const result = { text: text || null };
 
@@ -670,18 +671,6 @@ export default async function handler(req, res) {
   } catch (primaryError) {
     console.error('[AI] Error', primaryError.message);
     console.error(`[API] ${action} failed (Gemini):`, primaryError.message);
-
-    // Timeout short-circuit: do NOT attempt fallback. Timeout could be caused
-    // by Redis/Firebase/CPU and not Gemini itself, so calling OpenAI would
-    // double cost and latency without fixing the root cause.
-    if (primaryError.code === 'HANDLER_TIMEOUT') {
-      if (incremented) await safeKV(() => kv.decr(successRateKey));
-
-      return res.status(504).json({
-        ok: false,
-        error: 'TIMEOUT'
-      });
-    }
 
     // Concurrent-generation short-circuit: surface a proper 409 instead of
     // attempting a fallback (the user is mid-generation already).
