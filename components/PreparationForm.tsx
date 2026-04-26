@@ -15,7 +15,6 @@ const CORE_OCCASIONS: { id: Occasion; label: string; icon: string; defaultTone: 
   { id: 'anniversary',   label: 'Anniversary',  icon: '🥂',  hint: 'Celebrate your journey',  defaultTone: 'Nostalgic, proud, and enduring.' },
   { id: 'just-because',  label: 'Just Because', icon: '✨',  hint: 'No reason needed',         defaultTone: 'Playful, spontaneous, and affectionate.' },
   { id: 'apology',       label: 'I\'m Sorry',   icon: '🕯️', hint: 'Make things right',        defaultTone: 'Humble, sincere, and stripped back.' },
-  { id: 'long-distance', label: 'Missing You',  icon: '✈️',  hint: 'Across any distance',      defaultTone: 'Longing, hopeful, and digitally intimate.' },
   { id: 'thank-you',     label: 'A Thank You',  icon: '🙏',  hint: 'Say it properly',          defaultTone: 'Appreciative, specific, and admiring.' },
 ];
 

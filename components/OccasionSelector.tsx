@@ -144,30 +144,11 @@ export const OccasionSelector: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Missing You */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.9 }}
-        >
-          <div className="occasion-card occasion-card--longdistance" onClick={() => go("/letter/create?occasion=long-distance")}>
-            <div className="occasion-card__glow" />
-            <div className="occasion-card__icon">
-              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 24l12-8v6h12v-6l12 8-12 8v-6H18v6z"/>
-                <circle cx="24" cy="24" r="3"/>
-              </svg>
-            </div>
-            <span className="occasion-card__title">Missing You</span>
-            <span className="occasion-card__subtitle">Across distance</span>
-          </div>
-        </motion.div>
-
         {/* Thank You */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1.0 }}
+          transition={{ duration: 0.5, delay: 0.9 }}
         >
           <div className="occasion-card occasion-card--thankyou" onClick={() => go("/letter/create?occasion=thank-you")}>
             <div className="occasion-card__glow" />

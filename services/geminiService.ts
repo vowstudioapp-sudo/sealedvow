@@ -51,7 +51,6 @@ export const generateLoveLetter = async (data: CoupleData): Promise<string> => {
       anniversary: "Another year. I'd choose this again. Every part of it.",
       'just-because': "No reason for this. Just wanted you to know I was thinking about you.",
       apology: "I messed up. I know that. I'm not going to make excuses. I just want to do better.",
-      'long-distance': "It's quiet here without you. I keep reaching for my phone just to hear your voice.",
       'thank-you': "I don't say this enough. But thank you. For everything you do that I forget to notice.",
       eid: "Eid Mubarak. May this day bring you peace, joy, and the warmth of those you love.",
       birthday: "Happy birthday. Another year of you in the world — and I'm grateful for every one of them.",

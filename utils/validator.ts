@@ -104,7 +104,7 @@ export const CoupleDataSchema = z.object({
     .optional(),
 
   theme: z.enum(['obsidian', 'velvet', 'crimson', 'midnight', 'evergreen', 'pearl']),
-  occasion: z.enum(['anniversary', 'apology', 'just-because', 'long-distance', 'thank-you', 'eid']),
+  occasion: z.enum(['anniversary', 'apology', 'just-because', 'thank-you', 'eid', 'birthday']),
 
   sessionId: z.string().uuid().optional(),
 

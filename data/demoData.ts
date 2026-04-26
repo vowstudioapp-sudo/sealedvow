@@ -618,7 +618,7 @@ Eid Mubarak to all of you. May Allah keep this family together, always.
   missingyou: {
     senderName: 'Maya',
     recipientName: 'Raj',
-    occasion: 'long-distance',
+    occasion: 'just-because',
     theme: 'midnight',
     writingMode: 'assisted',
     timeShared: '14 months across timezones',

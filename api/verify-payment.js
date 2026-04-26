@@ -46,7 +46,7 @@ function validateCoupleData(data) {
   if (typeof data.recipientName !== 'string' || data.recipientName.trim().length === 0) return null;
   if (typeof data.senderName !== 'string' || data.senderName.trim().length === 0) return null;
 
-  const validOccasions = ['valentine', 'anniversary', 'apology', 'just-because', 'long-distance', 'thank-you', 'eid'];
+  const validOccasions = ['anniversary', 'apology', 'just-because', 'thank-you', 'eid', 'birthday'];
   if (!validOccasions.includes(data.occasion)) return null;
 
   const validThemes = ['obsidian', 'velvet', 'crimson', 'midnight', 'evergreen', 'pearl'];

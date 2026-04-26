@@ -51,17 +51,6 @@ const OCCASION_CONTRACTS = {
       forbidden: ['if I hurt you', 'you misunderstood', 'I was just trying to', 'but you also', 'self-pity', 'romantic escalation', 'you complete me'],
       tone: 'accountable, calm, grounded. No begging. No drama. Just clarity.',
     },
-    'long-distance': {
-      structure: `
-        Paragraph 1: Physical absence mentioned clearly. Where you are. What is missing.
-        Paragraph 2: A specific memory triggered by the distance — something you saw or heard that reminded you.
-        Paragraph 3: Looking forward to reunion. Realistic, not dramatic.`,
-      wordRange: [120, 150],
-      paragraphs: 3,
-      mustInclude: ['concrete distance reference — a room, a city, silence after a call, an empty side of bed'],
-      forbidden: ['dramatic longing metaphors', 'oceans between us', 'miles cannot separate', 'my heart aches', 'counting every second'],
-      tone: 'quiet longing, not dramatic ache. Like writing from a hotel room at night.',
-    },
     'thank-you': {
       structure: `
         Paragraph 1: Clear appreciation for a specific action or pattern they do.

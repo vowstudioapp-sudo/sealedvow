@@ -38,7 +38,6 @@ export type Occasion =
   | 'anniversary'
   | 'apology'
   | 'just-because'
-  | 'long-distance'
   | 'thank-you'
   | 'eid'
   | 'birthday';
