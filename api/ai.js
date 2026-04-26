@@ -200,50 +200,13 @@ async function handleLoveLetter(payload, userUid) {
       throw err;
     }
 
-    // ── GENERATE → VALIDATE → RETRY LOOP (Gemini) ──
-    const generate = async (attempt = 1) => {
-      let fullPrompt = prompt;
-      if (attempt === 2) fullPrompt += '\n\nCRITICAL: Previous output violated constraints. Write MORE SIMPLY. Shorter sentences. No metaphors. No markdown.';
-      if (attempt === 3) fullPrompt += '\n\nFINAL ATTEMPT. Write like a normal person texting. Ultra simple. Short sentences. No fancy words.';
-
-      const temp = Math.max(0.5, 0.75 - (attempt - 1) * 0.12);
-      const raw = await withTimeout(
-        gemini.generateText(fullPrompt, { temperature: temp })
-      );
-      const text = cleanOutput(raw);
-      const check = validateLetter(text, enforcement);
-
-      console.log(`[Letter] Gemini attempt ${attempt}: ${check.stats.wordCount} words, ${check.stats.paragraphCount}p, avg ${check.stats.avgSentenceLength}w/s, violations: ${check.violations.join(', ') || 'none'}`);
-
-      if (!check.valid && attempt < 3) {
-        console.log(`[Letter] Retry triggered attempt ${attempt + 1} — violations: ${check.violations.join(', ')}`);
-        return generate(attempt + 1);
-      }
-      return { text, check };
-    };
-
-    let { text, check } = await generate();
-
-    // ── SIMPLIFIER PASS ──
-    if (check.violations.length > 0 && text.length > 0) {
-      try {
-        const simplified = cleanOutput(
-          await withTimeout(
-            gemini.generateText(
-              `Rewrite this letter more simply. Break long sentences into shorter ones. Remove decorative language. Keep specific details.\n\n${text}`,
-              { temperature: 0.4 }
-            )
-          )
-        );
-        const simplifiedCheck = validateLetter(simplified, enforcement);
-        if (check.violations.length > 0 && simplifiedCheck.violations.length === 0) {
-          text = simplified;
-          console.log(`[Letter] Simplifier improved: avg ${check.stats.avgSentenceLength} → ${simplifiedCheck.stats.avgSentenceLength} w/s`);
-        }
-      } catch (e) {
-        console.log('[Letter] Simplifier pass failed, using original');
-      }
-    }
+    // ── SINGLE GEMINI CALL ──
+    const raw = await withTimeout(
+      gemini.generateText(prompt, { temperature: 0.75 })
+    );
+    let text = cleanOutput(raw) || null;
+    const check = text ? validateLetter(text, enforcement) : { violations: [], stats: {} };
+    console.log(`[Letter] Gemini single attempt: ${text ? check.stats.wordCount : 0} words, violations: ${check.violations?.join(', ') || 'none'}`);
 
     const result = { text: text || null };
 
