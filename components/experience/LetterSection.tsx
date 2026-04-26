@@ -9,10 +9,17 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
+import type { Theme } from '../../types';
 import { useAudioNarration } from '../../hooks/useAudioNarration';
 import { AtmosphericShell } from '../AtmosphericShell';
 
 const MAX_PARAGRAPH_CHARS = 180;
+
+export type LetterReadability = {
+  primary: string;
+  secondary: string;
+  muted: string;
+};
 
 interface LetterSectionProps {
   finalLetter: string;
@@ -22,6 +29,9 @@ interface LetterSectionProps {
     gold: string;
     text: string;
   };
+  readability: LetterReadability;
+  /** Letter / experience theme — drives atmospheric backdrop behind the letter. */
+  surfaceTheme: Theme;
   activeSection: number;
 }
 
@@ -30,6 +40,8 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
   senderName,
   audioUrl,
   theme,
+  readability: read,
+  surfaceTheme,
   activeSection,
 }) => {
   const [currentParagraph, setCurrentParagraph] = useState(0);
@@ -81,11 +93,18 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
 
   /* ── Render ── */
   return (
-    <AtmosphericShell>
+    <AtmosphericShell surfaceTheme={surfaceTheme}>
       <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center snap-start p-4 md:p-8">
       <div
         className="main-experience-letter-card"
         onClick={advanceParagraph}
+        style={
+          {
+            ['--sv-letter-read-primary']: read.primary,
+            ['--sv-letter-read-secondary']: read.secondary,
+            ['--sv-letter-read-muted']: read.muted,
+          } as React.CSSProperties
+        }
       >
         <div className="main-experience-letter-card-border" />
         <div className="main-experience-letter-texture" />
@@ -116,11 +135,16 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
               className="main-experience-letter-signature"
               style={{ animation: 'closureReveal 1s ease-out 1.5s both' }}
             >
-              <div className="w-px h-12 bg-gradient-to-b from-transparent via-white/20 to-transparent mb-6" />
-              <p className="font-romantic text-4xl mb-3" style={{ color: theme.gold, opacity: 0.9 }}>{senderName}</p>
+              <div
+                className="w-px h-12 mb-6 mx-auto"
+                style={{
+                  backgroundImage: `linear-gradient(to bottom, transparent, ${read.secondary}, transparent)`,
+                }}
+              />
+              <p className="font-romantic text-4xl mb-3" style={{ color: theme.gold }}>{senderName}</p>
               <div
                 className="w-12 h-px mx-auto mb-10"
-                style={{ backgroundColor: theme.gold, opacity: 0.3, animation: 'closureLine 0.8s ease-out 2.2s both' }}
+                style={{ backgroundColor: read.secondary, animation: 'closureLine 0.8s ease-out 2.2s both' }}
               />
 
               {audioBuffer && (
@@ -132,12 +156,12 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
                     <div className={`main-experience-voice-icon ${isVoicePlaying ? 'main-experience-voice-icon--playing' : ''}`}>
                       {isVoicePlaying ? (
                         <div className="flex gap-0.5 h-3 items-center">
-                          <div className="w-0.5 bg-black animate-[bounce_1s_infinite] h-full" />
-                          <div className="w-0.5 bg-black animate-[bounce_1.2s_infinite] h-2" />
-                          <div className="w-0.5 bg-black animate-[bounce_0.8s_infinite] h-full" />
+                          <div className="w-0.5 animate-[bounce_1s_infinite] h-full" style={{ backgroundColor: read.primary }} />
+                          <div className="w-0.5 animate-[bounce_1.2s_infinite] h-2" style={{ backgroundColor: read.primary }} />
+                          <div className="w-0.5 animate-[bounce_0.8s_infinite] h-full" style={{ backgroundColor: read.primary }} />
                         </div>
                       ) : (
-                        <span className="ml-0.5 text-[10px]">▶</span>
+                        <span className="ml-0.5 text-[10px]" style={{ color: read.primary }}>▶</span>
                       )}
                     </div>
                     <span className="main-experience-voice-label">
@@ -150,7 +174,7 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
           )}
 
           {currentParagraph < letterParagraphs.length - 1 && (
-            <div className="mt-12 animate-pulse opacity-60 text-[11px] uppercase tracking-widest" style={{ color: theme.gold }}>
+            <div className="mt-12 animate-pulse text-[11px] uppercase tracking-widest" style={{ color: read.secondary }}>
               Tap to continue
             </div>
           )}
@@ -160,7 +184,8 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
       {currentParagraph === letterParagraphs.length - 1 && (
         <button
           onClick={resetParagraph}
-          className="absolute top-10 right-10 text-[11px] uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity border-b border-white/20 pb-1 z-20"
+          className="absolute top-10 right-10 text-[11px] uppercase tracking-widest transition-opacity hover:opacity-100 pb-1 z-20"
+          style={{ color: read.muted, opacity: 0.85, borderBottomWidth: 1, borderBottomStyle: 'solid', borderColor: read.muted }}
         >
           Read Again
         </button>

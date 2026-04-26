@@ -5,6 +5,7 @@ import { useMediaUploads } from '../hooks/useMediaUploads';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useDictation } from '../hooks/useDictation';
 import { CoupleData, Occasion, GiftType, Theme, Coupon, RevealMethod } from '../types.ts';
+import { THEME_LABELS, THEME_ORDER, THEME_SYSTEM } from '../theme/themeSystem';
 
 interface Props {
   onComplete: (data: CoupleData) => void;
@@ -13,6 +14,7 @@ interface Props {
 // CORE OCCASIONS — always visible, 365 days a year
 const CORE_OCCASIONS: { id: Occasion; label: string; icon: string; defaultTone: string; hint: string }[] = [
   { id: 'anniversary',   label: 'Anniversary',  icon: '🥂',  hint: 'Celebrate your journey',  defaultTone: 'Nostalgic, proud, and enduring.' },
+  { id: 'birthday',      label: 'Birthday',     icon: '🎂',  hint: 'Mark the day',             defaultTone: 'Warm, celebratory, and deeply glad they exist.' },
   { id: 'just-because',  label: 'Just Because', icon: '✨',  hint: 'No reason needed',         defaultTone: 'Playful, spontaneous, and affectionate.' },
   { id: 'apology',       label: 'I\'m Sorry',   icon: '🕯️', hint: 'Make things right',        defaultTone: 'Humble, sincere, and stripped back.' },
   { id: 'thank-you',     label: 'A Thank You',  icon: '🙏',  hint: 'Say it properly',          defaultTone: 'Appreciative, specific, and admiring.' },
@@ -21,14 +23,12 @@ const CORE_OCCASIONS: { id: Occasion; label: string; icon: string; defaultTone: 
 // FESTIVAL OCCASIONS — Removed as Eid now has dedicated flow via OccasionSelector
 // Festivals are handled at the occasion selection screen level, not in this form
 
-const THEMES: { id: Theme; label: string; color: string; desc: string }[] = [
-  { id: 'obsidian', label: 'Obsidian & Gold', color: '#D4AF37', desc: 'Timeless, Bold, Classic' },
-  { id: 'velvet', label: 'Royal Velvet', color: '#9333EA', desc: 'Deep, Mysterious, Spiritual' },
-  { id: 'crimson', label: 'Desert Rose', color: '#9F1239', desc: 'Passionate, Warm, Romantic' },
-  { id: 'midnight', label: 'Midnight Blue', color: '#1E3A8A', desc: 'Celestial, Infinite, Calm' },
-  { id: 'evergreen', label: 'Forest Bronze', color: '#065F46', desc: 'Natural, Grounded, Eternal' },
-  { id: 'pearl', label: 'Ethereal Pearl', color: '#F3F4F6', desc: 'Pure, Delicate, Divine' },
-];
+const THEMES: { id: Theme; label: string; color: string; desc: string }[] = THEME_ORDER.map((id) => ({
+  id,
+  label: THEME_LABELS[id].label,
+  color: THEME_SYSTEM[id].accent,
+  desc: THEME_LABELS[id].description,
+}));
 
 const MUSIC_PRESETS = [
   { id: 'piano', label: 'Eternal Piano (Satie)', url: 'https://archive.org/download/gymnopedie-no-1-by-kevin-macleod/Gymnopedie_No_1.mp3' },

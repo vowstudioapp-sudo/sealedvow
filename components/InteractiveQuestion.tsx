@@ -1,18 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CoupleData, Theme } from '../types';
-
-/* ------------------------------------------------------------------ */
-/* THEME COLORS                                                        */
-/* ------------------------------------------------------------------ */
-
-const IQ_THEME: Record<Theme, { bg: string; text: string; gold: string; seal: string; goldRgb: string; sealRgb: string }> = {
-  obsidian:  { bg: '#0C0A09', text: '#E5D0A1', gold: '#D4AF37', seal: '#722F37', goldRgb: '212,175,55',  sealRgb: '114,47,55' },
-  velvet:    { bg: '#1A0B2E', text: '#E9D5FF', gold: '#C084FC', seal: '#7C3AED', goldRgb: '192,132,252', sealRgb: '124,58,237' },
-  crimson:   { bg: '#2B0A0A', text: '#FECDD3', gold: '#F43F5E', seal: '#9F1239', goldRgb: '244,63,94',   sealRgb: '159,18,57' },
-  midnight:  { bg: '#020617', text: '#E0F2FE', gold: '#7DD3FC', seal: '#1E40AF', goldRgb: '125,211,252', sealRgb: '30,64,175' },
-  evergreen: { bg: '#022C22', text: '#D1FAE5', gold: '#34D399', seal: '#065F46', goldRgb: '52,211,153',  sealRgb: '6,95,70' },
-  pearl:     { bg: '#1C1917', text: '#F5F5F4', gold: '#A8A29E', seal: '#57534E', goldRgb: '168,162,158', sealRgb: '87,83,78' },
-};
+import { CoupleData } from '../types';
+import { OCCASION_OPENING_LINES } from '@/content/occasionLines';
+import {
+  getCinematicLayer,
+  iqThemeFromSystem,
+  THEME_SYSTEM,
+} from '../theme/themeSystem';
 
 /* ------------------------------------------------------------------ */
 /* TYPES                                                               */
@@ -45,7 +38,9 @@ const ACCEPT_DELAY_REMOTE = 2000;
 /* ------------------------------------------------------------------ */
 
 export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
-  const tc = IQ_THEME[data.theme || 'obsidian'];
+  const tc = iqThemeFromSystem(data.theme);
+  const themeRow = THEME_SYSTEM[data.theme ?? 'obsidian'] ?? THEME_SYSTEM.obsidian;
+  const cinematic = useMemo(() => getCinematicLayer(themeRow), [data.theme]);
   /* ------------------------------------------------------------------ */
   /* ONE-SHOT ACCEPT GUARARD                                             */
   /* ------------------------------------------------------------------ */
@@ -224,8 +219,11 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
   /* ------------------------------------------------------------------ */
 
   if (phase === 'ignite') {
+    const openingLine =
+      OCCASION_OPENING_LINES[data.occasion] ||
+      OCCASION_OPENING_LINES.anniversary;
     const progress = energy / IGNITION_TARGET;
-    const glowIntensity = progress * 30;
+    const glowIntensity = progress * 30 * cinematic.glowStrength;
     const sealScale = 1 + progress * 0.08;
     const crackOpacity = Math.min(progress * 1.5, 1);
 
@@ -248,7 +246,7 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
           className="mb-16 text-[10px] uppercase tracking-[0.3em]"
           style={{ color: `rgba(${tc.goldRgb}, 0.6)` }}
         >
-          Something awaits you
+          {openingLine}
         </p>
 
         <button
@@ -267,7 +265,7 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
           <div 
             className="absolute inset-0 rounded-full"
             style={{
-              boxShadow: `0 0 ${glowIntensity}px ${glowIntensity / 2}px rgba(${tc.goldRgb}, ${progress * 0.3})`,
+              boxShadow: `0 0 ${glowIntensity}px ${glowIntensity / 2}px rgba(${tc.goldRgb}, ${progress * 0.3 * cinematic.glowStrength})`,
               transition: holding ? 'none' : 'box-shadow 0.3s ease-out',
             }}
           />
@@ -293,8 +291,8 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
           <span 
             className="relative z-10 text-3xl"
             style={{ 
-              color: `rgba(${tc.goldRgb}, ${0.6 + progress * 0.4})`,
-              filter: `drop-shadow(0 0 ${progress * 8}px rgba(${tc.goldRgb}, ${progress * 0.5}))`,
+              color: `rgba(${tc.goldRgb}, ${0.6 + progress * 0.4 * cinematic.glowStrength})`,
+              filter: `drop-shadow(0 0 ${progress * 8 * cinematic.glowStrength}px rgba(${tc.goldRgb}, ${progress * 0.5 * cinematic.glowStrength}))`,
             }}
           >
             ❦
@@ -307,7 +305,7 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
             fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
             fontStyle: 'italic',
             fontSize: '0.85rem',
-            color: holding ? `rgba(${tc.goldRgb}, 0.7)` : 'rgba(255, 255, 255, 0.5)',
+            color: holding ? `rgba(${tc.goldRgb}, 0.7)` : cinematic.readability.muted,
             letterSpacing: '0.05em',
             transition: 'color 0.3s ease',
           }}
@@ -316,7 +314,7 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
         </p>
 
         {energy > 0 && (
-          <div className="mt-6 w-32 h-px bg-white/10 overflow-hidden rounded-full">
+          <div className="mt-6 w-32 h-px overflow-hidden rounded-full" style={{ backgroundColor: cinematic.readability.muted }}>
             <div 
               className="h-full transition-all"
               style={{ 
@@ -337,6 +335,6 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
   /* ------------------------------------------------------------------ */
 
   return (
-    <div className="fixed inset-0 bg-white transition-opacity duration-1000 opacity-100" />
+    <div className="fixed inset-0 transition-opacity duration-1000 opacity-100" style={{ backgroundColor: cinematic.transitionFlash }} />
   );
 };

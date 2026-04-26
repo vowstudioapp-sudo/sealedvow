@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Theme } from '../types';
 import { AtmosphericShell } from './AtmosphericShell';
+import { ENVELOPE_STYLES } from './envelopeTheme';
+import { UI_PALETTE } from '../theme/themeSystem';
 
 /* ------------------------------------------------------------------ */
 /* CONFIGURATION (single source of truth)                               */
@@ -13,78 +15,6 @@ const TIMING = {
 };
 
 const PARTICLE_COUNT = 16;
-
-/* ------------------------------------------------------------------ */
-/* THEME DEFINITIONS                                                    */
-/* ------------------------------------------------------------------ */
-
-const ENVELOPE_STYLES: Record<
-  Theme,
-  {
-    paper: string;
-    border: string;
-    text: string;
-    subtext: string;
-    seal: string;
-    sealText: string;
-    particle: string;
-  }
-> = {
-  obsidian: {
-    paper: '#0A0A0A',
-    border: '#D4AF37',
-    text: '#E5D0A1',
-    subtext: 'rgba(212, 175, 55, 0.5)',
-    seal: 'radial-gradient(circle at 30% 30%, #a83232, #582F2F)',
-    sealText: 'rgba(255,255,255,0.8)',
-    particle: '#D4AF37',
-  },
-  velvet: {
-    paper: '#2E1065',
-    border: '#C084FC',
-    text: '#E9D5FF',
-    subtext: '#D8B4FE',
-    seal: 'radial-gradient(circle at 30% 30%, #F59E0B, #B45309)',
-    sealText: 'rgba(255,255,255,0.9)',
-    particle: '#F59E0B',
-  },
-  crimson: {
-    paper: '#881337',
-    border: '#FECDD3',
-    text: '#FFF1F2',
-    subtext: '#FDA4AF',
-    seal: 'radial-gradient(circle at 30% 30%, #4c0519, #881337)',
-    sealText: 'rgba(255,255,255,0.8)',
-    particle: '#FECDD3',
-  },
-  midnight: {
-    paper: '#172554',
-    border: '#93c5fd',
-    text: '#eff6ff',
-    subtext: '#60a5fa',
-    seal: 'radial-gradient(circle at 30% 30%, #94a3b8, #475569)',
-    sealText: 'rgba(255,255,255,0.95)',
-    particle: '#93c5fd',
-  },
-  evergreen: {
-    paper: '#022c22',
-    border: '#b45309',
-    text: '#ecfdf5',
-    subtext: '#d97706',
-    seal: 'radial-gradient(circle at 30% 30%, #d97706, #92400e)',
-    sealText: 'rgba(255,255,255,0.85)',
-    particle: '#d97706',
-  },
-  pearl: {
-    paper: '#fafafa',
-    border: '#d4af37',
-    text: '#44403c',
-    subtext: '#a8a29e',
-    seal: 'radial-gradient(circle at 30% 30%, #e7e5e4, #a8a29e)',
-    sealText: 'rgba(255,255,255,1)',
-    particle: '#d4af37',
-  },
-};
 
 /* ------------------------------------------------------------------ */
 /* TYPES                                                               */
@@ -166,7 +96,7 @@ export const Envelope: React.FC<Props> = ({
   /* ------------------------------------------------------------------ */
 
   return (
-    <AtmosphericShell>
+    <AtmosphericShell surfaceTheme={theme}>
       <div className="w-full flex flex-col items-center justify-center min-h-[100dvh] px-4">
       {/* Envelope */}
       <div
@@ -222,12 +152,12 @@ export const Envelope: React.FC<Props> = ({
             background: styles.seal,
             transform: 'translateX(-50%)',
             bottom: '1.5rem',
-            boxShadow: `0 0 0 3px ${styles.border}40, 0 8px 24px rgba(0,0,0,0.4), inset 0 -2px 4px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.15)`,
+            boxShadow: `0 0 0 3px ${styles.border}40, 0 8px 24px ${UI_PALETTE.sealLiftShadow}, inset 0 -2px 4px ${UI_PALETTE.sealInsetDark}, inset 0 2px 4px ${UI_PALETTE.sealInsetHighlight}`,
           }}
         >
           <span
             className="text-2xl italic font-serif select-none"
-            style={{ color: styles.sealText, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+            style={{ color: styles.sealText, textShadow: `0 1px 2px ${UI_PALETTE.sealGlyphShadow}` }}
           >
             V
           </span>

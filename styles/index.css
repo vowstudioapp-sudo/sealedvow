@@ -63,7 +63,7 @@
 
   /* Content sits above the texture layers. Exclude grain/vignette
      so they stay at z-index 0. */
-  .sv-surface-dark > *:not(.sv-grain):not(.lp-nav) {
+  .sv-surface-dark > *:not(.sv-grain):not(.lp-nav):not(.sv-cinematic-vignette) {
     position: relative;
     z-index: 1;
   }

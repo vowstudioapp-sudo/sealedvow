@@ -75,16 +75,13 @@ import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './utils/validator.ts';
 import { getDemoData } from './data/demoData.ts';
 
-const THEME_BG_COLORS: Record<Theme, string> = {
-  obsidian: '#050505',
-  velvet: '#1A0B2E',
-  crimson: '#2B0A0A',
-  midnight: '#0f172a',
-  evergreen: '#022c22',
-  pearl: '#ffffff'
-};
+import { THEME_ORDER, THEME_SYSTEM } from './theme/themeSystem';
 
-const STUDIO_BG_COLOR = '#1C1917';
+const THEME_BG_COLORS: Record<Theme, string> = Object.fromEntries(
+  THEME_ORDER.map((id) => [id, THEME_SYSTEM[id].surfaceSolid]),
+) as Record<Theme, string>;
+
+const STUDIO_BG_COLOR = THEME_SYSTEM.obsidian.boardSurface;
 
 
 const STORAGE_KEY = 'vday_data';
@@ -186,7 +183,7 @@ const resolveStage = (state: StageResolverState): AppStage => {
 
   if (isDevPreview && preview) {
     if (preview === 'intro' || preview === 'receiver') return AppStage.PERSONAL_INTRO;
-    if (preview === 'envelope') return AppStage.ENVELOPE;
+    if (preview === 'envelope') return AppStage.QUESTION;
     if (preview === 'letter' || preview === 'main') return AppStage.MAIN_EXPERIENCE;
     return AppStage.LANDING;
   }
@@ -204,7 +201,7 @@ const resolveStage = (state: StageResolverState): AppStage => {
   if (linkState === LoaderState.SUCCESS && sharedData) {
     if (role === 'master') return AppStage.MASTER_CONTROL;
     // Only transition into PERSONAL_INTRO from LANDING (initial entry). Once the
-    // receiver has advanced to ENVELOPE/QUESTION/MAIN_EXPERIENCE/REPLY_COMPOSE,
+    // receiver has advanced to QUESTION/MAIN_EXPERIENCE/REPLY_COMPOSE,
     // preserve currentStage — otherwise this branch re-fires on every stage
     // change (stage is in Effect 411's deps) and yanks the user back to
     // PERSONAL_INTRO, producing the "name keeps flashing" loop.
@@ -215,6 +212,10 @@ const resolveStage = (state: StageResolverState): AppStage => {
 
   if (linkState === LoaderState.LOADING) {
     return isReceiverLink ? AppStage.PERSONAL_INTRO : currentStage;
+  }
+
+  if (linkState === LoaderState.IDLE) {
+    return currentStage;
   }
 
   if (linkState === LoaderState.NO_LINK) {
@@ -351,7 +352,7 @@ const App: React.FC = () => {
     }
   }, [routeType, stage]);
 
-  // DEV PREVIEW — ?preview=receiver|intro|envelope|letter
+  // DEV PREVIEW — ?preview=receiver|intro|envelope (→ seal card)|letter
   useEffect(() => {
     if (import.meta.env.DEV) {
       const params = new URLSearchParams(window.location.search);
@@ -438,7 +439,7 @@ const App: React.FC = () => {
       setIsFadingOut(true);
 
       if (preview === 'intro') safeSetStage(AppStage.PERSONAL_INTRO);
-      else if (preview === 'envelope') safeSetStage(AppStage.ENVELOPE);
+      else if (preview === 'envelope') safeSetStage(AppStage.QUESTION);
       else if (preview === 'letter' || preview === 'main') safeSetStage(AppStage.MAIN_EXPERIENCE);
       else if (preview === 'receiver') safeSetStage(AppStage.PERSONAL_INTRO);
     }
@@ -482,18 +483,20 @@ const App: React.FC = () => {
       console.error('Link loading error:', linkError);
     }
 
-    const nextStage = resolveStage({
-      currentStage: stage,
-      linkState,
-      sharedData,
-      isReceiverLink,
-      isDemoMode,
-      isEidFlow,
-      isDevPreview,
-      preview,
-      role,
-    });
-    safeSetStage(nextStage);
+    if (linkState !== LoaderState.IDLE) {
+      const nextStage = resolveStage({
+        currentStage: stage,
+        linkState,
+        sharedData,
+        isReceiverLink,
+        isDemoMode,
+        isEidFlow,
+        isDevPreview,
+        preview,
+        role,
+      });
+      safeSetStage(nextStage);
+    }
   }, [demoData, isDemoMode, isEidFlow, isReceiverLink, linkError, linkState, sharedData, stage]);
 
   useEffect(() => {
@@ -698,7 +701,13 @@ const App: React.FC = () => {
         }
         break;
       }
-      case AppStage.QUESTION:
+      case AppStage.QUESTION: {
+        if (experienceData) {
+          document.body.style.transition = 'background-color 0.5s ease';
+          applyColor(THEME_BG_COLORS[experienceData.theme]);
+        }
+        break;
+      }
       case AppStage.SOULMATE_SYNC:
       case AppStage.PREVIEW: {
         break;
@@ -823,6 +832,32 @@ const App: React.FC = () => {
       safeSetStage(AppStage.MAIN_EXPERIENCE);
     }
   };
+
+  const receiverOpenedBeaconSentRef = useRef(false);
+  useEffect(() => {
+    if (stage !== AppStage.QUESTION || !isReceiverLink || !experienceData || isDemoMode) {
+      return;
+    }
+    if (receiverOpenedBeaconSentRef.current) return;
+    const path = window.location.pathname;
+    if (path.startsWith('/demo/')) return;
+    const parts = path.replace(/^\//, '').replace(/\/$/, '').split('-');
+    const key = parts[parts.length - 1];
+    if (!key || !/^[a-z0-9]{8}$/i.test(key)) return;
+    receiverOpenedBeaconSentRef.current = true;
+    fetch('/api/letters/mark-opened', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionKey: key }),
+    }).catch(() => {});
+  }, [stage, isReceiverLink, experienceData, isDemoMode]);
+
+  useEffect(() => {
+    if (!isReceiverLink || isCreatorPreview) return;
+    if (stage !== AppStage.ENVELOPE) return;
+    safeSetStage(AppStage.QUESTION);
+  }, [isReceiverLink, isCreatorPreview, stage]);
 
   const bootScreen = (
     <div
@@ -974,22 +1009,22 @@ const App: React.FC = () => {
               isDemoMode={isDemoMode}
               onThemeChange={isDemoMode ? (t: Theme) => setData(prev => (prev ? { ...prev, theme: t } : prev)) : undefined}
               onComplete={() => {
-                safeSetStage(AppStage.ENVELOPE);
+                safeSetStage(AppStage.QUESTION);
               }}
             />
           )}
 
-          {stage === AppStage.ENVELOPE && experienceData && (
+          {stage === AppStage.ENVELOPE && experienceData && isCreatorPreview && (
             <div className="animate-fade-in w-full min-h-screen">
-              {isCreatorPreview && (
-                 <div className="fixed top-0 left-0 w-full bg-[#1C1917] text-luxury-gold z-[100] py-3 text-center shadow-lg border-b border-luxury-gold/20">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.4em] animate-pulse">Previewing Receiver Experience</p>
-                 </div>
-              )}
-              <Envelope 
-                recipientName={experienceData.recipientName} 
+              <div className="fixed top-0 left-0 z-[100] w-full border-b border-luxury-gold/20 bg-[#1C1917] py-3 text-center text-luxury-gold shadow-lg">
+                <p className="animate-pulse text-[10px] font-bold uppercase tracking-[0.4em]">
+                  Previewing Receiver Experience
+                </p>
+              </div>
+              <Envelope
+                recipientName={experienceData.recipientName}
                 theme={experienceData.theme || 'obsidian'}
-                onOpen={handleEnvelopeOpen} 
+                onOpen={handleEnvelopeOpen}
                 onInteract={handleEnvelopeInteract}
               />
             </div>
@@ -1112,15 +1147,8 @@ const App: React.FC = () => {
       {import.meta.env.DEV && new URLSearchParams(window.location.search).get('preview') && data && (
         <div className="fixed bottom-0 left-0 right-0 z-[500] bg-black/90 border-t border-white/10 px-4 py-3 flex items-center justify-center gap-3 backdrop-blur-sm">
           <span className="text-[8px] uppercase tracking-widest text-white/30 mr-2">Theme</span>
-          {(['obsidian', 'velvet', 'crimson', 'midnight', 'evergreen', 'pearl'] as Theme[]).map((t) => {
-            const colors: Record<Theme, string> = {
-              obsidian: '#D4AF37',
-              velvet: '#C084FC',
-              crimson: '#FDA4AF',
-              midnight: '#93c5fd',
-              evergreen: '#d97706',
-              pearl: '#a8a29e',
-            };
+          {THEME_ORDER.map((t) => {
+            const accent = THEME_SYSTEM[t].accent;
             const isActive = data.theme === t;
             return (
               <button
@@ -1135,8 +1163,8 @@ const App: React.FC = () => {
                   className="w-5 h-5 rounded-full border-2" 
                   style={{ 
                     backgroundColor: THEME_BG_COLORS[t], 
-                    borderColor: isActive ? colors[t] : 'transparent',
-                    boxShadow: isActive ? `0 0 8px ${colors[t]}40` : 'none',
+                    borderColor: isActive ? accent : 'transparent',
+                    boxShadow: isActive ? `0 0 8px ${accent}40` : 'none',
                   }} 
                 />
                 <span className="text-[7px] uppercase tracking-wider text-white/50">{t}</span>

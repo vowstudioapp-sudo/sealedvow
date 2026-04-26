@@ -3,8 +3,8 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 // ════════════════════════════════════════════════════════════════════
 // ReceiverErrorBoundary
 //
-// Wraps the receiver-facing stages (PersonalIntro → Envelope →
-// InteractiveQuestion → SoulmateSync → MainExperience).
+// Wraps the receiver-facing stages (PersonalIntro → InteractiveQuestion
+// hold-to-break → SoulmateSync → MainExperience).
 //
 // If any child crashes during rendering, shows a graceful fallback
 // instead of a white screen. This matters because someone PAID for

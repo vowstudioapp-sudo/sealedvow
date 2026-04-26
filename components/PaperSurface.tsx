@@ -1,5 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Theme } from '../types';
+import { THEME_SYSTEM } from '../theme/themeSystem';
 
 /* ------------------------------------------------------------------ */
 /* SIX LUXURY PAPER MATERIALS                                          */
@@ -23,61 +24,16 @@ interface PaperMaterial {
   edge: string;
 }
 
-const MATERIALS: Record<Theme, PaperMaterial> = {
-
-  obsidian: {
-    base: '#0F0D0C',
-    drift: 'radial-gradient(ellipse at 30% 25%, rgba(28,20,14,0.010), transparent 75%), radial-gradient(ellipse at 75% 80%, rgba(0,0,0,0.012), transparent 70%)',
-    fall: 'linear-gradient(to bottom, rgba(255,245,230,0.012), transparent 40%, rgba(0,0,0,0.055))',
-    grainOpacity: 0.020,
-    grainBlend: 'soft-light',
-    edge: 'inset 0 0 190px rgba(0,0,0,0.45)',
-  },
-
-  velvet: {
-    base: '#120E18',
-    drift: 'radial-gradient(ellipse at 25% 20%, rgba(60,40,70,0.009), transparent 70%), radial-gradient(ellipse at 78% 82%, rgba(3,2,8,0.012), transparent 65%)',
-    fall: 'linear-gradient(to bottom, rgba(150,130,170,0.010), transparent 40%, rgba(0,0,0,0.055))',
-    grainOpacity: 0.018,
-    grainBlend: 'soft-light',
-    edge: 'inset 0 0 190px rgba(4,2,10,0.45)',
-  },
-
-  crimson: {
-    base: '#1A0C0C',
-    drift: 'radial-gradient(ellipse at 25% 30%, rgba(80,30,30,0.009), transparent 70%), radial-gradient(ellipse at 80% 75%, rgba(5,2,2,0.012), transparent 65%)',
-    fall: 'linear-gradient(to bottom, rgba(170,120,110,0.010), transparent 40%, rgba(0,0,0,0.055))',
-    grainOpacity: 0.019,
-    grainBlend: 'overlay',
-    edge: 'inset 0 0 190px rgba(8,3,3,0.45)',
-  },
-
-  midnight: {
-    base: '#080C16',
-    drift: 'radial-gradient(ellipse at 30% 22%, rgba(40,50,80,0.008), transparent 70%), radial-gradient(ellipse at 76% 82%, rgba(2,3,8,0.012), transparent 65%)',
-    fall: 'linear-gradient(to bottom, rgba(130,145,180,0.010), transparent 40%, rgba(0,0,0,0.055))',
-    grainOpacity: 0.018,
-    grainBlend: 'soft-light',
-    edge: 'inset 0 0 190px rgba(1,2,8,0.45)',
-  },
-
-  evergreen: {
-    base: '#0C1713',
-    drift: 'radial-gradient(ellipse at 28% 24%, rgba(30,55,40,0.009), transparent 70%), radial-gradient(ellipse at 78% 80%, rgba(2,6,4,0.012), transparent 65%)',
-    fall: 'linear-gradient(to bottom, rgba(130,170,140,0.010), transparent 40%, rgba(0,0,0,0.055))',
-    grainOpacity: 0.021,
-    grainBlend: 'overlay',
-    edge: 'inset 0 0 190px rgba(2,10,7,0.45)',
-  },
-
-  pearl: {
-    base: '#161411',
-    drift: 'radial-gradient(ellipse at 28% 22%, rgba(180,160,130,0.010), transparent 70%), radial-gradient(ellipse at 76% 80%, rgba(0,0,0,0.008), transparent 65%)',
-    fall: 'linear-gradient(to bottom, rgba(230,220,200,0.014), transparent 40%, rgba(0,0,0,0.035))',
-    grainOpacity: 0.022,
-    grainBlend: 'soft-light',
-    edge: 'inset 0 0 160px rgba(0,0,0,0.32)',
-  },
+const materialFromSystem = (theme: Theme): PaperMaterial => {
+  const t = THEME_SYSTEM[theme] ?? THEME_SYSTEM.obsidian;
+  return {
+    base: t.paperStage,
+    drift: t.paperDrift,
+    fall: t.paperFall,
+    grainOpacity: t.paperGrainOpacity,
+    grainBlend: t.paperGrainBlend,
+    edge: t.paperEdge,
+  };
 };
 
 /* ------------------------------------------------------------------ */
@@ -115,7 +71,7 @@ export const PaperSurface: React.FC<Props> = ({
   style = {},
   as: Tag = 'div',
 }) => {
-  const mat = MATERIALS[theme];
+  const mat = useMemo(() => materialFromSystem(theme), [theme]);
 
   const grainOffset = useRef(
     `${Math.floor(Math.random() * 50 + 11)}px ${Math.floor(Math.random() * 50 + 11)}px`

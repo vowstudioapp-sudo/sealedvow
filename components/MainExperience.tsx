@@ -11,7 +11,9 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { CoupleData, Coupon, Theme, Occasion } from '../types';
+import { CoupleData, Coupon, Theme } from '../types';
+import { OCCASION_OPENING_LINES } from '@/content/occasionLines';
+import { experienceTheme, getCinematicLayer, THEME_SYSTEM, UI_PALETTE } from '../theme/themeSystem';
 import { PaperSurface } from './PaperSurface';
 import { LetterSection } from './experience/LetterSection';
 import { MemoryBoard } from './experience/MemoryBoard';
@@ -60,32 +62,6 @@ function getYouTubeEmbedId(url: string): string | null {
 /* CONSTANTS                                                           */
 /* ------------------------------------------------------------------ */
 
-const THEME_STYLES: Record<Theme, { 
-  bg: string;
-  text: string;
-  gold: string;
-  overlay: string;
-  boardBg: string;
-  sectionBg: string;
-  sealColor: string;
-}> = {
-  obsidian:   { bg: '#0C0A09', text: '#E5D0A1', gold: '#D4AF37', overlay: 'rgba(0,0,0,0.7)',        boardBg: '#1C1917', sectionBg: '#050505', sealColor: '#722F37' },
-  velvet:     { bg: '#1A0B2E', text: '#E9D5FF', gold: '#C084FC', overlay: 'rgba(26,11,46,0.8)',      boardBg: '#2E1065', sectionBg: '#0F0520', sealColor: '#7C3AED' },
-  crimson:    { bg: '#2B0A0A', text: '#FECDD3', gold: '#F43F5E', overlay: 'rgba(43,10,10,0.8)',      boardBg: '#3B0A0A', sectionBg: '#1A0505', sealColor: '#9F1239' },
-  midnight:   { bg: '#020617', text: '#E0F2FE', gold: '#7DD3FC', overlay: 'rgba(2,6,23,0.8)',        boardBg: '#0F172A', sectionBg: '#010410', sealColor: '#1E40AF' },
-  evergreen:  { bg: '#022C22', text: '#D1FAE5', gold: '#34D399', overlay: 'rgba(2,44,34,0.8)',       boardBg: '#064E3B', sectionBg: '#011A14', sealColor: '#065F46' },
-  pearl:      { bg: '#1C1917', text: '#F5F5F4', gold: '#A8A29E', overlay: 'rgba(28,25,23,0.8)',      boardBg: '#292524', sectionBg: '#0C0A09', sealColor: '#57534E' },
-};
-
-const OCCASION_TITLES: Record<Occasion, string> = {
-  anniversary: "A Celebration of Time",
-  apology: "A Message of Reconciliation",
-  'just-because': "A Spontaneous Thought",
-  'thank-you': "With Gratitude",
-  eid: "A Blessed Gift",
-  birthday: "A Celebration of You",
-};
-
 /* ------------------------------------------------------------------ */
 /* COMPONENT                                                           */
 /* ------------------------------------------------------------------ */
@@ -106,6 +82,8 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const [showExitWhisper, setShowExitWhisper] = useState(false);
   const [showExitOverlay, setShowExitOverlay] = useState(false);
   const [locationUnlocked, setLocationUnlocked] = useState(false);
+  const [locationCardHover, setLocationCardHover] = useState(false);
+  const [demoConversionBtnHover, setDemoConversionBtnHover] = useState(false);
   const exitWhisperShownRef = useRef(false);
 
   // Exit intent — soft whisper when user tries to leave
@@ -216,10 +194,21 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   /* DERIVED VALUES                                                      */
   /* ------------------------------------------------------------------ */
 
-  const theme = THEME_STYLES[data.theme || 'obsidian'];
+  const themeId = data.theme || 'obsidian';
+  const themeTokens = THEME_SYSTEM[themeId] ?? THEME_SYSTEM.obsidian;
+  const theme = experienceTheme(themeId);
+  const cinematic = useMemo(() => getCinematicLayer(themeTokens), [themeId]);
+  const { readability: read } = cinematic;
+  const isLightMode = themeTokens.mode === 'light';
+  const locationGlowRgba = `rgba(${themeTokens.accentRgb},${(0.15 * cinematic.glowStrength).toFixed(3)})`;
+  const modalBackdropResolved = isLightMode ? 'rgba(28,25,23,0.4)' : themeTokens.modalBackdrop;
+  const modalSurfaceResolved = isLightMode ? 'rgba(250,250,250,0.96)' : themeTokens.modalSurface;
+  const modalCloseResolved = isLightMode ? 'rgba(44,40,40,0.55)' : themeTokens.modalClose;
   const activeVideo = data.video?.url;
   const hasVideo = !!activeVideo && data.videoSource !== 'none';
-  const occasionTitle = OCCASION_TITLES[data.occasion || 'anniversary'] || 'A Private Moment';
+  const openingLine =
+    OCCASION_OPENING_LINES[data.occasion] ||
+    OCCASION_OPENING_LINES.anniversary;
 
   // Derive sealed date once — validated and memoized
   const sealedDate = useMemo(() => {
@@ -343,7 +332,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       {/* Global Atmosphere */}
       <div className="main-experience-atmosphere">
         <div className="main-experience-texture" />
-        <div className="main-experience-vignette" />
+        <div className="main-experience-vignette" style={{ background: cinematic.vignette }} />
       </div>
 
       <div className="main-experience-nav-dots">
@@ -375,7 +364,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           <div className="main-experience-hero-card-inner" />
           <div className="main-experience-hero-content">
             <span className="main-experience-hero-icon">✦</span>
-            <p className="main-experience-hero-occasion">{occasionTitle}</p>
+            <p className="main-experience-hero-occasion">{openingLine}</p>
           </div>
           <h1 className="main-experience-hero-title">
             "{data.myth || (data.timeShared ? `${data.timeShared}. One story.` : 'Two souls, one timeline.')}"
@@ -405,9 +394,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               <div className="main-experience-polaroid-texture" />
             </div>
             <div className="main-experience-polaroid-caption">
-              <p className="font-serif-elegant italic text-2xl text-white/90 mb-2">{data.timeShared}</p>
-              <div className="w-8 h-px bg-white/30 mx-auto my-3" />
-              <p className="text-[8px] uppercase tracking-[0.4em] opacity-50">Time Dilation</p>
+              <p className="font-serif-elegant italic text-2xl mb-2" style={{ color: read.primary }}>{data.timeShared}</p>
+              <div className="w-8 h-px mx-auto my-3" style={{ backgroundColor: read.secondary }} />
+              <p className="text-[8px] uppercase tracking-[0.4em]" style={{ color: read.muted }}>Time Dilation</p>
             </div>
           </div>
         </PaperSurface>
@@ -449,7 +438,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
             <p 
               className="mt-6 text-[8px] uppercase tracking-[0.3em]"
-              style={{ color: theme.text, opacity: 0.5, animation: 'closureReveal 0.8s ease-out 0.8s both' }}
+              style={{ color: read.muted, animation: 'closureReveal 0.8s ease-out 0.8s both' }}
             >
               Press play
             </p>
@@ -463,6 +452,8 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
         senderName={data.senderName}
         audioUrl={data.audio?.url}
         theme={theme}
+        readability={read}
+        surfaceTheme={data.theme || 'obsidian'}
         activeSection={activeSection}
       />
 
@@ -487,14 +478,20 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
           {/* Compact Card — click to expand */}
           <div 
-            className="main-experience-location-card cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(212,175,55,0.15)]"
+            className="main-experience-location-card cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+            style={{
+              boxShadow: locationCardHover ? `0 0 40px ${locationGlowRgba}` : undefined,
+              transition: 'box-shadow 0.3s ease-out, transform 0.3s ease-out',
+            }}
+            onMouseEnter={() => setLocationCardHover(true)}
+            onMouseLeave={() => setLocationCardHover(false)}
             onClick={() => setLocationExpanded(true)}
           >
             <div className="text-2xl mb-4 animate-bounce" style={{ color: theme.gold }}>📍</div>
             <h3 className="text-[9px] uppercase tracking-[0.4em] font-bold mb-6" style={{ color: theme.gold, opacity: 0.8 }}>Cosmic Coordinate</h3>
-            <h2 className="font-serif-elegant italic text-3xl text-white mb-6 leading-tight">{data.sacredLocation.placeName}</h2>
-            <div className="w-12 h-px bg-white/10 mx-auto mb-6" />
-            <p className="text-white/60 text-xs italic leading-relaxed mb-6 font-serif-elegant line-clamp-2">
+            <h2 className="font-serif-elegant italic text-3xl mb-6 leading-tight" style={{ color: read.primary }}>{data.sacredLocation.placeName}</h2>
+            <div className="w-12 h-px mx-auto mb-6" style={{ backgroundColor: read.muted }} />
+            <p className="text-xs italic leading-relaxed mb-6 font-serif-elegant line-clamp-2" style={{ color: read.secondary }}>
               "{data.sacredLocation.description}"
             </p>
             <div className="text-[8px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.5 }}>
@@ -509,15 +506,18 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               onClick={() => setLocationExpanded(false)}
             >
               {/* Backdrop */}
-              <div className="absolute inset-0 bg-black/80 backdrop-blur-md" style={{ animation: 'fadeIn 0.3s ease' }} />
+              <div
+                className="absolute inset-0 backdrop-blur-md"
+                style={{ animation: 'fadeIn 0.3s ease', backgroundColor: modalBackdropResolved }}
+              />
               
               {/* Modal Content */}
               <div 
                 className="relative max-w-lg w-full rounded-2xl p-8 md:p-12 text-center border overflow-y-auto max-h-[85vh]"
                 style={{ 
-                  backgroundColor: 'rgba(15,15,15,0.95)', 
+                  backgroundColor: modalSurfaceResolved, 
                   borderColor: `${theme.gold}30`,
-                  boxShadow: `0 25px 60px rgba(0,0,0,0.6), 0 0 40px ${theme.gold}10`,
+                  boxShadow: `0 25px 60px ${cinematic.shadowStrength}, 0 0 40px ${theme.gold}10`,
                   animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -526,23 +526,23 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 <button 
                   onClick={() => setLocationExpanded(false)}
                   className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.6)' }}
+                  style={{ color: modalCloseResolved }}
                 >
                   ✕
                 </button>
 
                 <div className="text-3xl mb-6" style={{ color: theme.gold }}>📍</div>
                 <h3 className="text-[9px] uppercase tracking-[0.5em] font-bold mb-4" style={{ color: theme.gold, opacity: 0.8 }}>Cosmic Coordinate</h3>
-                <h2 className="font-serif-elegant italic text-2xl md:text-3xl text-white mb-6 leading-tight">{data.sacredLocation.placeName}</h2>
+                <h2 className="font-serif-elegant italic text-2xl md:text-3xl mb-6 leading-tight" style={{ color: read.primary }}>{data.sacredLocation.placeName}</h2>
                 
                 <div className="w-16 h-px mx-auto mb-8" style={{ backgroundColor: `${theme.gold}30` }} />
                 
-                <p className="text-white/70 text-sm italic leading-relaxed mb-10 font-serif-elegant max-w-md mx-auto">
+                <p className="text-sm italic leading-relaxed mb-10 font-serif-elegant max-w-md mx-auto" style={{ color: read.secondary }}>
                   "{data.sacredLocation.description}"
                 </p>
 
                 {data.sacredLocation.latLng && (
-                  <div className="mb-8 text-[10px] text-white/30 uppercase tracking-widest font-bold">
+                  <div className="mb-8 text-[10px] uppercase tracking-widest font-bold" style={{ color: read.muted }}>
                     {data.sacredLocation.latLng.lat.toFixed(4)}° N · {data.sacredLocation.latLng.lng.toFixed(4)}° E
                   </div>
                 )}
@@ -590,7 +590,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
                 fontStyle: 'italic',
                 fontSize: 'clamp(1.2rem, 4vw, 2rem)',
-                color: theme.text,
+                color: read.primary,
                 lineHeight: 1.6,
               }}
             >
@@ -659,7 +659,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
                 fontStyle: 'italic',
                 fontSize: 'clamp(1.2rem, 4vw, 2rem)',
-                color: theme.text,
+                color: read.primary,
                 lineHeight: 1.6,
                 animation: 'closureReveal 1.2s ease-out 0.4s both',
               }}
@@ -683,43 +683,52 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
       {/* DEMO: Final Conversion Screen — the only CTA in the entire demo */}
       {isDemoMode && !isPreview && (
-        <section className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-8 relative" style={{ backgroundColor: '#0C0A09' }}>
+        <section className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-8 relative" style={{ backgroundColor: themeTokens.bg }}>
           <div className="text-center max-w-md mx-auto">
 
             <div className="mb-16" style={{ animation: 'closureReveal 1.2s ease-out 0.2s both' }}>
-              <p className="text-[13px] text-[#E5D0A1]/60 italic leading-relaxed mb-3" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
+              <p className="text-[13px] italic leading-relaxed mb-3" style={{ fontFamily: '"Playfair Display", Georgia, serif', color: read.secondary }}>
                 They didn't speak for a few seconds.
               </p>
-              <p className="text-[13px] text-[#E5D0A1]/60 italic leading-relaxed" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
+              <p className="text-[13px] italic leading-relaxed" style={{ fontFamily: '"Playfair Display", Georgia, serif', color: read.secondary }}>
                 Then softly,<br/>
                 "You actually made this for me?"
               </p>
             </div>
 
-            <div className="w-px h-12 bg-gradient-to-b from-transparent via-[#D4AF37]/20 to-transparent mx-auto mb-10" style={{ animation: 'closureReveal 0.8s ease-out 1s both' }} />
+            <div
+              className="w-px h-12 mx-auto mb-10"
+              style={{ animation: 'closureReveal 0.8s ease-out 1s both', backgroundImage: `linear-gradient(to bottom, transparent, ${themeTokens.accent}33, transparent)` }}
+            />
 
             <div style={{ animation: 'closureReveal 0.8s ease-out 1.2s both' }}>
-              <p className="text-[11px] italic font-serif-elegant mb-10 leading-relaxed" style={{ color: '#E5D0A1', opacity: 0.6 }}>
+              <p className="text-[11px] italic font-serif-elegant mb-10 leading-relaxed" style={{ color: read.secondary }}>
                 If this reminded you of someone — don't scroll away.
               </p>
             </div>
 
             <div style={{ animation: 'closureReveal 1s ease-out 1.6s both' }}>
-              <p className="text-[10px] uppercase tracking-[0.4em] text-[#D4AF37]/60 font-bold mb-2">Love should not be assumed.</p>
-              <p className="text-[9px] text-[#E5D0A1]/50 italic mb-10">It should be expressed.</p>
+              <p className="text-[10px] uppercase tracking-[0.4em] font-bold mb-2" style={{ color: read.secondary }}>Love should not be assumed.</p>
+              <p className="text-[9px] italic mb-10" style={{ color: read.muted }}>It should be expressed.</p>
             </div>
 
             <div style={{ animation: 'closureReveal 0.8s ease-out 2.2s both' }}>
               <button
                 onClick={() => { window.location.href = '/create'; }}
-                className="bg-[#722F37] hover:bg-[#5a1f27] text-white font-bold text-[11px] tracking-[0.4em] uppercase px-14 py-5 rounded-full shadow-2xl transition-all duration-300 active:scale-[0.98]"
+                className="font-bold text-[11px] tracking-[0.4em] uppercase px-14 py-5 rounded-full shadow-2xl transition-all duration-300 active:scale-[0.98]"
+                style={{
+                  backgroundColor: demoConversionBtnHover ? themeTokens.ctaSealHover : themeTokens.seal,
+                  color: UI_PALETTE.onVividFill,
+                }}
+                onMouseEnter={() => setDemoConversionBtnHover(true)}
+                onMouseLeave={() => setDemoConversionBtnHover(false)}
               >
                 Create Your Own
               </button>
             </div>
 
             <div className="mt-8" style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}>
-              <p className="text-[7px] uppercase tracking-[0.3em] text-[#D4AF37]/50">This is how people are choosing to say it this year.</p>
+              <p className="text-[7px] uppercase tracking-[0.3em]" style={{ color: read.muted }}>This is how people are choosing to say it this year.</p>
             </div>
 
           </div>
@@ -741,14 +750,14 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       {showExitWhisper && (
         <div 
           className="fixed inset-0 z-[300] flex flex-col items-center justify-center select-none"
-          style={{ backgroundColor: theme.bg, opacity: 0.98, animation: 'exitIntentIn 0.6s ease-out both' }}
+          style={{ backgroundColor: theme.bg, opacity: cinematic.overlayOpacity, animation: 'exitIntentIn 0.6s ease-out both' }}
         >
           <p
             style={{
               fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
               fontStyle: 'italic',
               fontSize: 'clamp(1.2rem, 4vw, 2rem)',
-              color: theme.text,
+              color: read.primary,
               lineHeight: 1.6,
               animation: 'closureReveal 0.8s ease-out 0.3s both',
             }}
@@ -763,7 +772,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
           <p 
             className="text-[10px] tracking-[0.15em] font-serif-elegant italic"
-            style={{ color: theme.text, opacity: 0.6, animation: 'closureReveal 0.8s ease-out 1.2s both' }}
+            style={{ color: read.secondary, animation: 'closureReveal 0.8s ease-out 1.2s both' }}
           >
             {isPreview ? 'This is what your receiver will see when they try to leave' : `${data.senderName} left something more for you`}
           </p>
@@ -781,7 +790,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
               letterSpacing: '0.1em',
               borderColor: theme.gold + '44',
-              color: theme.text,
+              color: read.primary,
             }}
           >
             Reveal it
@@ -790,7 +799,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           <button
             onClick={() => setShowExitWhisper(false)}
             className="mt-4 text-[8px] uppercase tracking-[0.4em] transition-colors"
-            style={{ color: theme.text, opacity: 0.5, animation: 'closureReveal 0.6s ease-out 2.2s both' }}
+            style={{ color: read.muted, animation: 'closureReveal 0.6s ease-out 2.2s both' }}
           >
             Maybe later
           </button>
@@ -801,13 +810,13 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       {showExitOverlay && (
         <div 
           className="fixed inset-0 z-[280] overflow-y-auto"
-          style={{ backgroundColor: theme.bg, animation: 'exitIntentIn 0.8s ease-out both' }}
+          style={{ backgroundColor: theme.bg, opacity: cinematic.overlayOpacity, animation: 'exitIntentIn 0.8s ease-out both' }}
         >
           {/* Close button */}
           <button
             onClick={() => setShowExitOverlay(false)}
             className="fixed top-6 right-6 z-[290] text-xs uppercase tracking-widest transition-colors"
-            style={{ color: theme.text, opacity: 0.5 }}
+            style={{ color: read.muted }}
           >
             ✕
           </button>
@@ -821,7 +830,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                     fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
                     fontStyle: 'italic',
                     fontSize: 'clamp(1.2rem, 4vw, 2rem)',
-                    color: theme.text,
+                    color: read.primary,
                     lineHeight: 1.6,
                   }}
                 >
@@ -871,7 +880,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                   <p className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8" style={{ color: theme.gold, opacity: 0.6 }}>
                     Created for you. Only you.
                   </p>
-                  <p style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(1.2rem, 4vw, 2rem)', color: theme.text, lineHeight: 1.6 }}>
+                  <p style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(1.2rem, 4vw, 2rem)', color: read.primary, lineHeight: 1.6 }}>
                     Sealed by {data.senderName}
                   </p>
                   {sealedDate && (
@@ -885,32 +894,32 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
               {isPreview && (onPayment || onEdit) ? (
                 <>
-                  <p className="text-[10px] tracking-[0.12em] font-serif-elegant italic mb-3" style={{ color: theme.text, opacity: 0.6 }}>
+                  <p className="text-[10px] tracking-[0.12em] font-serif-elegant italic mb-3" style={{ color: read.secondary }}>
                     {data.replyEnabled 
                       ? `If ${data.recipientName || 'your receiver'} feels moved, they can seal a reply back to you right here.`
                       : `${data.recipientName || 'Your receiver'} will see an option to create their own Sealed Vow for you.`
                     }
                   </p>
-                  <div className="inline-block px-8 py-3 border opacity-60 cursor-default" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: theme.text }}>
+                  <div className="inline-block px-8 py-3 border cursor-default" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: read.secondary }}>
                     {data.replyEnabled ? 'Seal a reply' : `Seal something back for ${data.senderName}`}
                   </div>
-                  <p className="mt-3 text-[8px] uppercase tracking-[0.3em]" style={{ color: theme.gold, opacity: 0.6 }}>
+                  <p className="mt-3 text-[8px] uppercase tracking-[0.3em]" style={{ color: read.muted }}>
                     ↑ This is what your receiver will see
                   </p>
                 </>
               ) : isDemoMode ? (
                 <>
                   <div className="text-center mt-2">
-                    <p className="text-[11px] italic font-serif-elegant mb-8 leading-relaxed" style={{ color: theme.text, opacity: 0.6 }}>
+                    <p className="text-[11px] italic font-serif-elegant mb-8 leading-relaxed" style={{ color: read.secondary }}>
                       If this reminded you of someone — don't scroll away.
                     </p>
                     <a
                       href="/create"
                       className="inline-block px-14 py-5 rounded-full font-bold text-[11px] tracking-[0.4em] uppercase transition-all duration-300 active:scale-[0.98]"
                       style={{
-                        backgroundColor: '#722F37',
-                        color: '#fff',
-                        boxShadow: '0 10px 30px rgba(114,47,55,0.4)',
+                        backgroundColor: themeTokens.seal,
+                        color: UI_PALETTE.onVividFill,
+                        boxShadow: `0 10px 30px rgba(${themeTokens.sealRgb},${(0.4 * cinematic.glowStrength).toFixed(2)})`,
                       }}
                     >
                       Create Your Own
@@ -927,8 +936,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                       className="font-serif-elegant italic mb-6"
                       style={{
                         fontSize: 'clamp(1rem, 3vw, 1.4rem)',
-                        color: theme.text,
-                        opacity: 0.5,
+                        color: read.muted,
                       }}
                     >
                       Sealed by {data.senderName}
@@ -969,7 +977,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               <button
                 onClick={onEdit}
                 className="w-full py-3.5 text-[10px] font-bold uppercase tracking-[0.4em] border rounded-full transition-all duration-300 hover:bg-white/5"
-                style={{ borderColor: theme.gold + '40', color: theme.text }}
+                style={{ borderColor: theme.gold + '40', color: read.primary }}
               >
                 ← Modify
               </button>
@@ -978,7 +986,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               <button
                 onClick={onPayment}
                 className="w-full py-4 text-[10px] font-bold uppercase tracking-[0.4em] rounded-full transition-all duration-300 shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
-                style={{ backgroundColor: '#722F37', color: '#FFFFFF', letterSpacing: '0.4em' }}
+                style={{ backgroundColor: themeTokens.seal, color: UI_PALETTE.onVividFill, letterSpacing: '0.4em' }}
               >
                 Send letter
               </button>

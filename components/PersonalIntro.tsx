@@ -1,23 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Theme } from '../types';
-
-const THEME_COLORS: Record<Theme, { bg: string; text: string; accent: string }> = {
-  obsidian:  { bg: '#0C0A09', text: '#E5D0A1', accent: 'rgba(212, 175, 55, 0.5)' },
-  velvet:    { bg: '#1A0B2E', text: '#E9D5FF', accent: 'rgba(192, 132, 252, 0.5)' },
-  crimson:   { bg: '#2B0A0A', text: '#FECDD3', accent: 'rgba(244, 63, 94, 0.5)' },
-  midnight:  { bg: '#020617', text: '#E0F2FE', accent: 'rgba(125, 211, 252, 0.5)' },
-  evergreen: { bg: '#022C22', text: '#D1FAE5', accent: 'rgba(52, 211, 153, 0.5)' },
-  pearl:     { bg: '#1C1917', text: '#F5F5F4', accent: 'rgba(168, 162, 158, 0.5)' },
-};
-
-const THEME_DOTS: { id: Theme; color: string; label: string }[] = [
-  { id: 'obsidian', color: '#D4AF37', label: 'Obsidian' },
-  { id: 'velvet', color: '#C084FC', label: 'Velvet' },
-  { id: 'crimson', color: '#F43F5E', label: 'Crimson' },
-  { id: 'midnight', color: '#60A5FA', label: 'Midnight' },
-  { id: 'evergreen', color: '#34D399', label: 'Evergreen' },
-  { id: 'pearl', color: '#A8A29E', label: 'Pearl' },
-];
+import { THEME_LABELS, THEME_ORDER, THEME_SYSTEM, UI_PALETTE } from '../theme/themeSystem';
 
 interface Props {
   recipientName: string;
@@ -28,7 +11,21 @@ interface Props {
 }
 
 export const PersonalIntro: React.FC<Props> = ({ recipientName, theme = 'obsidian', isDemoMode = false, onThemeChange, onComplete }) => {
-  const colors = THEME_COLORS[theme];
+  const colors = useMemo(() => {
+    const t = THEME_SYSTEM[theme] ?? THEME_SYSTEM.obsidian;
+    return { bg: t.bg, text: t.textPrimary, accent: t.accentSoft };
+  }, [theme]);
+
+  const themeDots = useMemo(
+    () =>
+      THEME_ORDER.map((id) => ({
+        id,
+        color: THEME_SYSTEM[id].accent,
+        label: THEME_LABELS[id].shortName,
+      })),
+    [],
+  );
+
   const [showName, setShowName] = useState(false);
   const [showSubtitle, setShowSubtitle] = useState(false);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
@@ -98,7 +95,6 @@ export const PersonalIntro: React.FC<Props> = ({ recipientName, theme = 'obsidia
         This wasn't sent by accident.
       </p>
 
-      {/* Demo Theme Selector */}
       {isDemoMode && showThemeSelector && (
         <div className="mt-12 flex flex-col items-center" style={{ animation: 'closureReveal 0.6s ease-out both' }}>
           <p
@@ -108,7 +104,7 @@ export const PersonalIntro: React.FC<Props> = ({ recipientName, theme = 'obsidia
             Preview Theme
           </p>
           <div className="flex gap-3 mb-8">
-            {THEME_DOTS.map((t) => (
+            {themeDots.map((t) => (
               <button
                 key={t.id}
                 onClick={() => onThemeChange?.(t.id)}
@@ -117,7 +113,7 @@ export const PersonalIntro: React.FC<Props> = ({ recipientName, theme = 'obsidia
                   backgroundColor: t.color,
                   boxShadow: theme === t.id
                     ? `0 0 0 2px ${colors.bg}, 0 0 0 4px ${t.color}`
-                    : '0 2px 8px rgba(0,0,0,0.3)',
+                    : UI_PALETTE.dotElevation,
                   opacity: theme === t.id ? 1 : 0.5,
                 }}
                 title={t.label}

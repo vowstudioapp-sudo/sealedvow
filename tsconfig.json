@@ -22,6 +22,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@/content/occasionLines": [
+        "./src/content/occasionLines.ts"
       ]
     },
     "allowImportingTsExtensions": true,
