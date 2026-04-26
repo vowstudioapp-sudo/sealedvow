@@ -939,7 +939,7 @@ const App: React.FC = () => {
           )}
 
           {stage === AppStage.ENVELOPE && data && (
-            <div className="animate-fade-in w-full flex items-center justify-center min-h-screen">
+            <div className="animate-fade-in w-full min-h-screen">
               {isCreatorPreview && (
                  <div className="fixed top-0 left-0 w-full bg-[#1C1917] text-luxury-gold z-[100] py-3 text-center shadow-lg border-b border-luxury-gold/20">
                     <p className="text-[10px] font-bold uppercase tracking-[0.4em] animate-pulse">Previewing Receiver Experience</p>
