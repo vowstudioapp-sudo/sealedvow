@@ -6,7 +6,10 @@
   "installCommand": "npm install",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/((?!@vite|@react-refresh|@fs/|@id/|node_modules/|src/|assets/).*)",
+      "destination": "/index.html"
+    }
   ],
   "functions": {
     "api/ai.js": {
