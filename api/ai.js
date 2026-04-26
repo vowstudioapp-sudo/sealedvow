@@ -653,16 +653,16 @@ export default async function handler(req, res) {
   const updatedCount = await safeKV(() => kv.incr(successRateKey), null);
 
   if (updatedCount === null) {
-    return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
+    console.warn('[AI] KV unavailable for ai_rate_success — skipping hourly quota tracking');
   }
 
-  incremented = true;
+  incremented = updatedCount !== null;
 
-  if (updatedCount === 1) {
+  if (updatedCount !== null && updatedCount === 1) {
     await safeKV(() => kv.expire(successRateKey, RATE_LIMIT_WINDOW_SECONDS));
   }
 
-  if (updatedCount > RATE_LIMIT_MAX) {
+  if (updatedCount !== null && updatedCount > RATE_LIMIT_MAX) {
     return res.status(429).json({ ok: false, error: 'AI usage limit reached.' });
   }
 
