@@ -4,10 +4,6 @@
   "devCommand": "vite --port $PORT",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
   "functions": {
     "api/ai.js": {
       "maxDuration": 60

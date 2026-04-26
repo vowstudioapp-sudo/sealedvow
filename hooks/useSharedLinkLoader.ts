@@ -34,6 +34,8 @@ export interface SharedLinkLoaderResult {
   data: CoupleData | null;      // The letter data (if successful)
   error: LoaderError | null;    // Error details (if failed)
   retry: () => void;            // Function to try again
+  /** Title-case hint from /sender-recipient-key paths; null for hash links. */
+  pathRecipientTitleHint: string | null;
 }
 
 /**
@@ -143,5 +145,6 @@ export function useSharedLinkLoader(enabled: boolean = true): SharedLinkLoaderRe
     data,
     error,
     retry: loadFromURL,
+    pathRecipientTitleHint: null,
   };
 }

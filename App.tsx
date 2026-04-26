@@ -214,7 +214,7 @@ const resolveStage = (state: StageResolverState): AppStage => {
   }
 
   if (linkState === LoaderState.LOADING) {
-    return currentStage;
+    return isReceiverLink ? AppStage.PERSONAL_INTRO : currentStage;
   }
 
   if (linkState === LoaderState.NO_LINK) {
@@ -237,7 +237,12 @@ const resolveStage = (state: StageResolverState): AppStage => {
 };
 
 const App: React.FC = () => {
-  const { state: linkState, data: sharedData, error: linkError } = useLinkLoader();
+  const {
+    state: linkState,
+    data: sharedData,
+    error: linkError,
+    pathRecipientTitleHint,
+  } = useLinkLoader();
   const routeType = getRouteType();
   const isEidiCreate = routeType === 'EIDI_CREATE';
   const isEidiReceiver = routeType === 'EIDI_RECEIVER';
@@ -260,6 +265,17 @@ const App: React.FC = () => {
   
   const [stage, setStage] = useState<AppStage>(AppStage.LANDING);
   const [data, setData] = useState<CoupleData | null>(null);
+
+  const experienceData = useMemo(() => {
+    if (isReceiverLink) {
+      if (data) return data;
+      if (linkState === LoaderState.SUCCESS && sharedData) {
+        return hydrateCoupleData(sharedData);
+      }
+    }
+    return data;
+  }, [data, isReceiverLink, linkState, sharedData]);
+
   const [isBooting, setIsBooting] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -640,7 +656,7 @@ const App: React.FC = () => {
         break;
       }
       case AppStage.ENVELOPE: {
-        if (!data) {
+        if (!experienceData) {
           applyColor('#050505');
           break;
         }
@@ -649,12 +665,12 @@ const App: React.FC = () => {
           document.body.style.transition = 'background-color 2s ease-in-out';
           applyColor('#000000');
           timeoutId = window.setTimeout(() => {
-            applyColor(THEME_BG_COLORS[data.theme]);
+            applyColor(THEME_BG_COLORS[experienceData.theme]);
           }, 600);
         } else if (previousStageRef.current === AppStage.SHARE) {
-          applyColor(THEME_BG_COLORS[data.theme]);
+          applyColor(THEME_BG_COLORS[experienceData.theme]);
         } else {
-          applyColor(THEME_BG_COLORS[data.theme]);
+          applyColor(THEME_BG_COLORS[experienceData.theme]);
         }
         break;
       }
@@ -671,8 +687,8 @@ const App: React.FC = () => {
         break;
       }
       case AppStage.MAIN_EXPERIENCE: {
-        if (previousStageRef.current === AppStage.PAYMENT && data) {
-          applyColor(THEME_BG_COLORS[data.theme]);
+        if (previousStageRef.current === AppStage.PAYMENT && experienceData) {
+          applyColor(THEME_BG_COLORS[experienceData.theme]);
         }
         break;
       }
@@ -697,7 +713,7 @@ const App: React.FC = () => {
         clearTimeout(timeoutId);
       }
     };
-  }, [stage, data]);
+  }, [stage, experienceData]);
 
   // ── EIDI EARLY RETURNS — isolated from main stage engine ──────────
   const eidiLoadingFallback = (
@@ -801,7 +817,7 @@ const App: React.FC = () => {
   };
 
   const handleQuestionAccepted = () => {
-    if (data?.revealMethod === 'sync') {
+    if (experienceData?.revealMethod === 'sync') {
       safeSetStage(AppStage.SOULMATE_SYNC);
     } else {
       safeSetStage(AppStage.MAIN_EXPERIENCE);
@@ -896,6 +912,31 @@ const App: React.FC = () => {
         <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${
           isReceiverLink ? 'opacity-100' : (isBooting ? 'opacity-0' : 'opacity-100')
         }`}>
+          {isReceiverLink &&
+            linkState === LoaderState.LOADING &&
+            !experienceData &&
+            (pathRecipientTitleHint ? (
+              <div className="min-h-screen flex flex-col items-center justify-center px-8 text-[#E5D0A1]">
+                <h1
+                  className="text-center leading-tight"
+                  style={{
+                    fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
+                    fontStyle: 'italic',
+                    fontSize: 'clamp(2rem, 8vw, 4rem)',
+                    color: '#E5D0A1',
+                  }}
+                >
+                  {pathRecipientTitleHint}
+                </h1>
+                <p className="mt-6 text-[11px] uppercase tracking-[0.35em] text-[#E5D0A1]/55">
+                  Don't rush this.
+                </p>
+              </div>
+            ) : (
+              <div className="min-h-screen flex items-center justify-center text-[#E5D0A1] text-sm uppercase tracking-[0.35em]">
+                Don't rush this.
+              </div>
+            ))}
           
           {stage === AppStage.LANDING && !isReceiverLink && (
             <LandingPage onEnter={handleEnterStudio} />
@@ -926,19 +967,19 @@ const App: React.FC = () => {
             <MasterControl data={data} />
           )}
 
-          {stage === AppStage.PERSONAL_INTRO && data && (
+          {stage === AppStage.PERSONAL_INTRO && experienceData && (
             <PersonalIntro
-              recipientName={data.recipientName}
-              theme={data.theme}
+              recipientName={experienceData.recipientName}
+              theme={experienceData.theme}
               isDemoMode={isDemoMode}
-              onThemeChange={isDemoMode ? (t: Theme) => setData(prev => ({ ...prev, theme: t })) : undefined}
+              onThemeChange={isDemoMode ? (t: Theme) => setData(prev => (prev ? { ...prev, theme: t } : prev)) : undefined}
               onComplete={() => {
                 safeSetStage(AppStage.ENVELOPE);
               }}
             />
           )}
 
-          {stage === AppStage.ENVELOPE && data && (
+          {stage === AppStage.ENVELOPE && experienceData && (
             <div className="animate-fade-in w-full min-h-screen">
               {isCreatorPreview && (
                  <div className="fixed top-0 left-0 w-full bg-[#1C1917] text-luxury-gold z-[100] py-3 text-center shadow-lg border-b border-luxury-gold/20">
@@ -946,34 +987,34 @@ const App: React.FC = () => {
                  </div>
               )}
               <Envelope 
-                recipientName={data.recipientName} 
-                theme={data.theme || 'obsidian'}
+                recipientName={experienceData.recipientName} 
+                theme={experienceData.theme || 'obsidian'}
                 onOpen={handleEnvelopeOpen} 
                 onInteract={handleEnvelopeInteract}
               />
             </div>
           )}
 
-          {stage === AppStage.QUESTION && data && (
+          {stage === AppStage.QUESTION && experienceData && (
             <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
               <InteractiveQuestion 
-                 data={data} 
+                 data={experienceData} 
                  onAccept={handleQuestionAccepted} 
               />
             </div>
           )}
 
-          {stage === AppStage.SOULMATE_SYNC && data && (
+          {stage === AppStage.SOULMATE_SYNC && experienceData && (
             <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
               <SoulmateSync 
-                senderName={data.senderName} 
-                sessionId={data.sessionId}
+                senderName={experienceData.senderName} 
+                sessionId={experienceData.sessionId}
                 onComplete={() => safeSetStage(AppStage.MAIN_EXPERIENCE)} 
               />
             </div>
           )}
 
-          {stage === AppStage.MAIN_EXPERIENCE && data && (
+          {stage === AppStage.MAIN_EXPERIENCE && experienceData && (
             <div className="animate-fade-in relative">
               {isDemoMode && (
                 <>
@@ -992,7 +1033,7 @@ const App: React.FC = () => {
                 </>
               )}
               <MainExperience 
-                data={data} 
+                data={experienceData} 
                 isPreview={isCreatorPreview}
                 isDemoMode={isDemoMode}
                 onEdit={() => {
