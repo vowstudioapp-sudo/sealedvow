@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { LandingPage } from './components/LandingPage.tsx';
 import { PreparationForm } from './components/PreparationForm';
+import { PersonalIntro } from './components/PersonalIntro';
+import { InteractiveQuestion } from './components/InteractiveQuestion';
 import AdminPanel from './components/AdminPanel';
 import ClaimPage from './components/ClaimPage';
 import { SignInPromptModal } from './components/SignInPromptModal.tsx';
@@ -25,10 +27,6 @@ const SharePackage = lazy(() =>
   import('./components/SharePackage.tsx').then(m => ({ default: m.SharePackage }))
 );
 
-const InteractiveQuestion = lazy(() =>
-  import('./components/InteractiveQuestion.tsx').then(m => ({ default: m.InteractiveQuestion }))
-);
-
 const SoulmateSync = lazy(() =>
   import('./components/SoulmateSync.tsx').then(m => ({ default: m.SoulmateSync }))
 );
@@ -41,9 +39,6 @@ const MasterControl = lazy(() =>
   import('./components/MasterControl.tsx').then(m => ({ default: m.MasterControl }))
 );
 
-const PersonalIntro = lazy(() =>
-  import('./components/PersonalIntro.tsx').then(m => ({ default: m.PersonalIntro }))
-);
 const EidiCreatePage = lazy(() =>
   import('./pages/eidi/create.tsx').then(m => ({ default: m.EidiCreatePage }))
 );
