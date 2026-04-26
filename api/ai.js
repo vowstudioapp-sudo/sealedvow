@@ -86,12 +86,11 @@ const RATE_LIMIT_WINDOW = 60; // seconds
 const MAX_REQUESTS = 10; // per IP per minute
 
 function getClientIP(req) {
-  return (
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.headers["x-real-ip"] ||
-    req.socket?.remoteAddress ||
-    "unknown"
-  );
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string') {
+    return xff.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || 'unknown';
 }
 
 // ===============================
@@ -566,12 +565,10 @@ export default async function handler(req, res) {
 
   const sessionUser = await getSessionUser(req);
   req.user = sessionUser;
-  if (!req.user || !req.user.uid) {
-    return res.status(401).json({ ok: false, error: 'Authentication required' });
-  }
 
   const { action, payload } = req.body || {};
-  const userUid = req.user.uid;
+  const userUid = req.user?.uid || null;
+  const actorKey = userUid || `ip:${getClientIP(req)}`;
   const sessionId = typeof req.body?.sessionId === 'string'
     ? req.body.sessionId
     : typeof payload?.sessionId === 'string'
@@ -584,14 +581,14 @@ export default async function handler(req, res) {
   // Session is optional pre-payment. When provided, enforce ownership only.
   // Pre-payment AI generation (PreparationForm/RefineStage) hits this route
   // before shared/{sessionId} exists, so we no longer require it. Auth gate
-  // is the session cookie above (req.user.uid).
+  // is the session cookie above (req.user.uid) when present.
   if (sessionId) {
     const sessionSnap = await admin.database().ref(`shared/${sessionId}`).get();
 
-    if (sessionSnap.exists()) {
+    if (sessionSnap.exists() && userUid) {
       const session = sessionSnap.val() || {};
 
-      if (session.senderUid !== req.user.uid) {
+      if (session.senderUid !== userUid) {
         return res.status(403).json({ ok: false, error: 'Unauthorized access to this session' });
       }
     }
@@ -601,7 +598,7 @@ export default async function handler(req, res) {
   const EXPENSIVE_ACTIONS = ['generateValentineImage', 'generateAudioLetter'];
   if (EXPENSIVE_ACTIONS.includes(req.body?.action)) {
     const { limited: expensiveLimited } = await rateLimit(req, {
-      keyPrefix: `ai_expensive_${req.user.uid}`,
+      keyPrefix: `ai_expensive_${actorKey}`,
       windowSeconds: 86400,
       max: 3,
     });
@@ -646,7 +643,7 @@ export default async function handler(req, res) {
   // actually succeeded — guards against negative counters when KV is unstable.
   const RATE_LIMIT_MAX = 10;
   const RATE_LIMIT_WINDOW_SECONDS = 3600;
-  const successRateKey = `ai_rate_success:${req.user.uid}`;
+  const successRateKey = `ai_rate_success:${actorKey}`;
 
   let incremented = false;
 
@@ -666,7 +663,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ ok: false, error: 'AI usage limit reached.' });
   }
 
-  console.log('[AI] Request', { uid: req.user.uid, sessionId });
+  console.log('[AI] Request', { uid: userUid, sessionId });
 
   console.log('PROD ENV CHECK:', {
     GEMINI: !!process.env.GEMINI_API_KEY,
