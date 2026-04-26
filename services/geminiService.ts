@@ -44,7 +44,8 @@ export const generateLoveLetter = async (data: CoupleData): Promise<string> => {
         relationshipIntent: data.relationshipIntent,
       },
     });
-    return result.text;
+    const payload = result?.data ?? result;
+    return payload?.text || null;
   } catch (error) {
     console.error("AI ERROR:", error);
     const fallbacks: Record<Occasion, string> = {
@@ -68,7 +69,8 @@ export const generateCoupleMyth = async (data: CoupleData): Promise<string> => {
         sharedMoment: data.sharedMoment,
       },
     });
-    return result.text;
+    const payload = result?.data ?? result;
+    return payload?.text || null;
   } catch (error) {
     return "A story written not in ink, but in the quiet moments shared between two souls.";
   }
@@ -82,7 +84,8 @@ export const generateCinematicVideo = async (data: CoupleData): Promise<string |
 export const generateSacredLocation = async (memory: string, manualLink?: string): Promise<SacredLocation | null> => {
   try {
     const result = await callAPI('generateSacredLocation', { memory, manualLink });
-    return result.location;
+    const payload = result?.data ?? result;
+    return payload?.location || null;
   } catch (error) {
     console.error("Location generation failed", error);
     return {
@@ -96,8 +99,9 @@ export const generateSacredLocation = async (memory: string, manualLink?: string
 export const generateAudioLetter = async (text: string): Promise<Uint8Array | null> => {
   try {
     const result = await callAPI('generateAudioLetter', { text });
-    if (result.audio) {
-      return decodeBase64(result.audio);
+    const payload = result?.data ?? result;
+    if (payload?.audio) {
+      return decodeBase64(payload.audio);
     }
     return null;
   } catch (error) {
