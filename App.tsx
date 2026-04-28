@@ -949,6 +949,25 @@ const App: React.FC = () => {
     </div>
   );
 
+  const suspenseFallback = (
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{ background: 'var(--sv-bg-base, #1A1220)' }}
+    >
+      <h1
+        className="lp-nav__wordmark select-none"
+        aria-label="Sealed Vow"
+        style={{ fontSize: 'clamp(40px, 8vw, 56px)', margin: 0 }}
+      >
+        <span className="lp-nav__wordmark-sealed">
+          <span className="lp-nav__wordmark-sealed-first">S</span>
+          <span className="lp-nav__wordmark-sealed-rest">ealed</span>
+        </span>
+        <span className="lp-nav__wordmark-vow">Vow</span>
+      </h1>
+    </div>
+  );
+
   return (
     <div className="min-h-screen relative overflow-x-hidden transition-colors duration-1000" style={{ backgroundColor: '#0C0A09' }}>
       {!isEidiRoute(routeType) && isBooting && !isReceiverLink && bootScreen}
@@ -964,22 +983,11 @@ const App: React.FC = () => {
 
       <Suspense
         fallback={
-          <div
-            className="min-h-screen flex items-center justify-center"
-            style={{ background: 'var(--sv-bg-base, #1A1220)' }}
-          >
-            <h1
-              className="lp-nav__wordmark select-none"
-              aria-label="Sealed Vow"
-              style={{ fontSize: 'clamp(40px, 8vw, 56px)', margin: 0 }}
-            >
-              <span className="lp-nav__wordmark-sealed">
-                <span className="lp-nav__wordmark-sealed-first">S</span>
-                <span className="lp-nav__wordmark-sealed-rest">ealed</span>
-              </span>
-              <span className="lp-nav__wordmark-vow">Vow</span>
-            </h1>
-          </div>
+          isReceiverLink &&
+          (stage === AppStage.MAIN_EXPERIENCE ||
+            stage === AppStage.SOULMATE_SYNC)
+            ? null
+            : suspenseFallback
         }
       >
         <main className={`relative z-10 w-full min-h-screen transition-opacity duration-1000 ${
