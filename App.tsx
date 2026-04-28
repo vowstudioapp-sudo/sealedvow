@@ -637,6 +637,19 @@ const App: React.FC = () => {
     };
   }, [stage, experienceData]);
 
+  // Preload post-seal chunks once the receiver reaches PERSONAL_INTRO so the
+  // Suspense fallback (wordmark) doesn't flash during the Q→MAIN_EXPERIENCE
+  // transition. Paths must match the lazy() imports above exactly so Vite
+  // reuses the same chunk.
+  const receiverChunksPreloadedRef = useRef(false);
+  useEffect(() => {
+    if (stage !== AppStage.PERSONAL_INTRO) return;
+    if (receiverChunksPreloadedRef.current) return;
+    receiverChunksPreloadedRef.current = true;
+    import('./components/MainExperience.tsx');
+    import('./components/SoulmateSync.tsx');
+  }, [stage]);
+
   const receiverOpenedBeaconSentRef = useRef(false);
   useEffect(() => {
     if (stage !== AppStage.QUESTION || !isReceiverLink || !experienceData || isDemoMode) {

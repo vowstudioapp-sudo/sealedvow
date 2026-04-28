@@ -335,6 +335,22 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
   /* ------------------------------------------------------------------ */
 
   return (
-    <div className="fixed inset-0 transition-opacity duration-1000 opacity-100" style={{ backgroundColor: cinematic.transitionFlash }} />
+    <>
+      <div
+        className="fixed inset-0 pointer-events-none animate-flash"
+        style={{ backgroundColor: cinematic.transitionFlash }}
+      />
+      <style>{`
+        @keyframes flashFade {
+          0%   { opacity: 0; }
+          12%  { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        .animate-flash {
+          opacity: 0;
+          animation: flashFade 1200ms ease-out forwards;
+        }
+      `}</style>
+    </>
   );
 };
