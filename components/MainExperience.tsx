@@ -808,10 +808,13 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
       {/* Exit Overlay — fullscreen popup with remaining content */}
       {showExitOverlay && (
-        <div 
+        <div
           className="fixed inset-0 z-[280] overflow-y-auto"
-          style={{ backgroundColor: theme.bg, opacity: cinematic.overlayOpacity, animation: 'exitIntentIn 0.8s ease-out both' }}
+          style={{ backgroundColor: theme.bg, opacity: cinematic.overlayOpacity }}
         >
+          {/* Container is opaque on mount (covers MainExperience instantly).
+              Inner content fades in so the cinematic feel is preserved. */}
+          <div style={{ animation: 'exitIntentIn 0.6s ease-out both' }}>
           {/* Close button */}
           <button
             onClick={() => setShowExitOverlay(false)}
@@ -956,6 +959,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 </>
               )}
             </div>
+          </div>
           </div>
         </div>
       )}
