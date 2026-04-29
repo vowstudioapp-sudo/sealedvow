@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Theme } from '../types';
 import { THEME_LABELS, THEME_ORDER, THEME_SYSTEM, UI_PALETTE } from '../theme/themeSystem';
 
@@ -31,17 +31,26 @@ export const PersonalIntro: React.FC<Props> = ({ recipientName, theme = 'obsidia
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
 
+  // Keep latest props accessible from the mount-only timer effect without
+  // causing it to re-run when parent re-renders pass new function/prop refs.
+  const onCompleteRef = useRef(onComplete);
+  const isDemoModeRef = useRef(isDemoMode);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+    isDemoModeRef.current = isDemoMode;
+  });
+
   useEffect(() => {
     const t1 = setTimeout(() => setShowName(true), 500);
     const t2 = setTimeout(() => setShowSubtitle(true), 1400);
 
-    if (isDemoMode) {
+    if (isDemoModeRef.current) {
       const t3 = setTimeout(() => setShowThemeSelector(true), 2000);
       return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
 
     const t3 = setTimeout(() => setFadeOut(true), 3800);
-    const t4 = setTimeout(() => onComplete(), 4400);
+    const t4 = setTimeout(() => onCompleteRef.current(), 4400);
 
     return () => {
       clearTimeout(t1);
@@ -49,7 +58,7 @@ export const PersonalIntro: React.FC<Props> = ({ recipientName, theme = 'obsidia
       clearTimeout(t3);
       clearTimeout(t4);
     };
-  }, [onComplete, isDemoMode]);
+  }, []);
 
   const handleContinue = () => {
     setFadeOut(true);
