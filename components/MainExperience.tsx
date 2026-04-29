@@ -810,7 +810,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       {showExitOverlay && (
         <div
           className="fixed inset-0 z-[280] overflow-y-auto"
-          style={{ backgroundColor: theme.bg, opacity: cinematic.overlayOpacity }}
+          style={{ backgroundColor: theme.bg }}
         >
           {/* Container is opaque on mount (covers MainExperience instantly).
               Inner content fades in so the cinematic feel is preserved. */}
