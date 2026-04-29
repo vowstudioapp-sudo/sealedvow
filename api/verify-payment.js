@@ -212,7 +212,7 @@ export default async function handler(req, res) {
 
       const senderSlug = slugify(sanitized.senderName || 'sender');
       const receiverSlug = slugify(sanitized.recipientName || 'receiver');
-      const shareSlug = `${senderSlug}-${receiverSlug}-${sessionKey}`;
+      const shareSlug = `${senderSlug}--${receiverSlug}--${sessionKey}`;
 
       console.log(`[Verify] ✓ FOUNDER ${sessionKey} | ${founderId}`);
 
@@ -294,7 +294,7 @@ export default async function handler(req, res) {
           verified: true,
           replay: true,
           sessionKey: existing.sessionKey,
-          shareSlug: `${s}-${r}-${existing.sessionKey}`,
+          shareSlug: `${s}--${r}--${existing.sessionKey}`,
           replyEnabled: existing.replyEnabled || false,
           paymentId: razorpay_payment_id,
         });
@@ -401,7 +401,7 @@ export default async function handler(req, res) {
     // 7. RETURN SHARE URL
     const senderSlug = slugify(sanitized.senderName || 'sender');
     const receiverSlug = slugify(sanitized.recipientName || 'receiver');
-    const shareSlug = `${senderSlug}-${receiverSlug}-${sessionKey}`;
+    const shareSlug = `${senderSlug}--${receiverSlug}--${sessionKey}`;
 
     console.log(`[Verify] ✓ ${sessionKey} | ${razorpay_payment_id}`);
 

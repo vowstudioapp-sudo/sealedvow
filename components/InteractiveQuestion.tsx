@@ -243,8 +243,8 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
         </p>
 
         <p 
-          className="mb-16 text-[10px] uppercase tracking-[0.3em]"
-          style={{ color: `rgba(${tc.goldRgb}, 0.6)` }}
+          className="mb-16 text-[12px] uppercase tracking-[0.2em] font-medium"
+          style={{ color: `rgba(${tc.goldRgb}, 0.85)` }}
         >
           {openingLine}
         </p>

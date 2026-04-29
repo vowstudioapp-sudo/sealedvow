@@ -995,29 +995,11 @@ const App: React.FC = () => {
         }`}>
           {isReceiverLink &&
             linkState === LoaderState.LOADING &&
-            !experienceData &&
-            (pathRecipientTitleHint ? (
-              <div className="min-h-screen flex flex-col items-center justify-center px-8 text-[#E5D0A1]">
-                <h1
-                  className="text-center leading-tight"
-                  style={{
-                    fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
-                    fontStyle: 'italic',
-                    fontSize: 'clamp(2rem, 8vw, 4rem)',
-                    color: '#E5D0A1',
-                  }}
-                >
-                  {pathRecipientTitleHint}
-                </h1>
-                <p className="mt-6 text-[11px] uppercase tracking-[0.35em] text-[#E5D0A1]/55">
-                  Don't rush this.
-                </p>
-              </div>
-            ) : (
+            !experienceData && (
               <div className="min-h-screen flex items-center justify-center text-[#E5D0A1] text-sm uppercase tracking-[0.35em]">
-                Don't rush this.
+                Take a moment.
               </div>
-            ))}
+            )}
           
           {stage === AppStage.LANDING && !isReceiverLink && (
             <LandingPage onEnter={handleEnterStudio} />

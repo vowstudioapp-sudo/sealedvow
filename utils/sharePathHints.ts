@@ -15,26 +15,35 @@ export function extractSharePathSessionKey(pathname: string): string | null {
   return sessionKey;
 }
 
-/**
- * Share URLs are `${slugify(sender)}-${slugify(recipient)}-${sessionKey}`.
- * When the path has exactly three segments, the middle segment is the full
- * recipient slug (slugify collapses spaces to single hyphens within one name).
- */
 export function deriveRecipientTitleHintFromSharePath(pathname: string): string | null {
   const pathKey = normalizePathKey(pathname);
   if (!pathKey) return null;
-  const parts = pathKey.split('-');
-  if (parts.length !== 3) return null;
-  const sessionKey = parts[2];
-  if (!/^[a-z0-9]{8}$/i.test(sessionKey)) return null;
-  const recipientSlug = parts[1];
-  if (!recipientSlug) return null;
-  return recipientSlug
-    .split('-')
-    .map((w) =>
-      w.length === 0 ? w : w[0].toUpperCase() + w.slice(1).toLowerCase()
-    )
-    .join(' ');
+
+  // NEW FORMAT: deterministic parsing via '--' separator
+  if (pathKey.includes('--')) {
+    const parts = pathKey.split('--');
+    if (parts.length !== 3) return null;
+
+    const sessionKey = parts[2];
+    if (!/^[a-z0-9]{8}$/i.test(sessionKey)) return null;
+
+    const recipientSlug = parts[1];
+    if (!recipientSlug) return null;
+
+    return recipientSlug
+      .split('-')
+      .filter(Boolean)
+      .map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  // OLD FORMAT: single-hyphen separators with ambiguous name
+  // boundaries. Heuristic guessing risks displaying the wrong
+  // name. Return null intentionally — old URLs still LOAD via
+  // session key extraction (unaffected), but fall back to the
+  // contextless cold-load placeholder. Same experience old URLs
+  // had before this change.
+  return null;
 }
 
 function sessionCacheKey(sessionKey: string): string {
