@@ -996,8 +996,8 @@ const App: React.FC = () => {
           {isReceiverLink &&
             linkState === LoaderState.LOADING &&
             !experienceData && (
-              <div className="min-h-screen flex items-center justify-center text-[#E5D0A1] text-sm uppercase tracking-[0.35em]">
-                Take a moment.
+              <div className="min-h-screen flex items-center justify-center">
+                <span className="cold-load-text">Take a moment.</span>
               </div>
             )}
           

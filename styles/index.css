@@ -223,6 +223,36 @@
     - Replace with pure CSS grain later if external assets are banned
   */
   .film-grain { display: none; }
+
+  /* ================================================================
+     RECEIVER — COLD LOAD PLACEHOLDER
+     Single opacity fade-in; no motion, loop, or loading affordance.
+     ================================================================ */
+
+  .cold-load-text {
+    color: #E5D0A1;
+    font-size: 0.875rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+
+    opacity: 0;
+    animation: coldFadeIn 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  @media (min-width: 768px) {
+    .cold-load-text {
+      font-size: 1rem;
+    }
+  }
+
+  @keyframes coldFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 0.85;
+    }
+  }
   
   /* ================================================================
      ACCESSIBILITY (Always Last)
