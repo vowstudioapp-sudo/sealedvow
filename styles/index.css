@@ -236,7 +236,9 @@
     text-transform: uppercase;
 
     opacity: 0;
-    animation: coldFadeIn 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation:
+      coldFadeIn 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+      coldBreathing 5s ease-in-out 1.6s infinite;
   }
 
   @media (min-width: 768px) {
@@ -251,6 +253,15 @@
     }
     to {
       opacity: 0.85;
+    }
+  }
+
+  @keyframes coldBreathing {
+    0%, 100% {
+      opacity: 0.85;
+    }
+    50% {
+      opacity: 0.65;
     }
   }
   

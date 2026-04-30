@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'rea
 import { LandingPage } from './components/LandingPage.tsx';
 import { PreparationForm } from './components/PreparationForm';
 import { PersonalIntro } from './components/PersonalIntro';
+import { AtmosphericShell } from './components/AtmosphericShell';
 import { InteractiveQuestion } from './components/InteractiveQuestion';
 import AdminPanel from './components/AdminPanel';
 import ClaimPage from './components/ClaimPage';
@@ -996,9 +997,11 @@ const App: React.FC = () => {
           {isReceiverLink &&
             linkState === LoaderState.LOADING &&
             !experienceData && (
-              <div className="min-h-screen flex items-center justify-center">
-                <span className="cold-load-text">Take a moment.</span>
-              </div>
+              <AtmosphericShell surfaceTheme="obsidian">
+                <div className="min-h-screen flex items-center justify-center">
+                  <span className="cold-load-text">Take a moment.</span>
+                </div>
+              </AtmosphericShell>
             )}
           
           {stage === AppStage.LANDING && !isReceiverLink && (
