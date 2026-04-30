@@ -222,6 +222,7 @@
 @media (min-width: 768px) {
   .main-experience-polaroid {
     padding: 1.5rem;
+    max-width: 24rem; /* ~20% wider on desktop */
   }
 }
 
@@ -936,6 +937,50 @@ to { width: 2rem; }
 @keyframes kenBurns {
 0% { transform: scale(1) translate(0, 0); }
 100% { transform: scale(1.12) translate(-1.5%, -1%); }
+}
+
+/* --- Polaroid caption fade-in (opacity-only, no layout shift) --- */
+.polaroid-caption-fade {
+  opacity: 0;
+  transition: opacity 0.8s ease-out;
+}
+.polaroid-caption-fade--visible {
+  opacity: 1;
+}
+
+/* --- Chevron — bottom of section, appears after caption --- */
+.polaroid-chevron {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #E5D0A1;
+  font-size: 1.5rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.8s ease-out;
+  pointer-events: none;
+  z-index: 20;
+}
+.polaroid-chevron--visible {
+  opacity: 0.4;
+  animation: chevronPulse 2.4s ease-in-out infinite;
+}
+@keyframes chevronPulse {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.55; }
+}
+
+/* Reduced motion — collapse animations to instant */
+@media (prefers-reduced-motion: reduce) {
+  .polaroid-caption-fade,
+  .polaroid-chevron {
+    transition: none;
+  }
+  .polaroid-chevron--visible {
+    animation: none;
+    opacity: 0.4;
+  }
 }
 
 /* --- Exit intent overlay entrance --- */

@@ -12,7 +12,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { CoupleData, Coupon, Theme } from '../types';
-import { OCCASION_OPENING_LINES } from '@/content/occasionLines';
 import { experienceTheme, getCinematicLayer, THEME_SYSTEM, UI_PALETTE } from '../theme/themeSystem';
 import { PaperSurface } from './PaperSurface';
 import { LetterSection } from './experience/LetterSection';
@@ -58,6 +57,22 @@ function getYouTubeEmbedId(url: string): string | null {
   return null;
 }
 
+/** Format the polaroid caption for the receiver.
+ *  Pure integers get a "year(s) together" suffix; anything with non-digit
+ *  characters is shown verbatim; empty/zero values return null so the caller
+ *  can hide the block. */
+function formatCaption(raw?: string): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^\d+$/.test(trimmed)) {
+    const n = parseInt(trimmed, 10);
+    if (n === 0) return null;
+    return n === 1 ? '1 year together' : `${n} years together`;
+  }
+  return trimmed;
+}
+
 /* ------------------------------------------------------------------ */
 /* CONSTANTS                                                           */
 /* ------------------------------------------------------------------ */
@@ -85,6 +100,12 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const [locationCardHover, setLocationCardHover] = useState(false);
   const [demoConversionBtnHover, setDemoConversionBtnHover] = useState(false);
   const exitWhisperShownRef = useRef(false);
+
+  // Polaroid screen staggered reveal — caption at 1.5s, chevron at 3s
+  const [polaroidRevealed, setPolaroidRevealed] = useState({
+    caption: false,
+    chevron: false,
+  });
 
   // Exit intent — soft whisper when user tries to leave
   // Desktop: cursor moves to top of screen (desktop only)
@@ -204,11 +225,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const modalBackdropResolved = isLightMode ? 'rgba(28,25,23,0.4)' : themeTokens.modalBackdrop;
   const modalSurfaceResolved = isLightMode ? 'rgba(250,250,250,0.96)' : themeTokens.modalSurface;
   const modalCloseResolved = isLightMode ? 'rgba(44,40,40,0.55)' : themeTokens.modalClose;
-  const activeVideo = data.video?.url;
-  const hasVideo = !!activeVideo && data.videoSource !== 'none';
-  const openingLine =
-    OCCASION_OPENING_LINES[data.occasion] ||
-    OCCASION_OPENING_LINES.anniversary;
 
   // Derive sealed date once — validated and memoized
   const sealedDate = useMemo(() => {
@@ -223,7 +239,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   /* ------------------------------------------------------------------ */
 
   const sectionCount = useMemo(() => {
-    let count = 2; // Hero + Letter always present
+    let count = 1; // Letter always present
     if (data.userImageUrl) count++;
     if (data.memoryBoard?.length) count++;
     if (data.sacredLocation) count++;
@@ -242,6 +258,24 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     isPreview,
     locationUnlocked,
   ]);
+
+  /* ------------------------------------------------------------------ */
+  /* EFFECT: Polaroid staggered reveal                                  */
+  /* ------------------------------------------------------------------ */
+
+  useEffect(() => {
+    if (!data.userImageUrl) return;
+    const captionTimer = setTimeout(() => {
+      setPolaroidRevealed(prev => ({ ...prev, caption: true }));
+    }, 1500);
+    const chevronTimer = setTimeout(() => {
+      setPolaroidRevealed(prev => ({ ...prev, chevron: true }));
+    }, 3000);
+    return () => {
+      clearTimeout(captionTimer);
+      clearTimeout(chevronTimer);
+    };
+  }, [data.userImageUrl]);
 
   /* ------------------------------------------------------------------ */
   /* EFFECT: Scroll Observer                                            */
@@ -344,36 +378,10 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
         ))}
       </div>
 
-      {/* SECTION: Hero */}
-      <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center text-center p-8 snap-start overflow-hidden">
-        {hasVideo && (
-          <div className="main-experience-video-bg">
-            <video 
-              src={activeVideo} 
-              autoPlay 
-              loop 
-              muted 
-              playsInline 
-              className="main-experience-video"
-            />
-            <div className="main-experience-video-overlay" />
-          </div>
-        )}
-        
-        <div className="main-experience-hero-card">
-          <div className="main-experience-hero-card-inner" />
-          <div className="main-experience-hero-content">
-            <span className="main-experience-hero-icon">✦</span>
-            <p className="main-experience-hero-occasion">{openingLine}</p>
-          </div>
-          <h1 className="main-experience-hero-title">
-            "{data.myth || (data.timeShared ? `${data.timeShared}. One story.` : 'Two souls, one timeline.')}"
-          </h1>
-        </div>
-      </section>
-
       {/* SECTION: Image */}
-      {data.userImageUrl && (
+      {data.userImageUrl && (() => {
+        const formattedCaption = formatCaption(data.timeShared);
+        return (
         <PaperSurface
           theme={data.theme || 'obsidian'}
           as="section"
@@ -384,23 +392,47 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           </div>
           <div className="main-experience-polaroid">
             <div className="main-experience-polaroid-img">
-              <img 
+              <img
                 src={data.userImageUrl}
                 className="w-full h-full object-cover"
                 style={{ animation: 'kenBurns 12s ease-in-out infinite alternate', willChange: 'transform' }}
                 loading="lazy"
-                alt="Memory" 
+                alt="Memory"
               />
               <div className="main-experience-polaroid-texture" />
             </div>
-            <div className="main-experience-polaroid-caption">
-              <p className="font-serif-elegant italic text-2xl mb-2" style={{ color: read.primary }}>{data.timeShared}</p>
-              <div className="w-8 h-px mx-auto my-3" style={{ backgroundColor: read.secondary }} />
-              <p className="text-[8px] uppercase tracking-[0.4em]" style={{ color: read.muted }}>Time Dilation</p>
-            </div>
+            {formattedCaption && (
+              <div
+                className={`main-experience-polaroid-caption polaroid-caption-fade ${polaroidRevealed.caption ? 'polaroid-caption-fade--visible' : ''}`}
+              >
+                <p className="font-serif-elegant italic text-2xl mb-2" style={{ color: read.primary }}>{formattedCaption}</p>
+                <div className="w-8 h-px mx-auto my-3" style={{ backgroundColor: read.secondary }} />
+                <p className="text-[8px] uppercase tracking-[0.4em]" style={{ color: read.muted }}>Time Dilation</p>
+              </div>
+            )}
+          </div>
+
+          {/* Subtle scroll cue — appears at 3s, anchored to section */}
+          <div
+            className={`polaroid-chevron ${polaroidRevealed.chevron ? 'polaroid-chevron--visible' : ''}`}
+            aria-hidden="true"
+          >
+            ↓
           </div>
         </PaperSurface>
-      )}
+        );
+      })()}
+
+      {/* SECTION: Letter (emotional peak — comes early) */}
+      <LetterSection
+        finalLetter={data.finalLetter || ''}
+        senderName={data.senderName}
+        audioUrl={data.audio?.url}
+        theme={theme}
+        readability={read}
+        surfaceTheme={data.theme || 'obsidian'}
+        activeSection={activeSection}
+      />
 
       {/* SECTION: YouTube Video (soundtrack rendered as embedded player) */}
       {data.musicType === 'youtube' && data.musicUrl && isYouTubeLink(data.musicUrl) && (
@@ -445,17 +477,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           </div>
         </PaperSurface>
       )}
-
-      {/* SECTION: Letter (emotional peak — comes early) */}
-      <LetterSection
-        finalLetter={data.finalLetter || ''}
-        senderName={data.senderName}
-        audioUrl={data.audio?.url}
-        theme={theme}
-        readability={read}
-        surfaceTheme={data.theme || 'obsidian'}
-        activeSection={activeSection}
-      />
 
       {/* SECTION: Memory Board (warm decompression after letter) */}
       {data.memoryBoard && data.memoryBoard.length >= 1 && (
