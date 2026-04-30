@@ -8,12 +8,12 @@
  * Extracted from MainExperience.tsx — zero logic changes.
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Theme } from '../../types';
 import { useAudioNarration } from '../../hooks/useAudioNarration';
 import { AtmosphericShell } from '../AtmosphericShell';
 
-const MAX_PARAGRAPH_CHARS = 180;
+const MAX_PARAGRAPH_CHARS = 600;
 
 export type LetterReadability = {
   primary: string;
@@ -45,6 +45,7 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
   activeSection,
 }) => {
   const [currentParagraph, setCurrentParagraph] = useState(0);
+  const [showFinalChevron, setShowFinalChevron] = useState(false);
   const { audioBuffer, isVoicePlaying, toggleVoiceNote } = useAudioNarration(finalLetter, audioUrl);
 
   /* ── Letter Paragraphs (Memoized Chunking) ── */
@@ -78,11 +79,15 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
     if (currentParagraph < letterParagraphs.length - 1) {
       setCurrentParagraph(prev => prev + 1);
     } else {
-      // At last paragraph — scroll to next snap section
-      const currentSectionEl = document.querySelector(`[data-section="${activeSection}"]`);
-      const nextSectionEl = currentSectionEl?.nextElementSibling as HTMLElement;
-      if (nextSectionEl && nextSectionEl.classList.contains('snap-section')) {
-        nextSectionEl.scrollIntoView({ behavior: 'smooth' });
+      // Use index-based navigation that matches MainExperience's
+      // IntersectionObserver selector (document.querySelectorAll('.snap-section')).
+      // nextElementSibling fails because LetterSection's <section> is
+      // wrapped in AtmosphericShell, so it's not a sibling of the
+      // next experience section in the scroll container.
+      const allSections = document.querySelectorAll('.snap-section');
+      const nextIndex = activeSection + 1;
+      if (nextIndex < allSections.length && allSections[nextIndex]) {
+        allSections[nextIndex].scrollIntoView({ behavior: 'smooth' });
       }
     }
   }, [currentParagraph, letterParagraphs.length, activeSection]);
@@ -91,13 +96,41 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
     setCurrentParagraph(0);
   }, []);
 
+  const goBack = useCallback(() => {
+    if (currentParagraph > 0) {
+      setCurrentParagraph(prev => prev - 1);
+    }
+  }, [currentParagraph]);
+
+  // Final page scroll cue.
+  // Appears 3800ms after entering the final page — comfortable
+  // breathing pause after all signature animations have settled
+  // (signature: 2.5s, divider: 3.0s, voice: 3.4s when present).
+  // Resets when user goes back; re-fires when re-entering final page.
+  useEffect(() => {
+    const isLastPage = currentParagraph === letterParagraphs.length - 1;
+
+    if (!isLastPage) {
+      setShowFinalChevron(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setShowFinalChevron(true);
+    }, 3800);
+
+    return () => clearTimeout(timer);
+  }, [currentParagraph, letterParagraphs.length]);
+
   /* ── Render ── */
   return (
     <AtmosphericShell surfaceTheme={surfaceTheme}>
-      <section className="snap-section h-screen w-full relative flex flex-col items-center justify-center snap-start p-4 md:p-8">
+      <section
+        className="snap-section h-screen w-full relative flex flex-col items-center justify-center snap-start p-4 md:p-8"
+        onClick={advanceParagraph}
+      >
       <div
         className="main-experience-letter-card"
-        onClick={advanceParagraph}
         style={
           {
             ['--sv-letter-read-primary']: read.primary,
@@ -150,7 +183,10 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
               {audioBuffer && (
                 <div style={{ animation: 'closureReveal 0.8s ease-out 2.6s both' }}>
                   <button
-                    onClick={toggleVoiceNote}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleVoiceNote();
+                    }}
                     className={`main-experience-voice-button ${isVoicePlaying ? 'main-experience-voice-button--playing' : ''}`}
                   >
                     <div className={`main-experience-voice-icon ${isVoicePlaying ? 'main-experience-voice-icon--playing' : ''}`}>
@@ -173,17 +209,66 @@ export const LetterSection: React.FC<LetterSectionProps> = ({
             </div>
           )}
 
-          {currentParagraph < letterParagraphs.length - 1 && (
-            <div className="mt-12 animate-pulse text-[11px] uppercase tracking-widest" style={{ color: read.secondary }}>
-              Tap to continue
+          {letterParagraphs.length > 1 && (
+            <div className="mt-12 w-full flex flex-col items-center gap-3">
+              <div
+                className="w-full max-w-xs flex items-center justify-between text-[10px] uppercase tracking-[0.4em]"
+                style={{ color: read.muted, opacity: 0.7 }}
+              >
+                <div className="min-w-[60px] text-left">
+                  {currentParagraph > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        goBack();
+                      }}
+                      className="opacity-70 hover:opacity-100 transition-opacity"
+                    >
+                      ← Back
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  {currentParagraph + 1} / {letterParagraphs.length}
+                </div>
+
+                <div className="min-w-[60px]" />
+              </div>
+
+              {currentParagraph < letterParagraphs.length - 1 && (
+                <div
+                  className="animate-pulse text-[11px] uppercase tracking-widest"
+                  style={{ color: read.secondary }}
+                >
+                  Tap to continue
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
+      {/* Subtle scroll cue — appears 3.8s after entering final page */}
+      {currentParagraph === letterParagraphs.length - 1 && showFinalChevron && (
+        <div
+          className="polaroid-chevron polaroid-chevron--visible"
+          onClick={(e) => {
+            e.stopPropagation();
+            advanceParagraph();
+          }}
+          aria-hidden="true"
+        >
+          ↓
+        </div>
+      )}
+
       {currentParagraph === letterParagraphs.length - 1 && (
         <button
-          onClick={resetParagraph}
+          onClick={(e) => {
+            e.stopPropagation();
+            resetParagraph();
+          }}
           className="absolute top-10 right-10 text-[11px] uppercase tracking-widest transition-opacity hover:opacity-100 pb-1 z-20"
           style={{ color: read.muted, opacity: 0.85, borderBottomWidth: 1, borderBottomStyle: 'solid', borderColor: read.muted }}
         >

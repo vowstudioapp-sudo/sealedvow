@@ -415,6 +415,13 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           {/* Subtle scroll cue — appears at 3s, anchored to section */}
           <div
             className={`polaroid-chevron ${polaroidRevealed.chevron ? 'polaroid-chevron--visible' : ''}`}
+            onClick={() => {
+              const allSections = document.querySelectorAll('.snap-section');
+              const nextIndex = activeSection + 1;
+              if (nextIndex < allSections.length && allSections[nextIndex]) {
+                allSections[nextIndex].scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
             aria-hidden="true"
           >
             ↓
