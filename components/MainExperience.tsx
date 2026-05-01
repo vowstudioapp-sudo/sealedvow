@@ -107,6 +107,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     chevron: false,
   });
 
+  const [soundtrackIndex, setSoundtrackIndex] = useState<number | null>(null);
+  const [soundtrackHasBeenActive, setSoundtrackHasBeenActive] = useState(false);
+
   // Exit intent — soft whisper when user tries to leave
   // Desktop: cursor moves to top of screen (desktop only)
   // Mobile: user reaches last section + stays there for 2.5s
@@ -314,6 +317,31 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     };
   }, [sectionCount]);
 
+  useEffect(() => {
+    const marker = document.querySelector('[data-section-type="soundtrack"]');
+    if (!marker) {
+      setSoundtrackIndex(null);
+      setSoundtrackHasBeenActive(false);
+      return;
+    }
+    const snap = marker.closest('.snap-section');
+    if (!snap) return;
+    const raw = snap.getAttribute('data-section');
+    if (raw == null) return;
+    const index = Number(raw);
+    if (!isNaN(index)) {
+      setSoundtrackIndex(index);
+    }
+  }, [data.musicType, data.musicUrl, sectionCount]);
+
+  useEffect(() => {
+    if (soundtrackHasBeenActive) return;
+    if (soundtrackIndex === null) return;
+    if (activeSection === soundtrackIndex) {
+      setSoundtrackHasBeenActive(true);
+    }
+  }, [activeSection, soundtrackIndex, soundtrackHasBeenActive]);
+
   /* ------------------------------------------------------------------ */
   /* HANDLERS                                                            */
   /* ------------------------------------------------------------------ */
@@ -448,19 +476,22 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           as="section"
           className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-4 md:px-8"
         >
-          <div className="text-center w-full max-w-2xl mx-auto">
-            <p 
-              className="text-[9px] uppercase tracking-[0.5em] font-bold mb-6"
-              style={{ color: theme.gold, opacity: 0.5, animation: 'closureReveal 0.8s ease-out both' }}
-            >
-              A Soundtrack For You
-            </p>
-
-            <div 
+          <div
+            data-section-type="soundtrack"
+            className="w-full flex flex-col items-center justify-center min-h-0"
+          >
+          <div
+            className="text-center w-full max-w-2xl mx-auto"
+            style={{
+              opacity: soundtrackHasBeenActive ? 1 : 0,
+              transform: soundtrackHasBeenActive ? 'translateY(0px)' : 'translateY(16px)',
+              transition: 'opacity 500ms ease-out, transform 500ms ease-out',
+            }}
+          >
+            <div
               className="w-full rounded-xl overflow-hidden shadow-2xl"
-              style={{ 
+              style={{
                 border: `1px solid ${theme.gold}20`,
-                animation: 'closureReveal 1s ease-out 0.3s both',
               }}
             >
               <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
@@ -472,15 +503,46 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                   className="absolute inset-0 w-full h-full"
                   style={{ border: 'none' }}
                 />
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: `
+                      radial-gradient(circle at center,
+                        rgba(0,0,0,0.0) 0%,
+                        rgba(0,0,0,0.12) 60%,
+                        rgba(0,0,0,0.28) 100%
+                      ),
+                      linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.20) 100%)
+                    `,
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                  }}
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute top-0 left-0 w-full"
+                  style={{
+                    height: '60px',
+                    background: 'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.0) 100%)',
+                    pointerEvents: 'none',
+                    zIndex: 2,
+                  }}
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute bottom-0 right-0"
+                  style={{
+                    width: '140px',
+                    height: '80px',
+                    background: 'radial-gradient(ellipse at bottom right, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 100%)',
+                    pointerEvents: 'none',
+                    zIndex: 2,
+                  }}
+                  aria-hidden="true"
+                />
               </div>
             </div>
-
-            <p 
-              className="mt-6 text-[8px] uppercase tracking-[0.3em]"
-              style={{ color: read.muted, animation: 'closureReveal 0.8s ease-out 0.8s both' }}
-            >
-              Press play
-            </p>
+          </div>
           </div>
         </PaperSurface>
       )}
