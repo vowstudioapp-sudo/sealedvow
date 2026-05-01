@@ -228,7 +228,7 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
     const crackOpacity = Math.min(progress * 1.5, 1);
 
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center select-none" style={{ backgroundColor: tc.bg }}>
+      <div className="fixed inset-0 flex flex-col items-center justify-center select-none px-6" style={{ backgroundColor: tc.bg }}>
         <p
           className="mb-4"
           style={{
@@ -243,7 +243,7 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
         </p>
 
         <p 
-          className="mb-16 text-[12px] uppercase tracking-[0.2em] font-medium"
+          className="mb-16 text-[12px] uppercase tracking-[0.2em] font-medium text-center max-w-[90vw]"
           style={{ color: `rgba(${tc.goldRgb}, 0.85)` }}
         >
           {openingLine}
