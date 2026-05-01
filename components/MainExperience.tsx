@@ -94,12 +94,12 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   
   const [showReplyComposer, setShowReplyComposer] = useState(false);
   const [locationExpanded, setLocationExpanded] = useState(false);
-  const [showExitWhisper, setShowExitWhisper] = useState(false);
   const [showExitOverlay, setShowExitOverlay] = useState(false);
-  const [locationUnlocked, setLocationUnlocked] = useState(false);
+  const [hasReachedClosure, setHasReachedClosure] = useState(false);
+  const [closureRevealed, setClosureRevealed] = useState(false);
   const [locationCardHover, setLocationCardHover] = useState(false);
   const [demoConversionBtnHover, setDemoConversionBtnHover] = useState(false);
-  const exitWhisperShownRef = useRef(false);
+  const exitOverlayShownRef = useRef(false);
 
   // Polaroid screen staggered reveal — caption at 1.5s, chevron at 3s
   const [polaroidRevealed, setPolaroidRevealed] = useState({
@@ -110,102 +110,32 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const [soundtrackIndex, setSoundtrackIndex] = useState<number | null>(null);
   const [soundtrackHasBeenActive, setSoundtrackHasBeenActive] = useState(false);
 
-  // Exit intent — soft whisper when user tries to leave
-  // Desktop: cursor moves to top of screen (desktop only)
-  // Mobile: user reaches last section + stays there for 2.5s
-  // Visibility: only triggers at last section (not mid-flow)
-  // Preview: always allow trigger so sender sees the feature
-  const mobileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Precise last-section check — exact match, not greater-than
-  const atLastSection = useMemo(() => {
-    const lastIndex = sections.length - 1;
-    return lastIndex >= 0 && activeSection === lastIndex;
-  }, [activeSection, sections.length]);
+  // Exit intent — desktop only: cursor toward top-of-viewport leave (receiver, not preview).
+  const exitIntentDesktop = () => window.matchMedia('(min-width: 768px)').matches;
 
   useEffect(() => {
-    if (exitWhisperShownRef.current) return;
-
     const shouldTrigger = () => {
-      if (exitWhisperShownRef.current) return false;
-      // Preview: always allow
-      if (isPreview) return true;
-      // Only at the emotional end — last section or location gate
-      if (atLastSection) return true;
-      if (data.sacredLocation && !locationUnlocked) return true;
-      return false;
+      if (isPreview) return false;
+      if (exitOverlayShownRef.current) return false;
+      if (hasReachedClosure) return false;
+      return true;
     };
 
-    // Desktop only: cursor leaves viewport at top
-    const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+    if (!exitIntentDesktop()) return;
+
     const handleMouseLeave = (e: MouseEvent) => {
       if (e.clientY <= 5 && shouldTrigger()) {
-        exitWhisperShownRef.current = true;
-        setShowExitWhisper(true);
+        exitOverlayShownRef.current = true;
+        setShowExitOverlay(true);
       }
     };
 
-    // Both: tab switch / phone lock — only at last section
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden' && (atLastSection || (data.sacredLocation && !locationUnlocked) || isPreview)) {
-        if (exitWhisperShownRef.current) return;
-        exitWhisperShownRef.current = true;
-        const handleReturn = () => {
-          if (document.visibilityState === 'visible') {
-            setShowExitWhisper(true);
-            document.removeEventListener('visibilitychange', handleReturn);
-          }
-        };
-        document.addEventListener('visibilitychange', handleReturn);
-      }
-    };
-
-    if (isDesktop) {
-      document.addEventListener('mouseleave', handleMouseLeave);
-    }
-    document.addEventListener('visibilitychange', handleVisibility);
+    document.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
-      if (isDesktop) {
-        document.removeEventListener('mouseleave', handleMouseLeave);
-      }
-      document.removeEventListener('visibilitychange', handleVisibility);
+      document.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, [isPreview, atLastSection, locationUnlocked, data.sacredLocation]);
-
-  // Mobile: trigger whisper when user reaches last section AND stays there
-  useEffect(() => {
-    if (isPreview) return;
-    if (exitWhisperShownRef.current) return;
-    if (sections.length === 0) return;
-
-    const isMobile = window.matchMedia('(max-width: 767px)').matches;
-    if (!isMobile) return;
-
-    if (atLastSection) {
-      if (!mobileTimerRef.current) {
-        mobileTimerRef.current = setTimeout(() => {
-          if (!exitWhisperShownRef.current) {
-            exitWhisperShownRef.current = true;
-            setShowExitWhisper(true);
-          }
-          mobileTimerRef.current = null;
-        }, 2500);
-      }
-    } else {
-      if (mobileTimerRef.current) {
-        clearTimeout(mobileTimerRef.current);
-        mobileTimerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (mobileTimerRef.current) {
-        clearTimeout(mobileTimerRef.current);
-        mobileTimerRef.current = null;
-      }
-    };
-  }, [atLastSection, sections.length, isPreview]);
+  }, [isPreview, hasReachedClosure]);
 
 
   /* ------------------------------------------------------------------ */
@@ -242,24 +172,26 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   /* ------------------------------------------------------------------ */
 
   const sectionCount = useMemo(() => {
-    let count = 1; // Letter always present
+    let count = 1; // LetterSection — one .snap-section
     if (data.userImageUrl) count++;
-    if (data.memoryBoard?.length) count++;
+    if (data.musicType === 'youtube' && data.musicUrl && isYouTubeLink(data.musicUrl)) count++;
+    if (data.memoryBoard && data.memoryBoard.length >= 1) count++;
     if (data.sacredLocation) count++;
-    // Locked sections only count when unlocked (or no location to gate them)
-    const unlocked = !data.sacredLocation || locationUnlocked || isPreview;
-    if (unlocked && !isPreview && data.coupons?.length) count += 2; // divider + coupons
-    if (unlocked && !isPreview && data.hasGift) count++;
-    if (unlocked && !isPreview) count++; // final closure
+    if (!isPreview && coupons.length > 0) count += 2; // promise divider + PromiseStack (each own .snap-section)
+    if (!isPreview && data.hasGift) count++;
+    if (!isPreview) count++; // final closure (.snap-section wrapper)
+    if (isDemoMode && !isPreview) count++;
     return count;
   }, [
     data.userImageUrl,
+    data.musicType,
+    data.musicUrl,
     data.memoryBoard?.length,
     data.sacredLocation,
-    data.coupons?.length,
     data.hasGift,
+    coupons.length,
     isPreview,
-    locationUnlocked,
+    isDemoMode,
   ]);
 
   /* ------------------------------------------------------------------ */
@@ -301,6 +233,10 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             const index = Number(entry.target.getAttribute('data-section'));
             if (!isNaN(index)) {
               setActiveSection(index);
+            }
+            if (entry.target.getAttribute('data-section-type') === 'closure') {
+              setHasReachedClosure(true);
+              setClosureRevealed(true);
             }
           }
         });
@@ -577,15 +513,10 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             onMouseLeave={() => setLocationCardHover(false)}
             onClick={() => setLocationExpanded(true)}
           >
-            <div className="text-2xl mb-4 animate-bounce" style={{ color: theme.gold }}>📍</div>
-            <h3 className="text-[9px] uppercase tracking-[0.4em] font-bold mb-6" style={{ color: theme.gold, opacity: 0.8 }}>Cosmic Coordinate</h3>
-            <h2 className="font-serif-elegant italic text-3xl mb-6 leading-tight" style={{ color: read.primary }}>{data.sacredLocation.placeName}</h2>
-            <div className="w-12 h-px mx-auto mb-6" style={{ backgroundColor: read.muted }} />
-            <p className="text-xs italic leading-relaxed mb-6 font-serif-elegant line-clamp-2" style={{ color: read.secondary }}>
-              "{data.sacredLocation.description}"
-            </p>
-            <div className="text-[8px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.5 }}>
-              Tap to explore →
+            <h3 className="text-[9px] uppercase tracking-[0.4em] font-bold mb-6" style={{ color: theme.gold, opacity: 0.8 }}>A place that matters</h3>
+            <h2 className="font-serif-elegant italic text-3xl mb-8 leading-tight" style={{ color: read.primary }}>{data.sacredLocation.placeName}</h2>
+            <div className="text-[9px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.6 }}>
+              Open
             </div>
           </div>
 
@@ -622,7 +553,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 </button>
 
                 <div className="text-3xl mb-6" style={{ color: theme.gold }}>📍</div>
-                <h3 className="text-[9px] uppercase tracking-[0.5em] font-bold mb-4" style={{ color: theme.gold, opacity: 0.8 }}>Cosmic Coordinate</h3>
+                <h3 className="text-[9px] uppercase tracking-[0.5em] font-bold mb-4" style={{ color: theme.gold, opacity: 0.8 }}>A place that matters</h3>
                 <h2 className="font-serif-elegant italic text-2xl md:text-3xl mb-6 leading-tight" style={{ color: read.primary }}>{data.sacredLocation.placeName}</h2>
                 
                 <div className="w-16 h-px mx-auto mb-8" style={{ backgroundColor: `${theme.gold}30` }} />
@@ -658,12 +589,10 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       )}
 
       {/* ================================================================ */}
-      {/* LINEAR FLOW: Divider → Promises → Gift → Closure → Reply      */}
-      {/* Gated behind location unlock if location exists.                */}
-      {/* If no location, sections render freely.                         */}
+      {/* LINEAR FLOW: Divider → Promises → Gift → Closure → Demo         */}
       {/* ================================================================ */}
 
-      {(!data.sacredLocation || locationUnlocked || isPreview) && (<>
+      <>
 
       {/* SECTION: Promise Divider */}
       {!isPreview && coupons.length > 0 && (
@@ -731,15 +660,23 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
       {/* SECTION: Final Closure — the one and only ending */}
       {!isPreview && (
+        <section
+          data-section-type="closure"
+          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-8"
+        >
         <PaperSurface
           theme={data.theme || 'obsidian'}
-          as="section"
-          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-8"
+          as="div"
+          className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-center"
         >
           <div className="text-center">
             <p 
               className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8"
-              style={{ color: theme.gold, opacity: 0.6, animation: 'closureReveal 1s ease-out both' }}
+              style={{
+                color: theme.gold,
+                opacity: closureRevealed ? 0.6 : 0,
+                animation: closureRevealed ? 'closureReveal 1s ease-out both' : undefined,
+              }}
             >
               Created for you. Only you.
             </p>
@@ -751,7 +688,8 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                 fontSize: 'clamp(1.2rem, 4vw, 2rem)',
                 color: read.primary,
                 lineHeight: 1.6,
-                animation: 'closureReveal 1.2s ease-out 0.4s both',
+                opacity: closureRevealed ? 1 : 0,
+                animation: closureRevealed ? 'closureReveal 1.2s ease-out 0.4s both' : undefined,
               }}
             >
               Sealed by {data.senderName}
@@ -760,7 +698,11 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             {sealedDate && (
               <p 
                 className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold"
-                style={{ color: theme.gold, opacity: 0.6, animation: 'closureReveal 1s ease-out 1s both' }}
+                style={{
+                  color: theme.gold,
+                  opacity: closureRevealed ? 0.6 : 0,
+                  animation: closureRevealed ? 'closureReveal 1s ease-out 1s both' : undefined,
+                }}
               >
                 {sealedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
                   + ' · '
@@ -769,6 +711,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             )}
           </div>
         </PaperSurface>
+        </section>
       )}
 
       {/* DEMO: Final Conversion Screen — the only CTA in the entire demo */}
@@ -825,7 +768,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
         </section>
       )}
 
-      </>)}
+      </>
 
       {/* Reply Composer — ceremonial single reply */}
       {showReplyComposer && (
@@ -836,220 +779,71 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
         />
       )}
 
-      {/* Exit Whisper — soft nudge, not a gate. Dismisses cleanly. */}
-      {showExitWhisper && (
-        <div 
-          className="fixed inset-0 z-[300] flex flex-col items-center justify-center select-none"
-          style={{ backgroundColor: theme.bg, opacity: cinematic.overlayOpacity, animation: 'exitIntentIn 0.6s ease-out both' }}
-        >
-          <p
-            style={{
-              fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
-              fontStyle: 'italic',
-              fontSize: 'clamp(1.2rem, 4vw, 2rem)',
-              color: read.primary,
-              lineHeight: 1.6,
-              animation: 'closureReveal 0.8s ease-out 0.3s both',
-            }}
-          >
-            Before you go...
-          </p>
-
-          <div 
-            className="h-px mx-auto my-6 w-12"
-            style={{ backgroundColor: theme.gold, opacity: 0.2, animation: 'closureLine 0.6s ease-out 0.8s both' }}
-          />
-
-          <p 
-            className="text-[10px] tracking-[0.15em] font-serif-elegant italic"
-            style={{ color: read.secondary, animation: 'closureReveal 0.8s ease-out 1.2s both' }}
-          >
-            {isPreview ? 'This is what your receiver will see when they try to leave' : `${data.senderName} left something more for you`}
-          </p>
-
-          <button
-            onClick={() => {
-              setShowExitWhisper(false);
-              setShowExitOverlay(true);
-            }}
-            className="mt-10 px-8 py-3 border transition-all duration-300"
-            style={{ 
-              animation: 'closureReveal 0.8s ease-out 1.8s both',
-              fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
-              fontStyle: 'italic',
-              fontSize: 'clamp(0.85rem, 2.5vw, 1rem)',
-              letterSpacing: '0.1em',
-              borderColor: theme.gold + '44',
-              color: read.primary,
-            }}
-          >
-            Reveal it
-          </button>
-
-          <button
-            onClick={() => setShowExitWhisper(false)}
-            className="mt-4 text-[8px] uppercase tracking-[0.4em] transition-colors"
-            style={{ color: read.muted, animation: 'closureReveal 0.6s ease-out 2.2s both' }}
-          >
-            Maybe later
-          </button>
-        </div>
-      )}
-
-      {/* Exit Overlay — fullscreen popup with remaining content */}
+      {/* Exit Overlay — scroll nudge (no duplicated content) */}
       {showExitOverlay && (
         <div
-          className="fixed inset-0 z-[280] overflow-y-auto"
-          style={{ backgroundColor: theme.bg }}
+          className="fixed inset-0 z-[200] flex items-center justify-center p-6"
+          style={{
+            background: 'rgba(0, 0, 0, 0.85)',
+            animation: 'fadeIn 0.3s ease',
+          }}
+          onClick={() => setShowExitOverlay(false)}
         >
-          {/* Container is opaque on mount (covers MainExperience instantly).
-              Inner content fades in so the cinematic feel is preserved. */}
-          <div style={{ animation: 'exitIntentIn 0.6s ease-out both' }}>
-          {/* Close button */}
-          <button
-            onClick={() => setShowExitOverlay(false)}
-            className="fixed top-6 right-6 z-[290] text-xs uppercase tracking-widest transition-colors"
-            style={{ color: read.muted }}
+          <div
+            className="relative max-w-md mx-auto text-center px-8 py-12 rounded-2xl"
+            style={{
+              background: theme.bg,
+              border: `1px solid ${theme.gold}33`,
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+              animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
           >
-            ✕
-          </button>
+            <button
+              type="button"
+              onClick={() => setShowExitOverlay(false)}
+              className="absolute top-2 right-2 text-2xl"
+              style={{ color: theme.text, opacity: 0.5 }}
+              aria-label="Close"
+            >
+              ✕
+            </button>
 
-          {/* Promises */}
-          {coupons.length > 0 && (
-            <>
-              <div className="min-h-screen w-full flex flex-col items-center justify-center px-8" style={{ backgroundColor: theme.bg }}>
-                <p
-                  style={{
-                    fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
-                    fontStyle: 'italic',
-                    fontSize: 'clamp(1.2rem, 4vw, 2rem)',
-                    color: read.primary,
-                    lineHeight: 1.6,
-                  }}
-                >
-                  What I promise you.
-                </p>
-                <div className="h-px mx-auto mt-8 w-12" style={{ backgroundColor: theme.gold, opacity: 0.2 }} />
-              </div>
+            <p
+              className="text-sm uppercase tracking-[0.3em] mb-4"
+              style={{ color: theme.gold, opacity: 0.7 }}
+            >
+              Before you go
+            </p>
 
-              <div className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-20 relative" style={{ backgroundColor: theme.bg }}>
-                <PromiseStack
-                  coupons={coupons}
-                  currentCouponIndex={currentCouponIndex}
-                  onClaim={handleNextCoupon}
-                  theme={theme}
-                />
+            <h2
+              className="text-3xl md:text-4xl font-serif-elegant italic mb-6"
+              style={{ color: theme.text }}
+            >
+              {"There's more to see"}
+            </h2>
 
-                {/* Scroll hint */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center animate-pulse">
-                  <p className="text-[8px] uppercase tracking-[0.4em] mb-2" style={{ color: theme.gold, opacity: 0.6 }}>Scroll</p>
-                  <span className="text-xs" style={{ color: theme.gold, opacity: 0.6 }}>↓</span>
-                </div>
-              </div>
-            </>
-          )}
+            <p
+              className="text-base mb-8"
+              style={{ color: theme.text, opacity: 0.8 }}
+            >
+              Keep scrolling — the rest is waiting for you.
+            </p>
 
-          {/* Gift */}
-          {data.hasGift && (
-            <div className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-20" style={{ backgroundColor: theme.sectionBg }}>
-              <GiftReveal
-                isRevealed={isGiftRevealed}
-                onReveal={() => setIsGiftRevealed(true)}
-                giftTitle={data.giftTitle}
-                giftNote={data.giftNote}
-                giftLink={data.giftLink}
-                sessionId={data.sessionId}
-                theme={theme}
-              />
-            </div>
-          )}
-
-          {/* Closure + Reply */}
-          <div className="min-h-screen w-full flex flex-col items-center justify-center px-8 py-20" style={{ backgroundColor: theme.bg }}>
-            <div className="text-center">
-              {/* Seal block - only show for preview and demo, not for actual receivers (they have detailed version below) */}
-              {(isPreview && (onPayment || onEdit)) || isDemoMode ? (
-                <>
-                  <p className="text-[9px] uppercase tracking-[0.4em] font-bold mb-8" style={{ color: theme.gold, opacity: 0.6 }}>
-                    Created for you. Only you.
-                  </p>
-                  <p style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(1.2rem, 4vw, 2rem)', color: read.primary, lineHeight: 1.6 }}>
-                    Sealed by {data.senderName}
-                  </p>
-                  {sealedDate && (
-                    <p className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: theme.gold, opacity: 0.6 }}>
-                      {sealedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + sealedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                    </p>
-                  )}
-                  <div className="h-px mx-auto my-10" style={{ backgroundColor: theme.gold, opacity: 0.15 }} />
-                </>
-              ) : null}
-
-              {isPreview && (onPayment || onEdit) ? (
-                <>
-                  <p className="text-[10px] tracking-[0.12em] font-serif-elegant italic mb-3" style={{ color: read.secondary }}>
-                    {data.replyEnabled 
-                      ? `If ${data.recipientName || 'your receiver'} feels moved, they can seal a reply back to you right here.`
-                      : `${data.recipientName || 'Your receiver'} will see an option to create their own Sealed Vow for you.`
-                    }
-                  </p>
-                  <div className="inline-block px-8 py-3 border cursor-default" style={{ fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif', fontStyle: 'italic', fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)', letterSpacing: '0.1em', borderColor: theme.gold + '66', color: read.secondary }}>
-                    {data.replyEnabled ? 'Seal a reply' : `Seal something back for ${data.senderName}`}
-                  </div>
-                  <p className="mt-3 text-[8px] uppercase tracking-[0.3em]" style={{ color: read.muted }}>
-                    ↑ This is what your receiver will see
-                  </p>
-                </>
-              ) : isDemoMode ? (
-                <>
-                  <div className="text-center mt-2">
-                    <p className="text-[11px] italic font-serif-elegant mb-8 leading-relaxed" style={{ color: read.secondary }}>
-                      If this reminded you of someone — don't scroll away.
-                    </p>
-                    <a
-                      href="/create"
-                      className="inline-block px-14 py-5 rounded-full font-bold text-[11px] tracking-[0.4em] uppercase transition-all duration-300 active:scale-[0.98]"
-                      style={{
-                        backgroundColor: themeTokens.seal,
-                        color: UI_PALETTE.onVividFill,
-                        boxShadow: `0 10px 30px rgba(${themeTokens.sealRgb},${(0.4 * cinematic.glowStrength).toFixed(2)})`,
-                      }}
-                    >
-                      Create Your Own
-                    </a>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="text-center mt-4">
-                    <p className="text-[8px] uppercase tracking-[0.3em] mb-3" style={{ color: theme.gold, opacity: 0.6 }}>
-                      Created for you. Only you.
-                    </p>
-                    <p
-                      className="font-serif-elegant italic mb-6"
-                      style={{
-                        fontSize: 'clamp(1rem, 3vw, 1.4rem)',
-                        color: read.muted,
-                      }}
-                    >
-                      Sealed by {data.senderName}
-                    </p>
-                    {sealedDate && (
-                      <div style={{ color: theme.gold, opacity: 0.2 }}>
-                        <p className="text-[8px] uppercase tracking-[0.3em] mb-1">Sealed on</p>
-                        <p className="text-[10px] font-bold tracking-[0.15em]">
-                          {sealedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                        </p>
-                        <p className="text-[9px] tracking-[0.1em] mt-0.5">
-                          {sealedDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} IST
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowExitOverlay(false);
+              }}
+              className="px-8 py-3 border rounded-full transition-all hover:scale-[1.02]"
+              style={{
+                borderColor: theme.gold,
+                color: theme.gold,
+                background: 'transparent',
+              }}
+            >
+              {"Let's continue"}
+            </button>
           </div>
         </div>
       )}
@@ -1058,7 +852,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       {isPreview && (onPayment || onEdit) && (
         <>
           {/* Exit intent hint — fixed top banner */}
-          {!showExitOverlay && !showExitWhisper && !exitWhisperShownRef.current && (
+          {!showExitOverlay && !exitOverlayShownRef.current && (
             <div className="fixed top-0 left-0 right-0 z-[400] text-center py-3 px-4" style={{ backgroundColor: theme.bg + 'ee', borderBottom: `1px solid ${theme.gold}15` }}>
               <p className="text-[11px] font-serif-elegant italic" style={{ color: theme.gold, opacity: 0.7 }}>
                 ✨ Move your cursor toward the close button — see what your receiver experiences when they try to leave

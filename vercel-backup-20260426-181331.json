@@ -1,0 +1,43 @@
+{
+  "framework": "vite",
+  "buildCommand": "vite build",
+  "devCommand": "vite --port $PORT",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/@vite/(.*)", "destination": "/@vite/$1" },
+    { "source": "/@react-refresh", "destination": "/@react-refresh" },
+    { "source": "/@fs/(.*)", "destination": "/@fs/$1" },
+    { "source": "/__vite_ping", "destination": "/__vite_ping" },
+    { "source": "/src/(.*)", "destination": "/src/$1" },
+    { "source": "/node_modules/(.*)", "destination": "/node_modules/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/ai.js": {
+      "maxDuration": 60
+    },
+    "api/generate-eid-letter.js": {
+      "maxDuration": 60
+    },
+    "api/create-order.js": {
+      "maxDuration": 30
+    },
+    "api/verify-payment.js": {
+      "maxDuration": 30
+    },
+    "api/admin-generate-founder-codes.js": {
+      "maxDuration": 30
+    },
+    "api/load-session.js": {
+      "maxDuration": 10
+    },
+    "api/save-reply.js": {
+      "maxDuration": 10
+    },
+    "api/upload-media.js": {
+      "maxDuration": 30
+    }
+  }
+}

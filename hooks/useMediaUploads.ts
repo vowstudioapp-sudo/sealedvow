@@ -225,13 +225,36 @@ export function useMediaUploads({
         setUploadProgress(50 + Math.round(((i + 1) / compressedFiles.length) * 50));
       }
 
-      const newPhotos: MemoryPhoto[] = urls.map(url => ({
-        url,
-        caption: '',
-        angle: Math.random() * 20 - 10,
-        xOffset: Math.random() * 40 - 20,
-        yOffset: Math.random() * 40 - 20,
-      }));
+      const newPhotos: MemoryPhoto[] = urls.map((url, i) => {
+        const total = urls.length || 1;
+
+        // Distribute photos across width (left → right)
+        const indexFactor = total === 1 ? 0.5 : i / (total - 1); // 0 → 1
+
+        const spreadX = 80; // target range ±80px
+        const spreadY = 60; // target range ±60px
+
+        // Base structured position (ensures full horizontal coverage)
+        const baseX = (indexFactor - 0.5) * spreadX * 2;
+
+        // Add organic randomness (prevents rigid grid feel)
+        const jitterX = (Math.random() - 0.5) * 40;
+        const jitterY = (Math.random() - 0.5) * spreadY * 2;
+
+        const xOffset = baseX + jitterX;
+        const yOffset = jitterY;
+
+        // Controlled rotation (subtle, not chaotic)
+        const angle = (Math.random() - 0.5) * 20;
+
+        return {
+          url,
+          caption: '',
+          angle,
+          xOffset,
+          yOffset,
+        };
+      });
 
       updateData(prev => ({
         memoryBoard: [...(prev.memoryBoard ?? []), ...newPhotos],
