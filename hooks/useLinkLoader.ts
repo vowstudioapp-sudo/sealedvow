@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { LoaderState } from './useSharedLinkLoader';
-import type { SharedLinkLoaderResult } from './useSharedLinkLoader';
-import { useSharedLinkLoader } from './useSharedLinkLoader';
+import { LoaderState } from './linkLoaderTypes';
+import type { SharedLinkLoaderResult } from './linkLoaderTypes';
 import { usePathLinkLoader } from './usePathLinkLoader';
 
 /**
@@ -10,7 +9,6 @@ import { usePathLinkLoader } from './usePathLinkLoader';
  * "/" → false (homepage, creation mode)
  * "/ajmal-saniya-k8f2x9m1" → true (receiver link — single path segment)
  * "/letter/create" → false (creator route — multiple segments)
- * "/#p=..." → false (old hash link, handled by useSharedLinkLoader)
  */
 function detectPathKey(): boolean {
   const pathname = window.location.pathname;
@@ -26,27 +24,15 @@ function detectPathKey(): boolean {
 
 /**
  * useLinkLoader
- * 
+ *
  * Unified entry point for loading shared sessions.
- * Delegates to path-based loader (new clean URLs) or hash-based loader (legacy).
- * 
+ * Path mode → fetch session via path key. Otherwise → creator/no-link mode.
+ *
  * Detection runs once via useState initializer (not module scope).
- * Both hooks always execute (React rules). Only one is active.
- * Path takes absolute priority.
  */
 export function useLinkLoader(): SharedLinkLoaderResult {
-  // Computed once on first render. Stable across re-renders.
   const [pathMode] = useState<boolean>(() => detectPathKey());
-
-  // Both hooks always execute. Only the active one does work.
-  const pathResult = usePathLinkLoader(pathMode);
-  const hashResult = useSharedLinkLoader(!pathMode);
-
-  if (pathMode) {
-    return pathResult;
-  }
-
-  return hashResult;
+  return usePathLinkLoader(pathMode);
 }
 
 export { LoaderState };

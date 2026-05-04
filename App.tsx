@@ -231,6 +231,19 @@ const resolveStage = (state: StageResolverState): AppStage => {
 };
 
 const App: React.FC = () => {
+  // Legacy ?p=/#p= URLs are an obsolete client-side decode bypass. Redirect to /
+  // synchronously before any hooks initialize so no intermediate render occurs.
+  // window.location.replace tears down this render entirely — hooks below will
+  // run on the fresh page load, preserving the rules of hooks.
+  if (typeof window !== 'undefined') {
+    const hasLegacyQuery = new URLSearchParams(window.location.search).has('p');
+    const hasLegacyHash = /[#&]p=/.test(window.location.hash);
+    if (hasLegacyQuery || hasLegacyHash) {
+      window.location.replace('/');
+      return null;
+    }
+  }
+
   const {
     state: linkState,
     data: sharedData,

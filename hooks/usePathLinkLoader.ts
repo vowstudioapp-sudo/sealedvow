@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
-import { LoaderState } from './useSharedLinkLoader';
-import type { LoaderError, SharedLinkLoaderResult } from './useSharedLinkLoader';
+import { LoaderState } from './linkLoaderTypes';
+import type { LoaderError, SharedLinkLoaderResult } from './linkLoaderTypes';
 import {
   extractSharePathSessionKey,
   deriveRecipientTitleHintFromSharePath,
