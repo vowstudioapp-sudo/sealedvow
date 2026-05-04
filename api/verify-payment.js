@@ -280,28 +280,103 @@ export default async function handler(req, res) {
       return res.status(400).json({ verified: false, error: 'Payment verification failed.' });
     }
 
-    // 2. REPLAY PROTECTION
-    // Echoes the original replyEnabled value stored on the previous payment
-    // so legacy replays (pre-single-price) return the value their sender
-    // actually paid for.
+    // 2. ATOMIC CLAIM ON payments/{paymentId}
+    // Prevents duplicate sessions on retry/double-submit. Mirrors the
+    // founder-token pattern at lines 128-149.
+    let claimMarker = 0;
+    let existingRecord = null;
+
+    const paymentRef = adminDb.ref('payments/' + razorpay_payment_id);
+
     try {
-      const existingSnap = await adminDb.ref('payments/' + razorpay_payment_id).once('value');
-      const existing = existingSnap.val();
-      if (existing && existing.sessionKey) {
-        const s = slugify(coupleData.senderName || 'sender');
-        const r = slugify(coupleData.recipientName || 'receiver');
-        return res.status(200).json({
-          verified: true,
-          replay: true,
-          sessionKey: existing.sessionKey,
-          shareSlug: `${s}--${r}--${existing.sessionKey}`,
-          replyEnabled: existing.replyEnabled || false,
+      const claimResult = await paymentRef.transaction(current => {
+        if (current !== null) {
+          // Already claimed — capture for replay return path below
+          existingRecord = current;
+          return; // abort transaction, don't overwrite
+        }
+        claimMarker = Date.now();
+        return {
+          claiming: true,
+          claimedAt: claimMarker,
+          orderId: razorpay_order_id,
           paymentId: razorpay_payment_id,
+        };
+      });
+
+      if (!claimResult.committed) {
+        // Replay or race detected. Try to return existing sessionKey.
+        let final = existingRecord;
+
+        // If existing record has no sessionKey yet, the original
+        // request is mid-flight. Wait and re-read up to 3 seconds.
+        if (!final || !final.sessionKey) {
+          for (let attempt = 0; attempt < 6; attempt++) {
+            await new Promise(r => setTimeout(r, 500));
+            const retrySnap = await paymentRef.once('value');
+            const retryVal = retrySnap.val();
+            if (retryVal && retryVal.sessionKey) {
+              final = retryVal;
+              break;
+            }
+          }
+        }
+
+        // Final attempt before giving up
+        if (!final || !final.sessionKey) {
+          const finalSnap = await paymentRef.once('value');
+          const finalVal = finalSnap.val();
+          if (finalVal && finalVal.sessionKey) {
+            final = finalVal;
+          }
+        }
+
+        if (final && final.sessionKey) {
+          const s = slugify(coupleData.senderName || 'sender');
+          const r = slugify(coupleData.recipientName || 'receiver');
+          return res.status(200).json({
+            verified: true,
+            replay: true,
+            sessionKey: final.sessionKey,
+            shareSlug: `${s}--${r}--${final.sessionKey}`,
+            replyEnabled: final.replyEnabled || false,
+            paymentId: razorpay_payment_id,
+          });
+        }
+
+        // IMPORTANT — DO NOT "FIX" THIS TO RETURN 500 OR 409:
+        // We intentionally return 200 even when sessionKey is not ready,
+        // because the client (PaymentStage.tsx) treats any non-200 as
+        // a payment failure and triggers a new Razorpay order on retry
+        // → double charge risk.
+        //
+        // The `processing: true` flag is a forward-compatible signal:
+        // current client code falls into its existing reject path
+        // (verified is false), but future client code can hook into
+        // `processing` to show a proper "still processing" UI state.
+        //
+        // The C1 reconciliation system (next PR) will catch any orphan
+        // payments that fall through this branch.
+        console.error(`[Verify] Race unresolved after retries for ${razorpay_payment_id}`);
+        return res.status(200).json({
+          verified: false,
+          processing: true,
+          error: 'Payment is processing. Please wait a moment and refresh.',
         });
       }
-    } catch (e) {
-      console.warn('[Verify] Replay check failed, proceeding:', e.message);
+    } catch (claimError) {
+      // Genuine error in the claim transaction itself (RTDB outage, etc.)
+      // This is NOT a post-payment success state — the original request
+      // may not have reached us. Returning 500 here is acceptable
+      // because no payment record was successfully created.
+      console.error('[Verify] Claim transaction failed:', claimError.message);
+      return res.status(500).json({
+        verified: false,
+        error: 'Payment verification failed. Please contact support.',
+      });
     }
+
+    // Claim succeeded — proceed with session provisioning below.
 
     // 3. RESOLVE AMOUNT FROM SERVER-SIDE ORDER RECORD
     //    NEVER trust client-provided amounts. The order record in Firebase
@@ -396,7 +471,28 @@ export default async function handler(req, res) {
       };
     }
 
-    await adminDb.ref().update(updates);
+    try {
+      await adminDb.ref().update(updates);
+    } catch (writeError) {
+      // Multi-path update failed AFTER we successfully claimed the
+      // payment. Roll back the claim placeholder so a manual retry
+      // can proceed cleanly. Verify claimMarker still matches ours
+      // (don't roll back another request's later claim — same
+      // discipline as the founder rollback at lines 226-243).
+      console.error('[Verify] Multi-path update failed, rolling back claim:', writeError.message);
+      try {
+        await paymentRef.transaction(current => {
+          if (!current || !current.claiming) return current;
+          if (current.claimedAt !== claimMarker) return current;
+          return null; // delete the placeholder
+        });
+      } catch (rollbackError) {
+        console.error('[Verify] CRITICAL: rollback also failed:', rollbackError.message);
+        // Manual reconciliation will be needed for this paymentId.
+        // C1 reconciliation system (next PR) will detect this orphan.
+      }
+      throw writeError; // bubble up to outer catch at line 491
+    }
 
     // 7. RETURN SHARE URL
     const senderSlug = slugify(sanitized.senderName || 'sender');
