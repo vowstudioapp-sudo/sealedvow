@@ -66,16 +66,30 @@ const openai = {
 // ===============================
 // ALLOWED ACTIONS
 // ===============================
+// SECURITY NOTE — Live actions only.
+//
+// generateEidLetter, generateSacredLocation, and generateAudioLetter
+// are temporarily disabled because:
+//   (1) Their handlers read fields that safePayload (line 553)
+//       strips, so they fail at runtime today.
+//   (2) Their prompt builders have unfixed prompt-injection
+//       vectors (raw user-input interpolation).
+//
+// Before re-enabling ANY of these:
+//   - Apply the JSON.stringify(safeData) fencing pattern used in
+//     buildLetterPrompt / buildMythPrompt
+//   - Add output validation (validateLetter or validateBasicText)
+//     and ENFORCE on failure (throw, don't log)
+//   - Confirm the handler reads from coupleData (or expand
+//     safePayload deliberately, not by accident)
+//
+// Otherwise re-enabling reintroduces C5 vulnerability instantly.
 const ALLOWED_ACTIONS = [
   'generateLoveLetter',
-  'generateEidLetter',
   'generateCoupleMyth',
-  'generateSacredLocation',
-  'generateAudioLetter',
 ];
 
-// Actions that can fall back to OpenAI (text-only)
-const TEXT_ACTIONS = ['generateLoveLetter', 'generateEidLetter', 'generateCoupleMyth', 'generateSacredLocation'];
+const TEXT_ACTIONS = ['generateLoveLetter', 'generateCoupleMyth'];
 
 // ===============================
 // DISTRIBUTED RATE LIMITING (Redis/Vercel KV)
@@ -207,6 +221,13 @@ async function handleLoveLetter(payload, userUid) {
     const check = text ? validateLetter(text, enforcement) : { violations: [], stats: {} };
     console.log(`[Letter] OpenAI single attempt: ${text ? check.stats.wordCount : 0} words, violations: ${check.violations?.join(', ') || 'none'}`);
 
+    if (!check.valid) {
+      console.warn('[handleLoveLetter] Primary validation failed, triggering fallback', {
+        violations: check.violations,
+      });
+      throw new Error('Primary output failed validation');
+    }
+
     const result = { text: text || null };
 
     try {
@@ -309,7 +330,14 @@ async function handleCoupleMyth(payload) {
   const prompt = payload.prompt || (payload.coupleData ? buildMythPrompt(payload.coupleData) : null);
   if (!prompt) throw new Error('Missing prompt or coupleData for myth generation');
   const raw = await gemini.generateText(prompt, { temperature: 0.8 });
-  return { text: raw || null };
+  const cleaned = cleanOutput(raw);
+
+  if (!validateBasicText(cleaned, { minLength: 20, maxLength: 400 })) {
+    console.warn('[handleCoupleMyth] Primary validation failed, triggering fallback');
+    throw new Error('Primary output failed validation');
+  }
+
+  return { text: cleaned };
 }
 
 async function handleSacredLocation(payload) {
@@ -594,7 +622,10 @@ export default async function handler(req, res) {
   console.log('ACTION RECEIVED:', req.body?.action);
 
   if (!action || !ALLOWED_ACTIONS.includes(action)) {
-    return res.status(400).json({ ok: false, error: 'Invalid action' });
+    return res.status(403).json({
+      ok: false,
+      error: 'Feature disabled',
+    });
   }
 
   // ── PAYLOAD SIZE CAP (cost protection) ──
