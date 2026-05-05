@@ -742,7 +742,7 @@ export default async function handler(req, res) {
   // mid-deploy or after the request started.
   const killSwitch = await safeKV(() => kv.get('ai_kill_switch'));
 
-  if (process.env.AI_DISABLED === 'true' || killSwitch === 'true') {
+  if (process.env.AI_DISABLED === 'true' || killSwitch === true || killSwitch === 'true') {
     return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
   }
 
