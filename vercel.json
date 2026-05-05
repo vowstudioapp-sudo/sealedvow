@@ -35,6 +35,15 @@
     },
     "api/upload-media.js": {
       "maxDuration": 30
+    },
+    "api/razorpay-webhook.js": {
+      "maxDuration": 10
+    },
+    "api/admin/reconcile-payments.js": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/admin/reconcile-payments", "schedule": "30 20 * * *" }
+  ]
 }
