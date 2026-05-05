@@ -97,6 +97,39 @@ const TEXT_ACTIONS = ['generateLoveLetter', 'generateCoupleMyth'];
 const RATE_LIMIT_WINDOW = 60; // seconds
 const MAX_REQUESTS = 10; // per IP per minute
 
+// ===============================
+// COST CONTROL CONFIG
+// All overridable via env. Defaults sized for current load profile.
+// ===============================
+const HOURLY_AI_CAP_PER_ACTOR = Number(process.env.HOURLY_AI_CAP_PER_ACTOR || 10);
+const DAILY_AI_REQUEST_CAP_PER_ACTOR = Number(process.env.DAILY_AI_REQUEST_CAP_PER_ACTOR || 12);
+const GLOBAL_DAILY_UNIT_CAP = Number(process.env.GLOBAL_DAILY_UNIT_CAP || 3000);
+const GLOBAL_BURST_CAP_PER_MIN = Number(process.env.GLOBAL_BURST_CAP_PER_MIN || 20);
+
+const SOFT_CAP_THRESHOLD = Number(process.env.SOFT_CAP_THRESHOLD || 0.70);
+const DEGRADE_LEVEL_1 = Number(process.env.DEGRADE_LEVEL_1 || 0.80);
+const DEGRADE_LEVEL_2 = Number(process.env.DEGRADE_LEVEL_2 || 0.90);
+const HARD_BLOCK = Number(process.env.HARD_BLOCK || 1.00);
+
+// Per-action unit cost. Primary + fallback both succeed = 2 calls = 2 units.
+// Pre-debited at unitCost; 1 unit refunded on primary success (no fallback).
+const UNIT_COST = {
+  generateLoveLetter: 2,
+  generateCoupleMyth: 2,
+};
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function minuteKey() {
+  return Math.floor(Date.now() / 60000);
+}
+
+function requestId(req) {
+  return req.headers['x-request-id'] || null;
+}
+
 function getClientIP(req) {
   const xff = req.headers['x-forwarded-for'];
   if (typeof xff === 'string') {
@@ -326,18 +359,76 @@ async function handleEidLetter(payload) {
   return { letter: text || null };
 }
 
-async function handleCoupleMyth(payload) {
+async function handleCoupleMyth(payload, _userUid, actorKey) {
   const prompt = payload.prompt || (payload.coupleData ? buildMythPrompt(payload.coupleData) : null);
   if (!prompt) throw new Error('Missing prompt or coupleData for myth generation');
-  const raw = await gemini.generateText(prompt, { temperature: 0.8 });
-  const cleaned = cleanOutput(raw);
 
-  if (!validateBasicText(cleaned, { minLength: 20, maxLength: 400 })) {
-    console.warn('[handleCoupleMyth] Primary validation failed, triggering fallback');
-    throw new Error('Primary output failed validation');
+  // ── PROMPT HASH FOR CACHE + DEDUP (mirrors handleLoveLetter pattern) ──
+  // Keyed on actorKey so anonymous users don't collide on null-uid keys.
+  const promptHash = crypto
+    .createHash('sha256')
+    .update(prompt)
+    .digest('hex');
+
+  const cacheKey = `ai_result:${actorKey}:${promptHash}`;
+  const lockKey = `ai_lock:${actorKey}:${promptHash}`;
+  const recentKey = `ai_recent:${actorKey}:${promptHash}`;
+
+  // Check cache first
+  const cached = await safeKV(() => kv.get(cacheKey));
+  if (cached) {
+    console.log('[Myth Cache] returning cached result');
+    return typeof cached === 'string' ? JSON.parse(cached) : cached;
   }
 
-  return { text: cleaned };
+  const recent = await safeKV(() => kv.get(recentKey));
+  if (recent) {
+    return { text: recent };
+  }
+
+  let lockAcquired = false;
+  try {
+    const lock = await safeKV(() => kv.set(lockKey, '1', { nx: true, ex: 30 }));
+    lockAcquired = !!lock;
+
+    if (!lock) {
+      // Another request is generating the same prompt — wait briefly for cache.
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 400));
+        const cachedRetry = await safeKV(() => kv.get(cacheKey));
+        if (cachedRetry) {
+          console.log('[Myth Cache] reused concurrent result');
+          return typeof cachedRetry === 'string' ? JSON.parse(cachedRetry) : cachedRetry;
+        }
+      }
+      const err = new Error('CONCURRENT_GENERATION');
+      err.code = 'CONCURRENT_GENERATION';
+      throw err;
+    }
+
+    const raw = await gemini.generateText(prompt, { temperature: 0.8 });
+    const cleaned = cleanOutput(raw);
+
+    if (!validateBasicText(cleaned, { minLength: 20, maxLength: 400 })) {
+      console.warn('[handleCoupleMyth] Primary validation failed, triggering fallback');
+      throw new Error('Primary output failed validation');
+    }
+
+    const result = { text: cleaned };
+
+    try {
+      await safeKV(() => kv.set(cacheKey, result, { ex: 3600 }));
+      await safeKV(() => kv.set(recentKey, cleaned, { ex: 30 }));
+    } catch (e) {
+      console.warn('[Myth Cache] failed to store result:', e.message);
+    }
+
+    return result;
+  } finally {
+    if (lockAcquired) {
+      await safeKV(() => kv.del(lockKey));
+    }
+  }
 }
 
 async function handleSacredLocation(payload) {
@@ -599,7 +690,8 @@ export default async function handler(req, res) {
   const updatedCount = await safeKV(() => kv.incr(successRateKey), null);
 
   if (updatedCount === null) {
-    console.warn('[AI] KV unavailable for ai_rate_success — skipping hourly quota tracking');
+    console.error('[AI] KV unavailable — FAIL CLOSED');
+    return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
   }
 
   incremented = updatedCount !== null;
@@ -644,21 +736,153 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: 'Server configuration error.' });
   }
 
+  // ── STEP 2: REDIS KILL SWITCH ──
+  // Allows ops to disable AI immediately without redeploying. The env-var
+  // check at line 504 is a fast-path; this catches Redis flips that happen
+  // mid-deploy or after the request started.
+  const killSwitch = await safeKV(() => kv.get('ai_kill_switch'));
+
+  if (process.env.AI_DISABLED === 'true' || killSwitch === 'true') {
+    return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
+  }
+
+  // ── STEP 3: REQUEST IDEMPOTENCY (safe mode — only if X-Request-ID present) ──
+  // If the client sends X-Request-ID, cache the final response so retries
+  // return the same answer without re-billing. Skipped silently if header
+  // absent (legacy callers continue to work unchanged).
+  const reqId = requestId(req);
+  let reqKey = null;
+
+  if (reqId) {
+    reqKey = `ai_req:${reqId}`;
+    // Atomic NX claim — race-safe. If another instance won the lock, we either
+    // serve their cached response (if complete) or 409 (if still pending).
+    const lock = await safeKV(() =>
+      kv.set(reqKey, 'pending', { nx: true, ex: 300 })
+    );
+    if (!lock) {
+      const existing = await safeKV(() => kv.get(reqKey));
+      if (existing && existing !== 'pending') {
+        // Upstash auto-deserializes JSON; handle both shapes per existing pattern.
+        return res.status(200).json(
+          typeof existing === 'string' ? JSON.parse(existing) : existing
+        );
+      }
+      return res.status(409).json({ ok: false, error: 'Duplicate request' });
+    }
+  }
+
+  // ── STEP 4: COST KEYS ──
+  const today = todayKey();
+  const minute = minuteKey();
+
+  const actorDailyKey = `ai_actor_daily:${actorKey}:${today}`;
+  const globalDailyKey = `ai_global_daily:${today}`;
+  const burstKey = `ai_burst:${minute}`;
+
+  // ── STEP 5: LIMIT CHECK + DEGRADATION ──
+  // Single round trip via pipeline: actor daily, global daily, burst (per-minute).
+  // ratio = global spend so far / global daily cap. Drives degradation tiers.
+  // Fail-closed: if KV is unreachable for the limit read, refuse the request
+  // rather than risk uncapped spend.
+  const results = await safeKV(() =>
+    kv.pipeline()
+      .get(globalDailyKey)
+      .get(actorDailyKey)
+      .get(burstKey)
+      .exec(),
+    null
+  );
+  if (!results) {
+    return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
+  }
+  const [globalRaw, actorRaw, burstRaw] = results;
+
+  const globalCount = Number(globalRaw || 0);
+  const actorCount = Number(actorRaw || 0);
+  const burstCount = Number(burstRaw || 0);
+
+  const ratio = globalCount / GLOBAL_DAILY_UNIT_CAP;
+
+  if (ratio >= HARD_BLOCK ||
+      actorCount >= DAILY_AI_REQUEST_CAP_PER_ACTOR ||
+      burstCount >= GLOBAL_BURST_CAP_PER_MIN) {
+    return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
+  }
+
+  if (ratio >= SOFT_CAP_THRESHOLD) {
+    console.error('[CostAlert] AI spend at 70%+ of daily cap', { globalCount, cap: GLOBAL_DAILY_UNIT_CAP });
+  }
+
+  let allowFallback = true;
+
+  if (ratio >= DEGRADE_LEVEL_1) {
+    console.error('[CostAlert] AI spend at 80%+ — approaching limit');
+  }
+
+  if (ratio >= DEGRADE_LEVEL_2) {
+    allowFallback = false;
+  }
+
+  // ── STEP 6: PRE-DEBIT (fail-closed on global increment) ──
+  // Charge unitCost units up front. Refunded by Step 7 on primary-only success
+  // (1 unit unused) or full failure (all units). Burst is NEVER refunded —
+  // it measures spike pressure regardless of outcome.
+  const unitCost = UNIT_COST[action] || 1;
+
+  const updatedGlobal = await safeKV(() => kv.incrby(globalDailyKey, unitCost), null);
+
+  if (updatedGlobal === null) {
+    return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
+  }
+
+  if (updatedGlobal === unitCost) {
+    await safeKV(() => kv.expire(globalDailyKey, 86400));
+  }
+
+  const actorUpdated = await safeKV(() => kv.incr(actorDailyKey));
+  if (actorUpdated === 1) {
+    await safeKV(() => kv.expire(actorDailyKey, 86400));
+  }
+
+  const burstUpdated = await safeKV(() => kv.incr(burstKey));
+  if (burstUpdated === 1) {
+    await safeKV(() => kv.expire(burstKey, 70));
+  }
+
   // ── PRIMARY: Gemini (with handler-level timeout) ──
+  let provider = 'unknown';
+
   try {
     const timeoutError = new Error('HANDLER_TIMEOUT');
     timeoutError.code = 'HANDLER_TIMEOUT';
 
     const result = await Promise.race([
-      PRIMARY_HANDLERS[action](safePayload, userUid),
+      PRIMARY_HANDLERS[action](safePayload, userUid, actorKey),
       new Promise((_, reject) =>
         setTimeout(() => reject(timeoutError), 25000)
       )
     ]);
-    return res.status(200).json({ ok: true, data: result });
+
+    // Primary succeeded — tag provider per current handler routing.
+    // (handleLoveLetter currently uses OpenAI as primary; handleCoupleMyth uses Gemini.)
+    provider = (action === 'generateCoupleMyth') ? 'gemini' : 'openai';
+
+    // Refund the unused fallback unit (we charged unitCost up front).
+    if (unitCost > 1) {
+      await safeKV(() => kv.decr(globalDailyKey));
+    }
+
+    const response = { ok: true, data: result, provider };
+
+    if (reqKey) {
+      await safeKV(() => kv.set(reqKey, response, { ex: 300 }));
+    }
+
+    return res.status(200).json(response);
   } catch (primaryError) {
     console.error('[AI] Error', primaryError.message);
-    console.error(`[API] ${action} failed (Gemini):`, primaryError.message);
+    console.error(`[API] ${action} failed:`, primaryError.message);
 
     // Concurrent-generation short-circuit: surface a proper 409 instead of
     // attempting a fallback (the user is mid-generation already).
@@ -672,15 +896,22 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── FALLBACK: OpenAI (text actions only) ──
-    if (TEXT_ACTIONS.includes(action) && process.env.OPENAI_API_KEY && FALLBACK_HANDLERS[action]) {
+    // ── FALLBACK: OpenAI (text actions only, gated on allowFallback at 90% spend) ──
+    if (allowFallback && TEXT_ACTIONS.includes(action) && process.env.OPENAI_API_KEY && FALLBACK_HANDLERS[action]) {
       console.log(`[Fallback] Attempting OpenAI for ${action}...`);
       try {
-        console.log('TRY OPENAI');
-        const fallbackResult = await FALLBACK_HANDLERS[action](safePayload, userUid);
+        const fallbackResult = await FALLBACK_HANDLERS[action](safePayload, userUid, actorKey);
         if (fallbackResult) {
           console.log(`[Fallback] OpenAI succeeded for ${action}`);
-          return res.status(200).json({ ok: true, data: fallbackResult });
+          provider = 'openai';
+
+          const response = { ok: true, data: fallbackResult, provider };
+
+          if (reqKey) {
+            await safeKV(() => kv.set(reqKey, response, { ex: 300 }));
+          }
+
+          return res.status(200).json(response);
         }
       } catch (fallbackError) {
         console.error('[AI] Error', fallbackError.message);
@@ -688,8 +919,24 @@ export default async function handler(req, res) {
       }
     }
 
-    // Both primary and fallback failed — refund the quota since the user got
-    // nothing for it. Only roll back if the increment actually succeeded.
+    // FULL FAILURE → refund cost counters (global + actor). Burst is NOT refunded —
+    // it measures spike pressure regardless of outcome.
+    try {
+      await kv.pipeline()
+        .decrby(globalDailyKey, unitCost)
+        .decr(actorDailyKey)
+        .exec();
+    } catch (refundError) {
+      console.error('[AI] Failed to refund cost counters:', refundError.message);
+    }
+
+    // Release the idempotency pending marker so a manual retry can re-acquire
+    // the NX lock. Without this, the same X-Request-ID would 409 forever.
+    if (reqKey) {
+      await safeKV(() => kv.del(reqKey));
+    }
+
+    // Preserve existing hourly refund — only decrement if the increment succeeded.
     if (incremented) {
       await safeKV(() => kv.decr(successRateKey));
     }
