@@ -104,10 +104,54 @@ export default async function handler(req, res) {
 
     // Generate a one-time token for verify-payment to consume.
     const tokenBytes = crypto.randomBytes(16).toString('hex');
-    await adminDb.ref('founderTokens/' + tokenBytes).set({
-      createdAt: Date.now(),
-      consumed: false,
-    });
+
+    try {
+      await adminDb.ref('founderTokens/' + tokenBytes).set({
+        createdAt: Date.now(),
+        consumed: false,
+      });
+    } catch (mintError) {
+      // CRITICAL: founderCodes/{code} was just incremented by founderTransaction
+      // above, but token mint failed. Without rollback, the code is permanently
+      // stuck and the user has no token to proceed. Roll back the increment so
+      // the user can retry cleanly.
+      //
+      // Rollback safety guards:
+      //   1. !current — code was deleted between writes (don't recreate)
+      //   2. used <= 0 — already at zero, don't go negative
+      //   3. redeemedAt staleness — only roll back if the increment is recent
+      //      enough to plausibly be ours (60s window absorbs network jitter
+      //      and Vercel cold starts; the actual failure path runs within
+      //      ~500ms so this is generous)
+      //   4. active derived from newUsed < maxUses — preserves the same
+      //      invariant founderTransaction itself uses (don't hardcode true,
+      //      future-proofs against multi-use codes)
+      console.error('[FounderCode] Token mint failed, rolling back code:', mintError.message);
+      try {
+        const ref = adminDb.ref('founderCodes/' + normalized);
+        await ref.transaction(current => {
+          if (!current) return current;
+          if (current.used <= 0) return current;
+          if (current.redeemedAt && Date.now() - current.redeemedAt > 60000) {
+            // Stale — don't touch
+            return current;
+          }
+          const newUsed = current.used - 1;
+          return {
+            ...current,
+            used: newUsed,
+            active: newUsed < current.maxUses,
+            redeemedAt: null,
+          };
+        });
+      } catch (rollbackError) {
+        console.error('[FounderCode] CRITICAL: Rollback also failed:', rollbackError.message);
+        // Manual reconciliation needed for this code. Falls into the
+        // operational gap — until Fix 3 (admin revive endpoint) lands,
+        // a support ticket is required to unstick this code.
+      }
+      return res.status(500).json({ error: 'Code redemption failed. Please retry.' });
+    }
 
     return res.status(200).json({
       founderApproved: true,
