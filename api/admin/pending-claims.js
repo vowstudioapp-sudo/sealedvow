@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { db } from '../lib/firebaseAdmin';
+import { db } from '../lib/firebaseAdmin.js';
 import { rateLimit } from '../lib/middleware.js';
 
 export default async function handler(req, res) {
