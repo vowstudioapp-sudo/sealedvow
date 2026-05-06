@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Sessions path. Reads denied — receivers fetch via signed URLs from
+    // /api/upload-media, which bypass these rules (the signature is the auth).
+    // Writes are gated on auth + size + MIME type as belt-and-suspenders for
+    // any future client-SDK usage. Today no client code uses firebase/storage
+    // (services/firebase.ts imports firebase/auth only) — all uploads go
+    // through /api/upload-media using the Admin SDK, which also bypasses
+    // these rules. The write clause is preserved unchanged from the rules
+    // currently deployed in production via the Firebase Console.
+    match /sessions/{sessionId}/{allPaths=**} {
+      allow read: if false;
+      allow write: if request.auth != null
+                   && request.resource.size < 20 * 1024 * 1024
+                   && request.resource.contentType.matches(
+                        'image/.*|video/.*|audio/.*'
+                      );
+    }
+
+    // Everything else: deny-all.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
