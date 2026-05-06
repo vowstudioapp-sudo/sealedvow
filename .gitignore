@@ -53,3 +53,4 @@ dist-ssr
 Thumbs.db
 *.tmp
 *.temp.claude/
+FETCH_HEAD
