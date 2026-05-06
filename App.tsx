@@ -128,12 +128,23 @@ const readPersistedCoupleData = (): CoupleData | null => {
   }
 };
 
-const writePersistedCoupleData = (value: CoupleData): void => {
+// H6: optional onQuotaError callback. Mobile Safari's ~5-10 MB cap (and iOS's
+// memory-pressure-driven storage clears) can throw QuotaExceededError on
+// setItem. Without a user-visible signal the draft is silently lost on next
+// page load. Caller passes a setter to surface a banner.
+const writePersistedCoupleData = (value: CoupleData, onQuotaError?: () => void): void => {
   const hydrated = hydrateCoupleData(value);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(hydrated));
   } catch (e) {
     console.error('[Persistence] Failed to write CoupleData to storage', e);
+    const isQuotaError = e instanceof DOMException && (
+      e.name === 'QuotaExceededError' ||
+      e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      e.code === 22 ||
+      e.code === 1014
+    );
+    if (isQuotaError && onQuotaError) onQuotaError();
   }
 };
 
@@ -244,6 +255,11 @@ const App: React.FC = () => {
       return null;
     }
   }
+
+  // H6: surfaces when localStorage.setItem throws QuotaExceededError so the
+  // user can save their work before refreshing. Dismissable; sticky for the
+  // rest of the session because the underlying quota likely persists.
+  const [storageError, setStorageError] = useState(false);
 
   const {
     state: linkState,
@@ -977,6 +993,19 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen relative overflow-x-hidden transition-colors duration-1000" style={{ backgroundColor: '#0C0A09' }}>
+      {/* H6: storage-quota banner — sticky, dismissable, single-instance per session. */}
+      {storageError && (
+        <div className="fixed top-0 inset-x-0 z-[100] bg-amber-900/95 text-amber-100 text-[10px] md:text-xs uppercase tracking-widest px-4 py-3 text-center shadow-lg">
+          Browser storage is full. Save your letter to avoid losing it on refresh.
+          <button
+            onClick={() => setStorageError(false)}
+            className="ml-3 underline font-bold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {!isEidiRoute(routeType) && isBooting && !isReceiverLink && bootScreen}
 
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")' }}></div>
@@ -1029,7 +1058,7 @@ const App: React.FC = () => {
                 setData(updated);
                 setIsCreatorPreview(true);
                 safeSetStage(AppStage.ENVELOPE); 
-                writePersistedCoupleData(updated);
+                writePersistedCoupleData(updated, () => setStorageError(true));
               }}
               onBack={() => safeSetStage(AppStage.PREPARE)}
             />
