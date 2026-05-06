@@ -1448,13 +1448,10 @@ function S8Closing({ d, onNext, isPreview, onPayment }: { d: EidDemo; onNext: ()
         {isPreview && onPayment ? (
           <button
             onClick={() => {
-              console.log('🔥 SEAL & DELIVER clicked');
-              console.log('🔥 onPayment exists?', !!onPayment);
               if (onPayment) {
-                console.log('🔥 Calling onPayment...');
                 onPayment();
               } else {
-                console.error('❌ onPayment is undefined');
+                console.error('[EidExperience] onPayment is undefined');
               }
             }}
             style={{

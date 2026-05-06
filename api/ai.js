@@ -348,9 +348,7 @@ No headings.`;
 }
 
 async function handleEidLetter(payload) {
-  console.log('ENTERED generateEidLetter');
   const prompt = buildEidLetterPrompt(payload);
-  console.log('TRY GEMINI');
   const text = cleanOutput(await withTimeout(
     gemini.generateText(prompt, { temperature: 0.85 }),
     8000
@@ -578,7 +576,6 @@ const FALLBACK_HANDLERS = {
 // ===============================
 
 export default async function handler(req, res) {
-  console.log('AI ROUTE HIT');
   // CORS
   const origin = getAllowedOrigin(req.headers.origin);
   if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
@@ -704,14 +701,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ ok: false, error: 'AI usage limit reached.' });
   }
 
-  console.log('[AI] Request', { uid: userUid, sessionId });
-
-  console.log('PROD ENV CHECK:', {
-    GEMINI: !!process.env.GEMINI_API_KEY,
-    OPENAI: !!process.env.OPENAI_API_KEY,
-  });
-
-  console.log('ACTION RECEIVED:', req.body?.action);
+  console.log('[AI] Request', { uid: userUid, sessionId, action: req.body?.action });
 
   if (!action || !ALLOWED_ACTIONS.includes(action)) {
     return res.status(403).json({

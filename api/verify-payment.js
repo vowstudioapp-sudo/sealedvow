@@ -16,6 +16,7 @@ import crypto from 'crypto';
 import { adminDb, guardPost, rateLimit } from './lib/middleware.js';
 import { getSessionUser } from './lib/auth.js';
 import { validateCoupleData as parseCoupleData } from '../lib/coupleDataValidator.js';
+import { extractRequestId } from './lib/requestId.js';
 
 const MIN_PRICE_PAISE = 24900;  // ₹249 — single price floor
 
@@ -73,6 +74,11 @@ function validateCoupleData(data) {
 
 export default async function handler(req, res) {
   if (guardPost(req, res)) return;
+
+  // H1: correlation ID — set by create-order, forwarded by client. Used in
+  // every log line and stored on shared/{sessionKey} + payments/{paymentId}
+  // so an operator can grep one ID for the entire payment journey.
+  const requestId = extractRequestId(req);
 
   // ── GLOBAL IP RATE LIMITING ──
   const { limited } = await rateLimit(req, {
@@ -177,6 +183,7 @@ export default async function handler(req, res) {
         paymentMode: 'founder',
         paidAmount: 0,
         ...(senderUid ? { senderUid } : {}),
+        ...(requestId ? { requestId } : {}),
       };
 
       updates[`payments/${founderId}`] = {
@@ -186,6 +193,7 @@ export default async function handler(req, res) {
         replyEnabled,
         sessionKey,
         verifiedAt: now,
+        ...(requestId ? { requestId } : {}),
       };
 
       if (senderUid) {
@@ -202,7 +210,7 @@ export default async function handler(req, res) {
       const receiverSlug = slugify(sanitized.recipientName || 'receiver');
       const shareSlug = `${senderSlug}--${receiverSlug}--${sessionKey}`;
 
-      console.log(`[Verify] ✓ FOUNDER ${sessionKey} | ${founderId}`);
+      console.log('[Verify] ✓ FOUNDER', { requestId, sessionKey, paymentId: founderId });
 
       return res.status(200).json({
         verified: true,
@@ -226,7 +234,7 @@ export default async function handler(req, res) {
         });
       } catch {}
 
-      console.error('[Verify] Founder error:', error);
+      console.error('[Verify] Founder error', { requestId, error: error.message });
       return res.status(500).json({ verified: false, error: 'Session creation failed.' });
     }
   }
@@ -244,7 +252,7 @@ export default async function handler(req, res) {
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
   if (!keySecret) {
-    console.error('[Verify] Missing RAZORPAY_KEY_SECRET');
+    console.error('[Verify] Missing RAZORPAY_KEY_SECRET', { requestId });
     return res.status(500).json({ verified: false, error: 'Server configuration error.' });
   }
 
@@ -264,7 +272,7 @@ export default async function handler(req, res) {
     }
 
     if (!isValid) {
-      console.warn(`[Verify] Signature mismatch: ${razorpay_order_id}`);
+      console.warn('[Verify] Signature mismatch', { requestId, orderId: razorpay_order_id });
       return res.status(400).json({ verified: false, error: 'Payment verification failed.' });
     }
 
@@ -345,7 +353,7 @@ export default async function handler(req, res) {
         //
         // The C1 reconciliation system (next PR) will catch any orphan
         // payments that fall through this branch.
-        console.error(`[Verify] Race unresolved after retries for ${razorpay_payment_id}`);
+        console.error('[Verify] Race unresolved after retries', { requestId, paymentId: razorpay_payment_id });
         return res.status(200).json({
           verified: false,
           processing: true,
@@ -357,7 +365,7 @@ export default async function handler(req, res) {
       // This is NOT a post-payment success state — the original request
       // may not have reached us. Returning 500 here is acceptable
       // because no payment record was successfully created.
-      console.error('[Verify] Claim transaction failed:', claimError.message);
+      console.error('[Verify] Claim transaction failed', { requestId, paymentId: razorpay_payment_id, error: claimError.message });
       return res.status(500).json({
         verified: false,
         error: 'Payment verification failed. Please contact support.',
@@ -376,7 +384,7 @@ export default async function handler(req, res) {
       const orderData = orderSnap.val();
 
       if (!orderData || !orderData.amount) {
-        console.error(`[Verify] Order record missing or incomplete: ${razorpay_order_id}`);
+        console.error('[Verify] Order record missing or incomplete', { requestId, orderId: razorpay_order_id });
         return res.status(500).json({
           verified: false,
           error: 'Unable to verify order. Please contact support.',
@@ -384,7 +392,7 @@ export default async function handler(req, res) {
       }
 
       if (orderData.amount < MIN_PRICE_PAISE) {
-        console.error(`[Verify] Order amount below minimum: ${orderData.amount} (order ${razorpay_order_id})`);
+        console.error('[Verify] Order amount below minimum', { requestId, orderId: razorpay_order_id, amount: orderData.amount });
         return res.status(500).json({
           verified: false,
           error: 'Unable to verify order. Please contact support.',
@@ -393,7 +401,7 @@ export default async function handler(req, res) {
 
       orderAmount = orderData.amount;
     } catch (orderErr) {
-      console.error(`[Verify] Order lookup failed for ${razorpay_order_id}:`, orderErr.message);
+      console.error('[Verify] Order lookup failed', { requestId, orderId: razorpay_order_id, error: orderErr.message });
       return res.status(500).json({
         verified: false,
         error: 'Payment verification temporarily unavailable. Please retry.',
@@ -439,6 +447,7 @@ export default async function handler(req, res) {
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
       ...(senderUid ? { senderUid } : {}),
+      ...(requestId ? { requestId } : {}),
     };
 
     updates[`payments/${razorpay_payment_id}`] = {
@@ -448,6 +457,7 @@ export default async function handler(req, res) {
       replyEnabled,
       sessionKey,
       verifiedAt: now,
+      ...(requestId ? { requestId } : {}),
     };
 
     updates[`orders/${razorpay_order_id}/status`] = 'paid';
@@ -467,7 +477,7 @@ export default async function handler(req, res) {
       // can proceed cleanly. Verify claimMarker still matches ours
       // (don't roll back another request's later claim — same
       // discipline as the founder rollback at lines 226-243).
-      console.error('[Verify] Multi-path update failed, rolling back claim:', writeError.message);
+      console.error('[Verify] Multi-path update failed, rolling back claim', { requestId, paymentId: razorpay_payment_id, error: writeError.message });
       try {
         await paymentRef.transaction(current => {
           if (!current || !current.claiming) return current;
@@ -475,7 +485,7 @@ export default async function handler(req, res) {
           return null; // delete the placeholder
         });
       } catch (rollbackError) {
-        console.error('[Verify] CRITICAL: rollback also failed:', rollbackError.message);
+        console.error('[Verify] CRITICAL: rollback also failed', { requestId, paymentId: razorpay_payment_id, error: rollbackError.message });
         // Manual reconciliation will be needed for this paymentId.
         // C1 reconciliation system (next PR) will detect this orphan.
       }
@@ -487,7 +497,7 @@ export default async function handler(req, res) {
     const receiverSlug = slugify(sanitized.recipientName || 'receiver');
     const shareSlug = `${senderSlug}--${receiverSlug}--${sessionKey}`;
 
-    console.log(`[Verify] ✓ ${sessionKey} | ${razorpay_payment_id}`);
+    console.log('[Verify] ✓', { requestId, sessionKey, paymentId: razorpay_payment_id });
 
     return res.status(200).json({
       verified: true,
@@ -498,7 +508,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('[Verify] Error:', error);
+    console.error('[Verify] Error', { requestId, error: error.message });
     return res.status(500).json({ verified: false, error: 'Verification system error.' });
   }
 }

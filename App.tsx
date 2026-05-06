@@ -7,6 +7,7 @@ import { InteractiveQuestion } from './components/InteractiveQuestion';
 import AdminPanel from './components/AdminPanel';
 import ClaimPage from './components/ClaimPage';
 import { SignInPromptModal } from './components/SignInPromptModal.tsx';
+import { ReceiverErrorBoundary } from './components/ReceiverErrorBoundary';
 import { Analytics } from '@vercel/analytics/react';
 import { getRouteType, initialStageForRoute, isEidiRoute, isReceiverLinkType } from './utils/routing';
 import { decodeEidData } from './utils/eidDecoder';
@@ -739,19 +740,15 @@ const App: React.FC = () => {
           <EidExperience
             onPayment={() => {
               runOrPromptSignIn(() => {
-                console.log('💰 App.tsx onPayment callback triggered');
-
                 const decoded = decodeEidData();
-                console.log('💰 Decoded data:', decoded);
 
                 if (!decoded) {
-                  console.error('❌ Decoded data is null/undefined');
+                  console.error('[App] Eid payment: decoded data missing');
                   alert("Preview data missing - please return to form");
                   window.location.href = '/eid/parent-child';
                   return;
                 }
 
-                console.log('💰 Creating CoupleData object...');
                 const coupleData = {
                   sessionId: `eid-${Date.now()}`,
                   recipientName: decoded.recipient || '',
@@ -773,12 +770,8 @@ const App: React.FC = () => {
                   sealedAt: undefined,
                 } as CoupleData;
 
-                console.log('💰 CoupleData created:', coupleData);
-                console.log('💰 Calling setData...');
                 setData(coupleData);
-                console.log('💰 Calling safeSetStage(AppStage.PAYMENT)...');
                 safeSetStage(AppStage.PAYMENT);
-                console.log('💰 Payment stage transition complete');
               });
             }}
           />
@@ -1111,18 +1104,20 @@ const App: React.FC = () => {
                   </div>
                 </>
               )}
-              <MainExperience 
-                data={experienceData} 
-                isPreview={isCreatorPreview}
-                isDemoMode={isDemoMode}
-                onEdit={() => {
-                  safeSetStage(AppStage.REFINE);
-                  setIsCreatorPreview(false);
-                }}
-                onPayment={() => {
-                  runOrPromptSignIn(() => safeSetStage(AppStage.PAYMENT));
-                }}
-              />
+              <ReceiverErrorBoundary>
+                <MainExperience
+                  data={experienceData}
+                  isPreview={isCreatorPreview}
+                  isDemoMode={isDemoMode}
+                  onEdit={() => {
+                    safeSetStage(AppStage.REFINE);
+                    setIsCreatorPreview(false);
+                  }}
+                  onPayment={() => {
+                    runOrPromptSignIn(() => safeSetStage(AppStage.PAYMENT));
+                  }}
+                />
+              </ReceiverErrorBoundary>
             </div>
           )}
 

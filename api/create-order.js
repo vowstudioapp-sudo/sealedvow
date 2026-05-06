@@ -6,6 +6,7 @@
 
 import crypto from 'crypto';
 import { adminDb, kv, guardPost, getClientIP, rateLimit } from './lib/middleware.js';
+import { generateRequestId } from './lib/requestId.js';
 
 const PRICE_PAISE = 24900;  // ₹249 — single price for every letter
 const PRODUCT = 'sealedvow';
@@ -60,6 +61,11 @@ async function trackFounderFail(req) {
 export default async function handler(req, res) {
   if (guardPost(req, res)) return;
 
+  // H1: correlation ID — generated here, returned to client, propagated
+  // through verify-payment to shared/{sessionKey} and payments/{paymentId}.
+  const requestId = generateRequestId();
+  res.setHeader('X-Request-ID', requestId);
+
   // ── GLOBAL IP RATE LIMITING ──
   const { limited } = await rateLimit(req, {
     keyPrefix: 'payment_rate',
@@ -100,7 +106,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid or expired code.' });
     }
 
-    console.log(`[FounderCode] ✓ ${normalized} redeemed`);
+    console.log('[FounderCode] redeemed', { requestId });
 
     // Generate a one-time token for verify-payment to consume.
     const tokenBytes = crypto.randomBytes(16).toString('hex');
@@ -126,7 +132,7 @@ export default async function handler(req, res) {
       //   4. active derived from newUsed < maxUses — preserves the same
       //      invariant founderTransaction itself uses (don't hardcode true,
       //      future-proofs against multi-use codes)
-      console.error('[FounderCode] Token mint failed, rolling back code:', mintError.message);
+      console.error('[FounderCode] Token mint failed, rolling back code', { requestId, error: mintError.message });
       try {
         const ref = adminDb.ref('founderCodes/' + normalized);
         await ref.transaction(current => {
@@ -145,7 +151,7 @@ export default async function handler(req, res) {
           };
         });
       } catch (rollbackError) {
-        console.error('[FounderCode] CRITICAL: Rollback also failed:', rollbackError.message);
+        console.error('[FounderCode] CRITICAL: Rollback also failed', { requestId, error: rollbackError.message });
         // Manual reconciliation needed for this code. Falls into the
         // operational gap — until Fix 3 (admin revive endpoint) lands,
         // a support ticket is required to unstick this code.
@@ -156,6 +162,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       founderApproved: true,
       founderToken: tokenBytes,
+      requestId,
     });
   }
 
@@ -166,7 +173,7 @@ export default async function handler(req, res) {
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
   if (!keyId || !keySecret) {
-    console.error('[Razorpay] Missing credentials');
+    console.error('[Razorpay] Missing credentials', { requestId });
     return res.status(500).json({ error: 'Payment configuration error.' });
   }
 
@@ -194,7 +201,7 @@ export default async function handler(req, res) {
 
     if (!orderResponse.ok) {
       const errData = await orderResponse.json().catch(() => ({}));
-      console.error('[Razorpay] Order creation failed:', errData);
+      console.error('[Razorpay] Order creation failed', { requestId, status: orderResponse.status, error: errData?.error?.description });
       return res.status(502).json({ error: 'Failed to create payment order.' });
     }
 
@@ -210,24 +217,28 @@ export default async function handler(req, res) {
         currency: 'INR',
         status: 'created',
         createdAt: new Date().toISOString(),
+        requestId,
       });
     } catch (dbErr) {
-      console.error('[Razorpay] CRITICAL: Failed to persist order record:', dbErr);
+      console.error('[Razorpay] CRITICAL: Failed to persist order record', { requestId, orderId: order.id, error: dbErr.message });
       // Order exists in Razorpay but not in our DB.
       // Do NOT return orderId — client cannot complete verification without it.
       // User has not been charged yet (order created ≠ payment captured).
       return res.status(500).json({ error: 'Order setup failed. Please retry.' });
     }
 
+    console.log('[Razorpay] Order created', { requestId, orderId: order.id, amount: order.amount });
+
     return res.status(200).json({
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
       keyId,
+      requestId,
     });
 
   } catch (error) {
-    console.error('[Razorpay] Order error:', error);
+    console.error('[Razorpay] Order error', { requestId, error: error.message });
     return res.status(500).json({ error: 'Payment system error.' });
   }
 }

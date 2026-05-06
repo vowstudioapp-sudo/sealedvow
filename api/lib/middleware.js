@@ -104,6 +104,7 @@ export async function rateLimit(req, { keyPrefix, windowSeconds = 60, max = 10 }
     }
 
     if (current > max) {
+      console.warn('[RateLimit] Blocked', { keyPrefix, count: current, max });
       return { limited: true };
     }
 

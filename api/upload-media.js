@@ -112,6 +112,7 @@ export default async function handler(req, res) {
   // (actor, sessionId). Closes the UUID-rotation cost-abuse vector.
   const uploadToken = req.headers['x-upload-token'];
   if (!uploadToken || typeof uploadToken !== 'string' || !/^[a-f0-9]{32}$/i.test(uploadToken)) {
+    console.warn('[UploadAuth] Missing or invalid token');
     return res.status(401).json({ error: 'Missing or invalid upload token' });
   }
 
@@ -121,6 +122,7 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Service temporarily unavailable' });
   }
   if (!tokenRecord || Object.keys(tokenRecord).length === 0) {
+    console.warn('[UploadAuth] Token not found or expired');
     return res.status(401).json({ error: 'Token not found or expired' });
   }
 
@@ -142,6 +144,7 @@ export default async function handler(req, res) {
   } catch {}
   const requestActor = requestUid || `ip:${ip}`;
   if (tokenRecord.actor !== requestActor) {
+    console.warn('[UploadAuth] Actor mismatch');
     return res.status(403).json({ error: 'Token does not belong to this actor' });
   }
 
@@ -149,6 +152,7 @@ export default async function handler(req, res) {
   // (closes griefing vector where attacker overwrites a victim's pre-payment
   // session by stealing/guessing their sessionId).
   if (tokenRecord.sessionId !== sessionId) {
+    console.warn('[UploadAuth] Session mismatch');
     return res.status(403).json({ error: 'Token does not match session' });
   }
 
@@ -243,6 +247,7 @@ export default async function handler(req, res) {
       return res.status(503).json({ error: 'Service temporarily unavailable' });
     }
     if (currentBytes + buffer.length > DAILY_STORAGE_CAP) {
+      console.warn('[UploadCap] Daily storage cap hit');
       return res.status(429).json({ error: 'Daily storage limit reached' });
     }
 

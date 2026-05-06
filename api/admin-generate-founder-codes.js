@@ -149,8 +149,10 @@ export default async function handler(req, res) {
 
     await adminDb.ref().update(updates);
 
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
-    console.log(`[Admin] Generated ${codes.length} founder code(s) | expiry=${expiryHours}h | ip=${ip} | codes=${codes.join(',')}`);
+    // C7/H1: never log the codes themselves — they are valid credentials.
+    // Count + expiry only. Generated codes are returned to the admin caller
+    // in the response body; they don't need to live in the log stream.
+    console.log('[Admin] Generated founder codes', { count: codes.length });
 
     return res.status(200).json({
       success: true,

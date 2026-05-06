@@ -137,8 +137,8 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         throw new Error(errData.error || 'Failed to create payment order.');
       }
 
-      const { orderId, amount, currency, keyId } = await orderRes.json();
-      await openCheckout({ orderId, amount, currency, keyId });
+      const { orderId, amount, currency, keyId, requestId } = await orderRes.json();
+      await openCheckout({ orderId, amount, currency, keyId, requestId });
 
     } catch (err: any) {
       setError(err.message || 'Payment failed. Please try again.');
@@ -148,8 +148,8 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
     }
   };
 
-  const openCheckout = ({ orderId, amount, currency, keyId }: {
-    orderId: string; amount: number; currency: string; keyId: string;
+  const openCheckout = ({ orderId, amount, currency, keyId, requestId }: {
+    orderId: string; amount: number; currency: string; keyId: string; requestId?: string;
   }): Promise<void> => {
     return new Promise((resolve, reject) => {
       const options = {
@@ -165,12 +165,16 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
           try {
             const verifyRes = await fetch('/api/verify-payment', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ...(requestId ? { 'X-Request-ID': requestId } : {}),
+              },
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
                 coupleData: data,
+                ...(requestId ? { requestId } : {}),
               }),
             });
 

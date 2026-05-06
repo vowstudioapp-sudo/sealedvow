@@ -254,8 +254,6 @@ export const MemoryBoard: React.FC<MemoryBoardProps> = ({
     onDragStart?.();
   }, [onDragStart]);
 
-  console.log('[MB]', { isActive, layoutRevealed, hasUnfolded });
-
   /* ── Render ── */
   return (
     <section

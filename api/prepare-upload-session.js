@@ -66,6 +66,7 @@ export default async function handler(req, res) {
     max: MINT_RATE_MAX,
   });
   if (limited) {
+    console.warn('[UploadMint] Mint rate limit hit');
     return res.status(429).json({ error: 'Too many token mint attempts. Please wait a minute.' });
   }
 
@@ -74,12 +75,14 @@ export default async function handler(req, res) {
   const dailyKey = `upload_mint_daily:${ip}:${todayKey()}`;
   const dailyCount = await safeKV(() => kv.incr(dailyKey), undefined);
   if (dailyCount === undefined) {
+    console.error('[UploadMint] KV failure');
     return res.status(503).json({ error: 'Service temporarily unavailable' });
   }
   if (dailyCount === 1) {
     await safeKV(() => kv.expire(dailyKey, 86400));
   }
   if (dailyCount > MINT_DAILY_CAP) {
+    console.warn('[UploadMint] Daily mint cap hit', { count: dailyCount });
     return res.status(429).json({ error: 'Daily token mint limit reached' });
   }
 
@@ -109,11 +112,13 @@ export default async function handler(req, res) {
     uploadedBytes: 0,
   }), undefined);
   if (setResult === undefined) {
+    console.error('[UploadMint] KV failure');
     return res.status(503).json({ error: 'Service temporarily unavailable' });
   }
 
   const expireResult = await safeKV(() => kv.expire(`upload_token:${tokenId}`, TOKEN_TTL_SECONDS), undefined);
   if (expireResult === undefined) {
+    console.error('[UploadMint] KV failure');
     return res.status(503).json({ error: 'Service temporarily unavailable' });
   }
 

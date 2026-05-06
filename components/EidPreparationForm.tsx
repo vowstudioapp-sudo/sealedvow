@@ -76,9 +76,9 @@ export default function EidPreparationForm({ relationship, onPreview }: Props) {
     tone: FormData["tone"];
     customMessage: string;
   }, retryCount = 0) {
-    console.log("CALLING API (attempt " + (retryCount + 1) + ")");
-    console.log("ENDPOINT:", "/api/generate-eid-letter");
-    console.log("REQUEST PAYLOAD:", data);
+    // H1/Track 1B: never log the request payload — it contains user-entered
+    // text and recipient identifiers. Tag-only log instead.
+    console.log('[EidPreparationForm] Submitting', { action: 'generate-eid-letter', attempt: retryCount + 1 });
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -99,15 +99,14 @@ export default function EidPreparationForm({ relationship, onPreview }: Props) {
       }
 
       const result = await res.json();
-      console.log("API RESPONSE:", result);
       return result;
     } catch (err) {
       clearTimeout(timeoutId);
-      console.error("API FAILED:", err);
+      // Operational error log — keep. Drop dev breadcrumbs (Timeout/Network retrying).
+      console.error('[EidPreparationForm] API failed', { error: err.message });
 
       if (err.name === 'AbortError') {
         if (retryCount < 1) {
-          console.log("Timeout - retrying...");
           await new Promise(resolve => setTimeout(resolve, 1000));
           return generateLetter(data, retryCount + 1);
         }
@@ -115,7 +114,6 @@ export default function EidPreparationForm({ relationship, onPreview }: Props) {
       }
 
       if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network'))) {
-        console.log("Network error - retrying...");
         await new Promise(resolve => setTimeout(resolve, 1000));
         return generateLetter(data, retryCount + 1);
       }
