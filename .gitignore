@@ -54,3 +54,7 @@ Thumbs.db
 *.tmp
 *.temp.claude/
 FETCH_HEAD
+
+.env.production
+.env*.local
+.claude/
