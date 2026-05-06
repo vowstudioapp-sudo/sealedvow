@@ -7,6 +7,8 @@
 // Validator: lib/ai/validator.js
 // ================================================================
 
+import './lib/env.js'; // H3: cold-start required-env validation (side-effect import)
+
 import crypto from "crypto";
 import { Redis } from "@upstash/redis";
 import admin from 'firebase-admin';

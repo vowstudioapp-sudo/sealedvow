@@ -12,6 +12,8 @@
 // This avoids adding a multipart parsing dependency (busboy/formidable).
 // ============================================================================
 
+import './lib/env.js'; // H3: cold-start required-env validation (side-effect import)
+
 import admin from 'firebase-admin';
 import { Redis } from '@upstash/redis';
 import { guardPost, rateLimit, getClientIP } from './lib/middleware.js';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CoupleData } from '../types';
 import { generateLoveLetter, generateCoupleMyth, generateCinematicVideo, generateSacredLocation } from '../services/geminiService';
 
@@ -17,6 +17,54 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
   // Separate progress for drafting phase
   const [draftingProgress, setDraftingProgress] = useState(0);
   const hasGeneratedRef = useRef(false);
+  const draftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // H7: failure UX — error message + retry/manual fallback states.
+  const [error, setError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+
+  // Hoisted from inside useEffect so the retry button can call it again.
+  // Reset progress + clear error on each attempt; user input (data prop) is
+  // preserved by the parent (App.tsx), so retry is just a fresh AI call.
+  const fetchDraft = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    setDraftingProgress(0);
+
+    if (draftIntervalRef.current) clearInterval(draftIntervalRef.current);
+    draftIntervalRef.current = setInterval(() => {
+      setDraftingProgress(prev => (prev >= 90 ? prev : prev + Math.random() * 5));
+    }, 200);
+
+    try {
+      const draft = await generateLoveLetter(data);
+
+      if (draftIntervalRef.current) clearInterval(draftIntervalRef.current);
+      setDraftingProgress(100);
+
+      setTimeout(() => {
+        setLetter(draft);
+        setLoading(false);
+      }, 300);
+    } catch (err) {
+      if (draftIntervalRef.current) clearInterval(draftIntervalRef.current);
+      setLoading(false);
+      setError(err instanceof Error ? err.message : 'AI generation failed.');
+    } finally {
+      setRetrying(false);
+    }
+  }, [data]);
+
+  const handleRetry = () => {
+    setRetrying(true);
+    fetchDraft();
+  };
+
+  const handleWriteItMyself = () => {
+    setError(null);
+    setLetter(''); // empty textarea for user to type into
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (
@@ -28,36 +76,13 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
       !hasGeneratedRef.current
     ) {
       hasGeneratedRef.current = true;
-
-      const draftInterval = setInterval(() => {
-        setDraftingProgress(prev => {
-          if (prev >= 90) return prev;
-          return prev + Math.random() * 5;
-        });
-      }, 200);
-
-      const fetchDraft = async () => {
-        setLoading(true);
-        try {
-          const draft = await generateLoveLetter(data);
-
-          clearInterval(draftInterval);
-          setDraftingProgress(100);
-
-          setTimeout(() => {
-            setLetter(draft);
-            setLoading(false);
-          }, 300);
-        } catch (err) {
-          clearInterval(draftInterval);
-          setLoading(false);
-        }
-      };
-
       fetchDraft();
-
-      return () => clearInterval(draftInterval);
+      return () => {
+        if (draftIntervalRef.current) clearInterval(draftIntervalRef.current);
+      };
     }
+    // Intentionally only run on mount — fetchDraft has data in its closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFinalize = async () => {
@@ -137,6 +162,41 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
     );
   }
 
+  // H7: error state — shown if the AI draft fails (e.g., 5xx, 503 cap hit,
+  // network error). Two affordances: Try Again (re-runs the same fetch) and
+  // Write It Myself (clears the loading state and lets the user type into
+  // the existing textarea below). User input is preserved either way because
+  // `data` (CoupleData) lives in the parent component.
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-8 animate-fade-in text-[#E5D0A1]">
+        <div className="max-w-md">
+          <div className="w-16 h-16 rounded-full border border-[#D4AF37]/30 flex items-center justify-center mx-auto mb-8">
+            <span className="text-2xl">✦</span>
+          </div>
+          <h2 className="text-xl font-serif-elegant italic mb-4">We couldn't draft your letter</h2>
+          <p className="text-[#A89F91] text-sm italic mb-2">{error}</p>
+          <p className="text-[#A89F91] text-xs italic mb-8">Your input is saved. You can try again or write it yourself.</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={handleRetry}
+              disabled={retrying}
+              className="px-6 py-3 border border-[#E5D0A1]/40 rounded-full text-xs uppercase tracking-widest font-bold hover:bg-[#E5D0A1]/10 transition disabled:opacity-50 disabled:cursor-wait"
+            >
+              {retrying ? 'Retrying…' : 'Try Again'}
+            </button>
+            <button
+              onClick={handleWriteItMyself}
+              className="px-6 py-3 bg-luxury-wine text-white rounded-full text-xs uppercase tracking-widest font-bold hover:bg-black transition"
+            >
+              Write It Myself
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isPackaging) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-8 animate-fade-in text-[#E5D0A1]">
@@ -182,10 +242,11 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
       </div>
 
       <div className="bg-luxury-paper border border-[#D4C5A5] p-8 md:p-12 rounded-xl shadow-sm space-y-8 relative">
-        <textarea 
-          className="w-full bg-transparent border-none focus:ring-0 p-0 font-serif-elegant text-xl md:text-2xl leading-[1.8] text-luxury-ink italic h-[50vh] resize-none"
+        <textarea
+          className="w-full bg-transparent border-none focus:ring-0 p-0 font-serif-elegant text-xl md:text-2xl leading-[1.8] text-luxury-ink italic h-[50vh] resize-none placeholder:text-luxury-ink/40"
           value={letter}
           onChange={(e) => setLetter(e.target.value)}
+          placeholder="Write your letter here…"
         />
         
         <div className="flex flex-col md:flex-row gap-6 pt-8 border-t border-luxury-ink/20">

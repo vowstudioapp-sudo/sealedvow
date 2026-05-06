@@ -11,6 +11,10 @@
 // Every API route imports from here. No duplication.
 // ============================================================================
 
+// H3: side-effect import — validates required env vars at module load.
+// Must come BEFORE firebase-admin / Redis init so we fail fast on missing creds.
+import './env.js';
+
 import admin from "firebase-admin";
 import { Redis } from "@upstash/redis";
 

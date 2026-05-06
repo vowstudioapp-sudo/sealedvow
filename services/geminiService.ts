@@ -1,4 +1,4 @@
-import { CoupleData, SacredLocation, Occasion } from "../types.ts";
+import { CoupleData, SacredLocation } from "../types.ts";
 
 /**
  * All AI calls are proxied through /api/ai (Vercel serverless function).
@@ -31,33 +31,30 @@ const callAPI = async (action: string, payload: Record<string, any>): Promise<an
 /* ------------------------------------------------------------------ */
 
 export const generateLoveLetter = async (data: CoupleData): Promise<string> => {
-  try {
-    console.log("SERVICE HIT");
-    const result = await callAPI('generateLoveLetter', {
-      coupleData: {
-        senderName: data.senderName,
-        recipientName: data.recipientName,
-        occasion: data.occasion,
-        sharedMoment: data.sharedMoment,
-        timeShared: data.timeShared,
-        senderRawThoughts: data.senderRawThoughts,
-        relationshipIntent: data.relationshipIntent,
-      },
-    });
-    const payload = result?.data ?? result;
-    return payload?.text || null;
-  } catch (error) {
-    console.error("AI ERROR:", error);
-    const fallbacks: Record<Occasion, string> = {
-      anniversary: "Another year. I'd choose this again. Every part of it.",
-      'just-because': "No reason for this. Just wanted you to know I was thinking about you.",
-      apology: "I messed up. I know that. I'm not going to make excuses. I just want to do better.",
-      'thank-you': "I don't say this enough. But thank you. For everything you do that I forget to notice.",
-      eid: "Eid Mubarak. May this day bring you peace, joy, and the warmth of those you love.",
-      birthday: "Happy birthday. Another year of you in the world — and I'm grateful for every one of them.",
-    };
-    return fallbacks[data.occasion] || fallbacks.anniversary;
+  // H7: throw on failure so callers (RefineStage) can show a real error UI
+  // with retry + "write it myself". Previously this swallowed all errors and
+  // returned a hardcoded occasion fallback string ("Another year. I'd choose
+  // this again..." etc), which the user couldn't distinguish from a real AI
+  // letter. That silent-degradation made AI failures invisible to both
+  // users (received generic copy as if it were their letter) and operators
+  // (no error in client-side logs).
+  const result = await callAPI('generateLoveLetter', {
+    coupleData: {
+      senderName: data.senderName,
+      recipientName: data.recipientName,
+      occasion: data.occasion,
+      sharedMoment: data.sharedMoment,
+      timeShared: data.timeShared,
+      senderRawThoughts: data.senderRawThoughts,
+      relationshipIntent: data.relationshipIntent,
+    },
+  });
+  const payload = result?.data ?? result;
+  const text = payload?.text;
+  if (!text || typeof text !== 'string') {
+    throw new Error('AI returned an empty letter. Please try again or write it yourself.');
   }
+  return text;
 };
 
 export const generateCoupleMyth = async (data: CoupleData): Promise<string> => {

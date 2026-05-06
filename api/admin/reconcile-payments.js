@@ -8,6 +8,8 @@
 // manually via curl with ADMIN_SECRET.
 // ============================================================================
 
+import '../lib/env.js'; // H3: cold-start required-env validation (side-effect import)
+
 import crypto from 'crypto';
 import admin from 'firebase-admin';
 
