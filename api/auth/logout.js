@@ -2,7 +2,7 @@
 // /api/auth/logout.js — Clear session cookie
 // ============================================================================
 
-import { guardPost } from '../lib/middleware.js';
+import { guardPost, rateLimit } from '../lib/middleware.js';
 import { SESSION_COOKIE_NAME } from '../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -10,6 +10,17 @@ export default async function handler(req, res) {
 
   // Never cache auth responses.
   res.setHeader('Cache-Control', 'no-store');
+
+  // H8: per-IP rate limit. Logout is rare per-user but cheap server-side;
+  // this stops abuse without blocking legitimate session cleanup.
+  const { limited } = await rateLimit(req, {
+    keyPrefix: 'auth_logout',
+    windowSeconds: 60,
+    max: 10,
+  });
+  if (limited) {
+    return res.status(429).json({ error: 'Too many requests. Please wait a minute.' });
+  }
 
   const isProd =
     process.env.VERCEL_ENV === 'production' ||
