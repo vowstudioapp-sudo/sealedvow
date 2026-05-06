@@ -11,6 +11,11 @@ import { generateRequestId } from './lib/requestId.js';
 const PRICE_PAISE = 24900;  // ₹249 — single price for every letter
 const PRODUCT = 'sealedvow';
 
+// M5: outbound Razorpay timeout. Default 10s, env-tunable for post-launch
+// adjustment without redeploy. Vercel function maxDuration is 30s so we
+// keep ~20s headroom for response parse + RTDB write after the call.
+const RAZORPAY_TIMEOUT_MS = Number(process.env.RAZORPAY_TIMEOUT_MS || 10000);
+
 async function founderTransaction(code) {
   const ref = adminDb.ref('founderCodes/' + code);
 
@@ -188,19 +193,39 @@ export default async function handler(req, res) {
   const amount = hasValidCustomAmount ? parsedCustomAmount : PRICE_PAISE;
 
   try {
-    const orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64'),
-      },
-      body: JSON.stringify({
-        amount,
-        currency: 'INR',
-        receipt: `rcpt_${Date.now()}`,
-        notes: { product: PRODUCT },
-      }),
-    });
+    // M5: server-side AbortController. Caps how long this server waits on
+    // Razorpay's API before aborting and returning 503. Does NOT cap end-to-end
+    // customer wait — client-side timeout is a separate concern (M5b, deferred).
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), RAZORPAY_TIMEOUT_MS);
+
+    let orderResponse;
+    try {
+      orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64'),
+        },
+        body: JSON.stringify({
+          amount,
+          currency: 'INR',
+          receipt: `rcpt_${Date.now()}`,
+          notes: { product: PRODUCT },
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchErr) {
+      if (fetchErr.name === 'AbortError') {
+        console.error('[Razorpay] Order creation timeout', { requestId, timeoutMs: RAZORPAY_TIMEOUT_MS });
+        return res.status(503).json({
+          error: 'Payment service is slow right now. Please try again in a moment.',
+        });
+      }
+      throw fetchErr; // network errors etc. fall through to outer catch
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!orderResponse.ok) {
       const errData = await orderResponse.json().catch(() => ({}));

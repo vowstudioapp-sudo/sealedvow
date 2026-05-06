@@ -26,6 +26,11 @@ if (!admin.apps.length) {
 
 const adminDb = admin.database();
 
+// M5: per-page timeout for outbound Razorpay GET. Hardcoded — admin-only
+// endpoint, low frequency, low tuning value. One slow page shouldn't block
+// the whole scan; a separate AbortController fires per loop iteration.
+const RECONCILE_PAGE_TIMEOUT_MS = 15000;
+
 function safeBufferEqual(provided, expected) {
   try {
     const a = Buffer.from(provided);
@@ -109,7 +114,28 @@ export default async function handler(req, res) {
 
     while (pages < MAX_PAGES) {
       const url = `https://api.razorpay.com/v1/payments?from=${fromSeconds}&to=${toSeconds}&count=100&skip=${skip}`;
-      const response = await fetch(url, { headers: { 'Authorization': auth } });
+
+      // M5: per-page server-side AbortController. One slow page shouldn't
+      // block the whole scan; a hung Razorpay call still aborts at 15s.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), RECONCILE_PAGE_TIMEOUT_MS);
+
+      let response;
+      try {
+        response = await fetch(url, {
+          headers: { 'Authorization': auth },
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        if (fetchErr.name === 'AbortError') {
+          console.error('[Reconcile] Razorpay fetch timeout', { page: pages, timeoutMs: RECONCILE_PAGE_TIMEOUT_MS });
+          return res.status(503).json({ error: 'Razorpay API timeout', page: pages });
+        }
+        throw fetchErr; // network errors etc. fall through to outer catch
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
       if (!response.ok) {
         console.error('[Reconcile] Razorpay fetch failed', { status: response.status, page: pages });
         return res.status(502).json({ error: 'Razorpay API error', status: response.status });
