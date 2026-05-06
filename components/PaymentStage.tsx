@@ -18,6 +18,11 @@ const LETTER_PRICE = 249;
 const PRODUCT_NAME = 'Sealed Vow';
 const PRODUCT_TAGLINE = 'A private letter, sealed in time.';
 
+// M5b: client-side timeout for /api/create-order. 20s is deliberately longer
+// than M5's 10s server cap, to allow full server processing + flaky-network
+// round-trip without spurious aborts before the server's own 503 can return.
+const CLIENT_TIMEOUT_MS = 20000;
+
 function parseAmountFromText(value?: string): number {
   if (!value) return 0;
   const digits = String(value).replace(/[^\d]/g, '');
@@ -124,13 +129,32 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         setScriptLoaded(true);
       }
 
-      const orderRes = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customAmountPaise: isEidFlow ? totalPayablePaise : undefined,
-        }),
-      });
+      // M5b: client-side AbortController. Caps customer-perceived wait at 20s
+      // so a slow client→server connection doesn't produce a hung spinner.
+      // Outer try/finally below resets isProcessing + paymentInProgressRef,
+      // so the AbortError branch only sets the error and returns.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
+
+      let orderRes: Response;
+      try {
+        orderRes = await fetch('/api/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customAmountPaise: isEidFlow ? totalPayablePaise : undefined,
+          }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr: any) {
+        if (fetchErr?.name === 'AbortError') {
+          setError('Payment service is slow right now. Please try again in a moment.');
+          return;
+        }
+        throw fetchErr; // network errors etc. fall through to existing error handling
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!orderRes.ok) {
         const errData = await orderRes.json().catch(() => ({}));
