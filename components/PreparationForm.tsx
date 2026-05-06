@@ -131,7 +131,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   };
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
   const memoryInputRef = useRef<HTMLInputElement>(null);
 
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
@@ -160,12 +159,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
     const file = e.target.files?.[0];
     if (!file) return;
     media.uploadCoverImage(file);
-  };
-
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    media.uploadVideo(file);
   };
 
   const handleMemoryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -855,29 +848,9 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                      <span className="text-[10px] uppercase font-bold tracking-widest text-white">None</span>
                   </button>
 
-                  <div 
-                    onClick={() => {
-                        updateData({ videoSource: 'upload' });
-                        videoInputRef.current?.click();
-                    }}
-                    className={`p-6 rounded border-2 transition-all cursor-pointer relative group ${data.videoSource === 'upload' ? 'bg-[#2A2522] border-luxury-gold' : 'bg-transparent border-white/10 opacity-90 hover:opacity-100 hover:border-white/30'}`}
-                  >
-                     <span className="text-3xl block mb-2">📹</span>
-                     <span className="text-[10px] uppercase font-bold tracking-widest text-white block mb-1">Upload Video</span>
-                     <span className="text-[10px] uppercase tracking-widest text-green-400 block font-bold">Standard (Free)</span>
-                     <span className="text-[9px] uppercase tracking-widest text-green-400 block mt-1">Max 5MB (~15s)</span>
-                     {data.video?.url && <span className="absolute top-3 right-3 text-green-400 text-lg font-bold">✓</span>}
-                     {media.isUploadingVideo && <span className="absolute top-3 right-3 text-white text-lg animate-spin">⟳</span>}
-                     <input 
-                        type="file" 
-                        ref={videoInputRef} 
-                        accept="video/*" 
-                        className="hidden" 
-                        onChange={handleVideoUpload}
-                     />
-                  </div>
+                  {/* C7 cleanup: "Upload Video" card removed — server gate now blocks type='video'. */}
 
-                  <button 
+                  <button
                     type="button"
                     onClick={() => updateData({ videoSource: 'veo' })}
                     className={`p-6 rounded border-2 transition-all ${data.videoSource === 'veo' ? 'bg-luxury-gold/10 border-luxury-gold shadow-[0_0_15px_rgba(212,175,55,0.3)]' : 'bg-transparent border-white/10 opacity-90 hover:opacity-100 hover:border-luxury-gold/60'}`}
@@ -924,16 +897,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                   </div>
                )}
 
-               {data.videoSource === 'upload' && (
-                  <div className="mt-4 p-4 bg-luxury-gold/10 border border-luxury-gold/30 rounded-lg">
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-luxury-gold mb-2">Upload Requirements</h4>
-                      <ul className="text-[10px] text-white/80 space-y-1 list-disc list-inside font-bold">
-                          <li>Format: MP4 or WebM (Vertical 9:16 preferred)</li>
-                          <li>Size Limit: <span className="text-white">Max 5MB</span> (Strict limit)</li>
-                          <li>Duration: <span className="text-white">10-15 seconds</span> (Loops automatically)</li>
-                      </ul>
-                  </div>
-               )}
+               {/* C7 cleanup: videoSource === 'upload' requirements callout removed. */}
             </div>
             )}
 

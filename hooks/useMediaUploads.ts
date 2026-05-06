@@ -19,7 +19,7 @@ async function fileToDataUri(file: File | Blob): Promise<string> {
 async function uploadToApi(
   sessionId: string,
   file: File | Blob,
-  type: 'cover' | 'memory' | 'video' | 'audio',
+  type: 'cover' | 'memory' | 'audio',
   index?: number
 ): Promise<string> {
   const dataUri = await fileToDataUri(file);
@@ -36,8 +36,9 @@ async function uploadToApi(
  *
  * Handles all media uploads via /api/upload-media:
  * - Cover image
- * - User video
  * - Memory board photos
+ *
+ * (Video upload was removed — see C7. Server gate now blocks `type='video'`.)
  *
  * Rules:
  * - Uploads go through server-side API (not direct to Firebase)
@@ -48,7 +49,6 @@ async function uploadToApi(
 const LIMITS = {
   IMAGE_MB: 10,
   MEMORY_IMAGE_MB: 15,
-  VIDEO_MB: 10,
   MEMORY_MAX: 10,
 } as const;
 
@@ -76,7 +76,6 @@ export function useMediaUploads({
   // ---------------------------------------------------------------------------
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [isUploadingMemories, setIsUploadingMemories] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -131,30 +130,6 @@ export function useMediaUploads({
 
   const removeCoverImage = () => {
     updateData({ userImageUrl: undefined });
-  };
-
-  // ---------------------------------------------------------------------------
-  // VIDEO
-  // ---------------------------------------------------------------------------
-
-  const uploadVideo = async (file: File) => {
-    setIsUploadingVideo(true);
-
-    try {
-      const sid = ensureSession();
-      validateFileSize(file, LIMITS.VIDEO_MB, 'Video');
-
-      const url = await uploadToApi(sid, file, 'video');
-      updateData({ video: { url, source: 'user' } });
-    } catch (err: any) {
-      onError(err.message || 'Video upload failed');
-    } finally {
-      setIsUploadingVideo(false);
-    }
-  };
-
-  const removeVideo = () => {
-    updateData({ video: undefined });
   };
 
   // ---------------------------------------------------------------------------
@@ -270,11 +245,6 @@ export function useMediaUploads({
     uploadCoverImage,
     removeCoverImage,
     isUploadingImage,
-
-    // Video
-    uploadVideo,
-    removeVideo,
-    isUploadingVideo,
 
     // Memory board
     uploadMemoryBoard,

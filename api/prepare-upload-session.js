@@ -61,6 +61,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // M4: mutation route — never cache responses.
+  res.setHeader('Cache-Control', 'no-store');
+
   // Per-IP burst rate limit (5 / 60s)
   const { limited } = await rateLimit(req, {
     keyPrefix: 'upload_token_mint',

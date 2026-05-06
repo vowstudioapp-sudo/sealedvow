@@ -2,6 +2,9 @@ import crypto from 'crypto';
 import { db } from '../lib/firebaseAdmin';
 
 export default async function handler(req, res) {
+  // M4: sensitive admin data — never cache responses.
+  res.setHeader('Cache-Control', 'no-store');
+
   const authHeader = req.headers.authorization || '';
 
   const token = authHeader.startsWith('Bearer ')

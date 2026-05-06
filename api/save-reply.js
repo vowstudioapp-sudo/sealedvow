@@ -10,6 +10,9 @@ import { adminDb, guardPost, rateLimit } from './lib/middleware.js';
 export default async function handler(req, res) {
   if (guardPost(req, res)) return;
 
+  // M4: mutation route — never cache responses.
+  res.setHeader('Cache-Control', 'no-store');
+
   // ── RATE LIMITING ──
   const { limited } = await rateLimit(req, {
     keyPrefix: 'reply_rate',

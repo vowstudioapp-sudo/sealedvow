@@ -47,6 +47,9 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
+    // M4: sensitive admin data — never cache responses.
+    res.setHeader('Cache-Control', 'no-store');
+
     // ── AUTH (Pattern A from api/admin/* files, extended for CRON_SECRET) ──
     const adminSecret = process.env.ADMIN_SECRET;
     if (!adminSecret) {

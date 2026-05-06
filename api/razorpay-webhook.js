@@ -43,6 +43,9 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' });
     }
+
+    // M4: mutation route — never cache responses.
+    res.setHeader('Cache-Control', 'no-store');
     if (!req.headers['content-type']?.includes('application/json')) {
       return res.status(415).json({ error: 'Unsupported Media Type' });
     }

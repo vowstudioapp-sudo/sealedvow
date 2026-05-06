@@ -4,7 +4,9 @@
 // Accepts base64-encoded files in JSON body, uploads to Firebase Storage
 // via Admin SDK. Returns public download URL.
 //
-// Supports: cover images, memory board photos, videos, audio recordings.
+// Supports: cover images, memory board photos, audio recordings.
+// (Video uploads were disabled at the API gate — see C7. Re-enable only
+// with paid-actor binding.)
 //
 // Architecture decision: base64 in JSON body (not multipart/form-data).
 // Reason: images are already compressed to ~1MB on the client side,
@@ -62,14 +64,12 @@ const ALLOWED_TYPES = ['cover', 'memory', 'audio'];
 const ALLOWED_MIME_PREFIXES = {
   cover: ['image/jpeg', 'image/png', 'image/webp'],
   memory: ['image/jpeg', 'image/png', 'image/webp'],
-  video: ['video/mp4', 'video/webm'],
   audio: ['audio/webm', 'audio/mp4', 'audio/mpeg'],
 };
 
 const MAX_SIZES = {
   cover: 2 * 1024 * 1024,    // 2MB (already compressed on client)
   memory: 2 * 1024 * 1024,   // 2MB per photo
-  video: 15 * 1024 * 1024,   // 15MB
   audio: 3 * 1024 * 1024,    // 3MB
 };
 
@@ -108,6 +108,9 @@ function extractBase64(dataUri) {
 export default async function handler(req, res) {
   // guardPost handles CORS, OPTIONS, method check, content-type check
   if (guardPost(req, res)) return;
+
+  // M4: mutation route — never cache responses.
+  res.setHeader('Cache-Control', 'no-store');
 
   // ── STEP 1 (C7): UPLOAD TOKEN VERIFICATION ──
   // Token must be minted by /api/prepare-upload-session and bound to

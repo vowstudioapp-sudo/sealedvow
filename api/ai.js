@@ -588,6 +588,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
 
+  // M4: mutation route — never cache responses.
+  res.setHeader('Cache-Control', 'no-store');
+
   // ── GLOBAL KILL SWITCH ──
   // Flip process.env.AI_DISABLED=true to instantly disable every AI call
   // without redeploying (safety valve for cost runaway / provider incident).

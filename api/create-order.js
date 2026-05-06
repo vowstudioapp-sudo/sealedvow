@@ -61,6 +61,9 @@ async function trackFounderFail(req) {
 export default async function handler(req, res) {
   if (guardPost(req, res)) return;
 
+  // M4: mutation route — never cache responses.
+  res.setHeader('Cache-Control', 'no-store');
+
   // H1: correlation ID — generated here, returned to client, propagated
   // through verify-payment to shared/{sessionKey} and payments/{paymentId}.
   const requestId = generateRequestId();

@@ -6,6 +6,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // M4: admin mutation route — never cache responses.
+  res.setHeader('Cache-Control', 'no-store');
+
   const authHeader = req.headers.authorization || '';
 
   const token = authHeader.startsWith('Bearer ')

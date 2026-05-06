@@ -45,7 +45,7 @@ async function ensureToken(sessionId: string): Promise<string> {
 interface UploadBody {
   sessionId: string;
   file: string; // data URI
-  type: 'cover' | 'memory' | 'video' | 'audio';
+  type: 'cover' | 'memory' | 'audio';
   index?: number;
 }
 

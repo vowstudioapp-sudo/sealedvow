@@ -75,6 +75,9 @@ function validateCoupleData(data) {
 export default async function handler(req, res) {
   if (guardPost(req, res)) return;
 
+  // M4: mutation route — never cache responses.
+  res.setHeader('Cache-Control', 'no-store');
+
   // H1: correlation ID — set by create-order, forwarded by client. Used in
   // every log line and stored on shared/{sessionKey} + payments/{paymentId}
   // so an operator can grep one ID for the entire payment journey.
