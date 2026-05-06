@@ -1,9 +1,20 @@
 import crypto from 'crypto';
 import { db } from '../lib/firebaseAdmin';
+import { rateLimit } from '../lib/middleware.js';
 
 export default async function handler(req, res) {
   // M4: sensitive admin data — never cache responses.
   res.setHeader('Cache-Control', 'no-store');
+
+  // M3: rate-limit before auth — throttle attempts before the secret comparison.
+  const { limited } = await rateLimit(req, {
+    keyPrefix: 'admin_pending_claims_rate',
+    windowSeconds: 60,
+    max: 5,
+  });
+  if (limited) {
+    return res.status(429).json({ error: 'Too many requests. Please wait a minute.' });
+  }
 
   const authHeader = req.headers.authorization || '';
 

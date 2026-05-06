@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { db } from '../lib/firebaseAdmin';
+import { rateLimit } from '../lib/middleware.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -8,6 +9,16 @@ export default async function handler(req, res) {
 
   // M4: admin mutation route — never cache responses.
   res.setHeader('Cache-Control', 'no-store');
+
+  // M3: rate-limit before auth — throttle attempts before the secret comparison.
+  const { limited } = await rateLimit(req, {
+    keyPrefix: 'admin_revert_claim_rate',
+    windowSeconds: 60,
+    max: 5,
+  });
+  if (limited) {
+    return res.status(429).json({ error: 'Too many requests. Please wait a minute.' });
+  }
 
   const authHeader = req.headers.authorization || '';
 

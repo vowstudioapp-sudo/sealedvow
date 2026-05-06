@@ -7,7 +7,7 @@
 // ============================================================================
 
 import crypto from 'crypto';
-import { adminDb } from './lib/middleware.js';
+import { adminDb, rateLimit } from './lib/middleware.js';
 
 // ── SECURITY HELPERS ──
 
@@ -87,6 +87,16 @@ export default async function handler(req, res) {
 
   if (!req.headers['content-type']?.includes('application/json')) {
     return res.status(415).json({ error: 'Unsupported Media Type' });
+  }
+
+  // M3: rate-limit before auth — throttle attempts before the secret comparison.
+  const { limited } = await rateLimit(req, {
+    keyPrefix: 'admin_founder_codes_rate',
+    windowSeconds: 60,
+    max: 5,
+  });
+  if (limited) {
+    return res.status(429).json({ error: 'Too many requests. Please wait a minute.' });
   }
 
   // ── ADMIN AUTHENTICATION ──

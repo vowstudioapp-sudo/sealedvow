@@ -12,6 +12,7 @@ import '../lib/env.js'; // H3: cold-start required-env validation (side-effect i
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
+import { rateLimit } from '../lib/middleware.js';
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -64,6 +65,24 @@ export default async function handler(req, res) {
 
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+    // M3: cron carve-out (block-scoped to avoid `cronSecret` const collision
+    // with the existing auth block below). Daily reconcile cron bypasses
+    // the rate limit; manual admin requests still get throttled.
+    {
+      const cronSecret = process.env.CRON_SECRET;
+      const isCron = cronSecret ? safeBufferEqual(token, cronSecret) : false;
+      if (!isCron) {
+        const { limited } = await rateLimit(req, {
+          keyPrefix: 'admin_reconcile_rate',
+          windowSeconds: 60,
+          max: 5,
+        });
+        if (limited) {
+          return res.status(429).json({ error: 'Too many requests. Please wait a minute.' });
+        }
+      }
+    }
 
     const cronSecret = process.env.CRON_SECRET;
     const adminMatch = safeBufferEqual(token, adminSecret);
