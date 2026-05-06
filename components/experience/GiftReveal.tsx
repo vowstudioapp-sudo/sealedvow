@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import { safeUrl } from '../../utils/safeUrl';
 
 interface GiftRevealProps {
   isRevealed: boolean;
@@ -76,7 +77,7 @@ export const GiftReveal: React.FC<GiftRevealProps> = ({
             ) : (
               <div className="animate-fade-in w-full">
                 <a
-                  href={giftLink || '#'}
+                  href={safeUrl(giftLink)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="main-experience-gift-access"

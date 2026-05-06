@@ -65,7 +65,7 @@ const EidPreparationForm = lazy(() =>
 );
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
-import { validateCoupleData } from './utils/validator.ts';
+import { validateCoupleData } from './lib/coupleDataValidator.js';
 import { getDemoData } from './data/demoData.ts';
 
 import { THEME_ORDER, THEME_SYSTEM } from './theme/themeSystem';

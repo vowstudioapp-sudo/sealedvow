@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { CoupleData, Coupon, Theme } from '../types';
 import { experienceTheme, getCinematicLayer, THEME_SYSTEM, UI_PALETTE } from '../theme/themeSystem';
+import { safeUrl } from '../utils/safeUrl';
 import { PaperSurface } from './PaperSurface';
 import { LetterSection } from './experience/LetterSection';
 import { MemoryBoard } from './experience/MemoryBoard';
@@ -568,9 +569,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
                   </div>
                 )}
                 
-                <a 
-                  href={data.sacredLocation.googleMapsUri} 
-                  target="_blank" 
+                <a
+                  href={safeUrl(data.sacredLocation.googleMapsUri)}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-3 px-8 py-4 rounded-full text-[10px] uppercase tracking-[0.3em] font-bold transition-all hover:scale-[1.03]"
                   style={{ 

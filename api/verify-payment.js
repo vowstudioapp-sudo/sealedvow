@@ -15,6 +15,7 @@
 import crypto from 'crypto';
 import { adminDb, guardPost, rateLimit } from './lib/middleware.js';
 import { getSessionUser } from './lib/auth.js';
+import { validateCoupleData as parseCoupleData } from '../lib/coupleDataValidator.js';
 
 const MIN_PRICE_PAISE = 24900;  // ₹249 — single price floor
 
@@ -37,45 +38,32 @@ function slugify(text) {
     .substring(0, 30);
 }
 
+// C11+C12 fix: route through the shared Zod schema in lib/coupleDataValidator.js.
+// The schema validates EVERY field including nested objects (sacredLocation,
+// memoryBoard[], video, audio, coupons[]) and enforces the URL allowlist on
+// every URL-typed field. The previous hand-rolled version only sanitized
+// top-level strings — nested objects passed through unmodified, allowing
+// `javascript:` URIs to land in shared/{sessionKey}.sacredLocation.googleMapsUri
+// and similar nested paths.
+//
+// Returns null on validation failure (preserves the existing call-site contract
+// at lines 156 and 419: `if (!sanitized) return res.status(400)`).
 function validateCoupleData(data) {
   if (!data || typeof data !== 'object') return null;
 
-  const raw = JSON.stringify(data);
-  if (raw.length > 200_000) return null;
-
-  if (typeof data.recipientName !== 'string' || data.recipientName.trim().length === 0) return null;
-  if (typeof data.senderName !== 'string' || data.senderName.trim().length === 0) return null;
-
-  const validOccasions = ['anniversary', 'apology', 'just-because', 'thank-you', 'eid', 'birthday'];
-  if (!validOccasions.includes(data.occasion)) return null;
-
-  const validThemes = ['obsidian', 'velvet', 'crimson', 'midnight', 'evergreen', 'pearl'];
-  if (!validThemes.includes(data.theme)) return null;
-
-  const sanitized = {};
-  const MAX_STRING = 10000;
-  const MAX_NAME = 100;
-
-  for (const [key, value] of Object.entries(data)) {
-    if (typeof value === 'string') {
-      let clean = value
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/javascript:/gi, '')
-        .replace(/on\w+\s*=/gi, '');
-      clean = (key === 'recipientName' || key === 'senderName')
-        ? clean.substring(0, MAX_NAME).trim()
-        : clean.substring(0, MAX_STRING);
-      sanitized[key] = clean;
-    } else if (Array.isArray(value)) {
-      sanitized[key] = value.slice(0, 10);
-    } else if (typeof value === 'boolean' || typeof value === 'number') {
-      sanitized[key] = value;
-    } else if (value !== null && typeof value === 'object') {
-      sanitized[key] = value;
-    }
+  // Total payload size cap before schema parse (cheap denial-of-service guard).
+  try {
+    if (JSON.stringify(data).length > 200_000) return null;
+  } catch {
+    return null;
   }
 
-  return sanitized;
+  const result = parseCoupleData(data);
+  if (!result.success) {
+    console.warn('[Verify] coupleData validation failed:', result.error);
+    return null;
+  }
+  return result.data;
 }
 
 
