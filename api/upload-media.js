@@ -13,8 +13,29 @@
 // ============================================================================
 
 import admin from 'firebase-admin';
-import { guardPost, rateLimit } from './lib/middleware.js';
+import { Redis } from '@upstash/redis';
+import { guardPost, rateLimit, getClientIP } from './lib/middleware.js';
 import { getSessionUser } from './lib/auth.js';
+
+const kv = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function safeKV(fn, fallback = null) {
+  try {
+    return await fn();
+  } catch {
+    return fallback;
+  }
+}
+
+const TOKEN_UPLOAD_CAP = 20;
+const DAILY_STORAGE_CAP = 100 * 1024 * 1024; // 100 MB / actor / day
 
 // ── LAZY BUCKET INITIALIZATION ──
 // Initialized inside handler, not at module level, to ensure Firebase Admin
@@ -32,7 +53,9 @@ function getBucket() {
 
 // ── VALIDATION ──
 
-const ALLOWED_TYPES = ['cover', 'memory', 'video', 'audio'];
+// STEP 2: video uploads disabled at API gate (C7) — large per-file size made
+// it the dominant cost-attack vector. Re-enable only with paid-actor binding.
+const ALLOWED_TYPES = ['cover', 'memory', 'audio'];
 
 const ALLOWED_MIME_PREFIXES = {
   cover: ['image/jpeg', 'image/png', 'image/webp'],
@@ -84,7 +107,57 @@ export default async function handler(req, res) {
   // guardPost handles CORS, OPTIONS, method check, content-type check
   if (guardPost(req, res)) return;
 
-  // ── RATE LIMITING ──
+  // ── STEP 1 (C7): UPLOAD TOKEN VERIFICATION ──
+  // Token must be minted by /api/prepare-upload-session and bound to
+  // (actor, sessionId). Closes the UUID-rotation cost-abuse vector.
+  const uploadToken = req.headers['x-upload-token'];
+  if (!uploadToken || typeof uploadToken !== 'string' || !/^[a-f0-9]{32}$/i.test(uploadToken)) {
+    return res.status(401).json({ error: 'Missing or invalid upload token' });
+  }
+
+  // Undefined sentinel distinguishes KV failure from missing key.
+  const tokenRecord = await safeKV(() => kv.hgetall(`upload_token:${uploadToken}`), undefined);
+  if (tokenRecord === undefined) {
+    return res.status(503).json({ error: 'Service temporarily unavailable' });
+  }
+  if (!tokenRecord || Object.keys(tokenRecord).length === 0) {
+    return res.status(401).json({ error: 'Token not found or expired' });
+  }
+
+  // Explicit expiresAt check (defense against stale-eviction edge case where
+  // Upstash hasn't yet purged a TTL'd key).
+  if (Date.now() > Number(tokenRecord.expiresAt)) {
+    return res.status(401).json({ error: 'Token expired' });
+  }
+
+  // Need sessionId from body to enforce session binding.
+  const { sessionId, file, type, index } = req.body || {};
+
+  // Actor binding — strict.
+  const ip = getClientIP(req);
+  let requestUid = null;
+  try {
+    const sessionUser = await getSessionUser(req);
+    requestUid = sessionUser?.uid || null;
+  } catch {}
+  const requestActor = requestUid || `ip:${ip}`;
+  if (tokenRecord.actor !== requestActor) {
+    return res.status(403).json({ error: 'Token does not belong to this actor' });
+  }
+
+  // SessionId binding — token can only upload to its bound session
+  // (closes griefing vector where attacker overwrites a victim's pre-payment
+  // session by stealing/guessing their sessionId).
+  if (tokenRecord.sessionId !== sessionId) {
+    return res.status(403).json({ error: 'Token does not match session' });
+  }
+
+  // Token-level upload count cap.
+  if (Number(tokenRecord.uploadCount) >= TOKEN_UPLOAD_CAP) {
+    return res.status(429).json({ error: 'Token upload limit reached' });
+  }
+
+  // ── RATE LIMITING (defense-in-depth, post-token) ──
   const { limited } = await rateLimit(req, {
     keyPrefix: 'upload_rate',
     windowSeconds: 60,
@@ -96,14 +169,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { sessionId, file, type, index } = req.body || {};
-    let uploadedByUid = null;
-    try {
-      const sessionUser = await getSessionUser(req);
-      uploadedByUid = sessionUser?.uid || null;
-    } catch {
-      // swallow errors — upload must not fail due to auth
-    }
+    // sessionId/file/type/index already destructured above for the token check.
+    const uploadedByUid = requestUid;
 
     // ── VALIDATE INPUTS ──
 
@@ -160,6 +227,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `File too large. Maximum ${maxMB}MB for ${type}.` });
     }
 
+    // ── STEP 4 (C7): PER-ACTOR DAILY STORAGE CAP ──
+    // Race window exists between this read and the post-upload incrby below
+    // (two concurrent uploads can both pass). Acceptable for MVP — abuse
+    // already massively reduced by token + actor binding. Deferred to a Lua
+    // CAS script post-launch if needed.
+    const today = todayKey();
+    const storageKey = `upload_storage_daily:${requestActor}:${today}`;
+    const rawDaily = await safeKV(() => kv.get(storageKey), undefined);
+    if (rawDaily === undefined) {
+      return res.status(503).json({ error: 'Service temporarily unavailable' });
+    }
+    const currentBytes = Number(rawDaily || 0);
+    if (Number.isNaN(currentBytes)) {
+      return res.status(503).json({ error: 'Service temporarily unavailable' });
+    }
+    if (currentBytes + buffer.length > DAILY_STORAGE_CAP) {
+      return res.status(429).json({ error: 'Daily storage limit reached' });
+    }
+
     // ── BUILD STORAGE PATH ──
 
     const ext = getExtension(mimeType);
@@ -168,10 +254,11 @@ export default async function handler(req, res) {
     if (type === 'cover') {
       storagePath = `sessions/${sessionId}/cover.${ext}`;
     } else if (type === 'memory') {
-      const idx = (typeof index === 'number' && index >= 0) ? index : Date.now();
-      storagePath = `sessions/${sessionId}/memory/${idx}.${ext}`;
-    } else if (type === 'video') {
-      storagePath = `sessions/${sessionId}/video.${ext}`;
+      // STEP 3 (C7): bounded memory index 0-9; Date.now() fallback dropped.
+      if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index > 9) {
+        return res.status(400).json({ error: 'Invalid memory index — must be integer 0-9' });
+      }
+      storagePath = `sessions/${sessionId}/memory/${index}.${ext}`;
     } else if (type === 'audio') {
       storagePath = `sessions/${sessionId}/audio.${ext}`;
     }
@@ -197,6 +284,17 @@ export default async function handler(req, res) {
       action: 'read',
       expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
     });
+
+    // ── STEP 5 (C7): POST-UPLOAD COUNTER UPDATES ──
+    // hincrby preserves the token's TTL — token cannot be kept alive
+    // indefinitely via uploads. Daily storage counter gets a TTL on first hit.
+    await safeKV(() => kv.hincrby(`upload_token:${uploadToken}`, 'uploadCount', 1));
+    await safeKV(() => kv.hincrby(`upload_token:${uploadToken}`, 'uploadedBytes', buffer.length));
+
+    const newDailyBytes = await safeKV(() => kv.incrby(storageKey, buffer.length));
+    if (newDailyBytes === buffer.length) {
+      await safeKV(() => kv.expire(storageKey, 86400));
+    }
 
     return res.status(200).json({ url, success: true });
 

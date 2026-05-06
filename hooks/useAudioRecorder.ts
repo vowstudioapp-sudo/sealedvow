@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { CoupleData } from '../types';
+import { uploadWithAuth } from './uploadClient';
 
-// Upload voice recording via /api/upload-media
+// Upload voice recording via /api/upload-media (with X-Upload-Token + retry).
 async function uploadVoiceRecording(sessionId: string, blob: Blob): Promise<string> {
   const dataUri = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -10,23 +11,11 @@ async function uploadVoiceRecording(sessionId: string, blob: Blob): Promise<stri
     reader.readAsDataURL(blob);
   });
 
-  const response = await fetch('/api/upload-media', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId,
-      file: dataUri,
-      type: 'audio',
-    }),
+  return uploadWithAuth({
+    sessionId,
+    file: dataUri,
+    type: 'audio',
   });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || 'Voice upload failed');
-  }
-
-  const result = await response.json();
-  return result.url;
 }
 
 /**

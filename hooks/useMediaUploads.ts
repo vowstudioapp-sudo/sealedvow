@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { CoupleData, MemoryPhoto } from '../types';
+import { uploadWithAuth } from './uploadClient';
 
 // ── API Upload Helper ──
-// Converts File to base64 data URI and POSTs to /api/upload-media.
-// Returns the public URL of the uploaded file.
+// Converts File to base64 data URI and routes through uploadWithAuth, which
+// handles X-Upload-Token minting and one-shot retry on 401/403.
 
 async function fileToDataUri(file: File | Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -22,25 +23,12 @@ async function uploadToApi(
   index?: number
 ): Promise<string> {
   const dataUri = await fileToDataUri(file);
-
-  const response = await fetch('/api/upload-media', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId,
-      file: dataUri,
-      type,
-      ...(index !== undefined && { index }),
-    }),
+  return uploadWithAuth({
+    sessionId,
+    file: dataUri,
+    type,
+    ...(index !== undefined && { index }),
   });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || 'Upload failed');
-  }
-
-  const result = await response.json();
-  return result.url;
 }
 
 /**
