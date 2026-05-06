@@ -46,6 +46,24 @@ export default async function handler(req, res) {
 
   try {
     const sessionRef = adminDb.ref(`shared/${sessionKey}`);
+
+    // M7: pre-read for idempotency. Missing parent → 404. Already-replied
+    // session → 200 alreadyReplied (no overwrite, no DB write). The pre-read
+    // and the post-abort re-read are DELIBERATELY two distinct reads — the
+    // post-abort re-read is semantically fresh after a transaction race.
+    // Do not optimize into one cached snapshot.
+    const existingSnap = await sessionRef.once('value');
+    const existing = existingSnap.val();
+    if (!existing) {
+      return res.status(404).json({ error: "Session not found." });
+    }
+    if (existing.reply?.text) {
+      return res.status(200).json({
+        saved: true,
+        alreadyReplied: true,
+      });
+    }
+
     const result = await sessionRef.transaction(current => {
       if (!current) return;
       if (!current.replyEnabled) return;
@@ -61,6 +79,20 @@ export default async function handler(req, res) {
     });
 
     if (!result.committed || !result.snapshot.val()) {
+      // M7: post-abort re-read for race-condition convergence. If another
+      // request won the race and committed a reply between our pre-read and
+      // our transaction, surface the same idempotent 200 instead of a false
+      // 400. Falls through to the existing 400 only when no reply exists
+      // (e.g. !replyEnabled or transient transaction failure).
+      const latest =
+        result.snapshot.val() ||
+        (await sessionRef.once('value')).val();
+      if (latest?.reply?.text) {
+        return res.status(200).json({
+          saved: true,
+          alreadyReplied: true,
+        });
+      }
       return res.status(400).json({ error: "Reply is unavailable for this session." });
     }
 
