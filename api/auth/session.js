@@ -7,7 +7,7 @@
 // subsequent same-origin requests.
 // ============================================================================
 
-import { adminAuth, guardPost } from '../lib/middleware.js';
+import { adminAuth, guardPost, rateLimit } from '../lib/middleware.js';
 import { SESSION_COOKIE_NAME } from '../lib/auth.js';
 
 const EXPIRES_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
@@ -18,6 +18,18 @@ export default async function handler(req, res) {
 
   // Never cache auth responses.
   res.setHeader('Cache-Control', 'no-store');
+
+  // H8: per-IP rate limit. Each call invokes Firebase Admin token verification
+  // (paid quota + latency); this prevents accidental loops or brute-force
+  // attempts from burning Firebase Auth quota.
+  const { limited } = await rateLimit(req, {
+    keyPrefix: 'auth_session_rate',
+    windowSeconds: 60,
+    max: 5,
+  });
+  if (limited) {
+    return res.status(429).json({ error: 'Too many requests. Please wait a minute.' });
+  }
 
   const { idToken } = req.body || {};
   if (!idToken || typeof idToken !== 'string') {

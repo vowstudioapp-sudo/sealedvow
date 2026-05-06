@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import { setCors, rateLimit } from './lib/middleware.js';
 
 /* =========================
    🔐 FIREBASE INIT
@@ -69,10 +70,9 @@ function isSessionPaid(data) {
 ========================= */
 export default async function handler(req, res) {
 
-  // ✅ FORCE CORS (no logic, no conditions)
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // H4: CORS via shared allowlist (single source of truth in middleware.js).
+  // Was a wildcard '*'; now restricts to sealedvow.com + Vercel preview + dev.
+  setCors(req, res);
 
   // ✅ Preflight
   if (req.method === "OPTIONS") {
@@ -86,6 +86,18 @@ export default async function handler(req, res) {
 
   // M4: mutation route — never cache responses.
   res.setHeader('Cache-Control', 'no-store');
+
+  // H8: per-IP rate limit. Existing claimAttempts/{sessionKey} transaction
+  // blocks per-session attacks (3/session, 5/IP/session) but not fanout
+  // attacks across random sessionKeys. This closes that gap.
+  const { limited } = await rateLimit(req, {
+    keyPrefix: 'claim_eidi_rate',
+    windowSeconds: 60,
+    max: 10,
+  });
+  if (limited) {
+    return res.status(429).json({ error: "Too many requests. Please wait a minute." });
+  }
 
   try {
     const { sessionKey, upiId, phoneNumber } = req.body || {};
