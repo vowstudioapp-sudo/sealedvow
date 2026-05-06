@@ -231,21 +231,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                 <span className="lp-card__hint">Preview →</span>
               </a>
 
-              {/* Eid */}
-              <a className="lp-card lp-card--eid" style={{ ['--card-accent' as any]: '#4CAF78' }} href="/demo/eid">
-                <div className="lp-card__icon">
-                  <svg viewBox="0 0 48 48" fill="none" stroke="var(--card-accent)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
-                    <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
-                    <circle cx="36" cy="10" r="2.5"/>
-                    <path d="M36 6v-2M36 16v-2M40 10h2M32 10h-2M39 7l1-1M33 13l-1 1M39 13l1 1M33 7l-1-1"/>
-                  </svg>
-                </div>
-                <span className="lp-card__title">Eid</span>
-                <span className="lp-card__desc">A gift, held until it's opened.</span>
-                <span className="lp-card__hint">Preview →</span>
-              </a>
-
               {/* Just Because */}
               <a className="lp-card lp-card--justbecause" style={{ ['--card-accent' as any]: '#7A6AE6' }} href="/demo/justbecause">
                 <div className="lp-card__icon">

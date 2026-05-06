@@ -7,7 +7,7 @@
 export const FEATURES = Object.freeze({
 
   // ── Eidi MVP (Eid 2026) ───────────────────
-  eidiEnabled: true,              // Master switch — show/hide all Eidi entry points
+  eidiEnabled: false,             // Master switch — show/hide all Eidi entry points
 
   // ── Phase 2 (Eid ul-Adha / later) ────────
   eidiRealMoneyEnabled: false,    // Real UPI payout after reveal

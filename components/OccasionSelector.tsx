@@ -26,28 +26,6 @@ export const OccasionSelector: React.FC = () => {
         <h1 className="occasion-selector__title">Choose the Occasion</h1>
       </motion.div>
 
-      {/* Eid Hero Card */}
-      <motion.div
-        className="occasion-selector__hero"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
-      >
-        <div className="occasion-card occasion-card--eid occasion-card--hero" onClick={() => go("/eid")}>
-          <div className="occasion-card__glow" />
-          <div className="occasion-card__icon">
-            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M24 6c0 8-6 12-6 18a6 6 0 0 0 12 0c0-6-6-10-6-18z"/>
-              <path d="M20 38c-4 2-8 3-8 3"/><path d="M28 38c4 2 8 3 8 3"/>
-              <circle cx="36" cy="10" r="2.5"/>
-              <path d="M36 6v-2M36 16v-2M40 10h2M32 10h-2M39 7l1-1M33 13l-1 1M39 13l1 1M33 7l-1-1"/>
-            </svg>
-          </div>
-          <span className="occasion-card__title">Eid</span>
-          <span className="occasion-card__subtitle">Share Eid Blessings</span>
-        </div>
-      </motion.div>
-
       {/* Divider */}
       <div className="occasion-selector__divider">
         <span>MOMENTS</span>
