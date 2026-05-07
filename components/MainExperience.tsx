@@ -95,12 +95,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   
   const [showReplyComposer, setShowReplyComposer] = useState(false);
   const [locationExpanded, setLocationExpanded] = useState(false);
-  const [showExitOverlay, setShowExitOverlay] = useState(false);
-  const [hasReachedClosure, setHasReachedClosure] = useState(false);
   const [closureRevealed, setClosureRevealed] = useState(false);
   const [locationCardHover, setLocationCardHover] = useState(false);
   const [demoConversionBtnHover, setDemoConversionBtnHover] = useState(false);
-  const exitOverlayShownRef = useRef(false);
 
   // Polaroid screen staggered reveal — caption at 1.5s, chevron at 3s
   const [polaroidRevealed, setPolaroidRevealed] = useState({
@@ -110,34 +107,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
   const [soundtrackIndex, setSoundtrackIndex] = useState<number | null>(null);
   const [soundtrackHasBeenActive, setSoundtrackHasBeenActive] = useState(false);
-
-  // Exit intent — desktop only: cursor toward top-of-viewport leave (receiver, not preview).
-  const exitIntentDesktop = () => window.matchMedia('(min-width: 768px)').matches;
-
-  useEffect(() => {
-    const shouldTrigger = () => {
-      if (isPreview) return false;
-      if (exitOverlayShownRef.current) return false;
-      if (hasReachedClosure) return false;
-      return true;
-    };
-
-    if (!exitIntentDesktop()) return;
-
-    const handleMouseLeave = (e: MouseEvent) => {
-      if (e.clientY <= 5 && shouldTrigger()) {
-        exitOverlayShownRef.current = true;
-        setShowExitOverlay(true);
-      }
-    };
-
-    document.addEventListener('mouseleave', handleMouseLeave);
-
-    return () => {
-      document.removeEventListener('mouseleave', handleMouseLeave);
-    };
-  }, [isPreview, hasReachedClosure]);
-
 
   /* ------------------------------------------------------------------ */
   /* REFS                                                                */
@@ -236,7 +205,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               setActiveSection(index);
             }
             if (entry.target.getAttribute('data-section-type') === 'closure') {
-              setHasReachedClosure(true);
               setClosureRevealed(true);
             }
           }
@@ -780,86 +748,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
         />
       )}
 
-      {/* Exit Overlay — scroll nudge (no duplicated content) */}
-      {showExitOverlay && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-6"
-          style={{
-            background: 'rgba(0, 0, 0, 0.85)',
-            animation: 'fadeIn 0.3s ease',
-          }}
-          onClick={() => setShowExitOverlay(false)}
-        >
-          <div
-            className="relative max-w-md mx-auto text-center px-8 py-12 rounded-2xl"
-            style={{
-              background: theme.bg,
-              border: `1px solid ${theme.gold}33`,
-              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
-              animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setShowExitOverlay(false)}
-              className="absolute top-2 right-2 text-2xl"
-              style={{ color: theme.text, opacity: 0.5 }}
-              aria-label="Close"
-            >
-              ✕
-            </button>
-
-            <p
-              className="text-sm uppercase tracking-[0.3em] mb-4"
-              style={{ color: theme.gold, opacity: 0.7 }}
-            >
-              Before you go
-            </p>
-
-            <h2
-              className="text-3xl md:text-4xl font-serif-elegant italic mb-6"
-              style={{ color: theme.text }}
-            >
-              {"There's more to see"}
-            </h2>
-
-            <p
-              className="text-base mb-8"
-              style={{ color: theme.text, opacity: 0.8 }}
-            >
-              Keep scrolling — the rest is waiting for you.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowExitOverlay(false);
-              }}
-              className="px-8 py-3 border rounded-full transition-all hover:scale-[1.02]"
-              style={{
-                borderColor: theme.gold,
-                color: theme.gold,
-                background: 'transparent',
-              }}
-            >
-              {"Let's continue"}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Creator Preview Controls — Modify + Seal & Deliver */}
       {isPreview && (onPayment || onEdit) && (
         <>
-          {/* Exit intent hint — fixed top banner */}
-          {!showExitOverlay && !exitOverlayShownRef.current && (
-            <div className="fixed top-0 left-0 right-0 z-[400] text-center py-3 px-4" style={{ backgroundColor: theme.bg + 'ee', borderBottom: `1px solid ${theme.gold}15` }}>
-              <p className="text-[11px] font-serif-elegant italic" style={{ color: theme.gold, opacity: 0.7 }}>
-                ✨ Move your cursor toward the close button — see what your receiver experiences when they try to leave
-              </p>
-            </div>
-          )}
           <div className="fixed bottom-0 left-0 right-0 z-[400]" style={{ background: `linear-gradient(to top, ${theme.bg}, ${theme.bg}ee, transparent)` }}>
           <div className="max-w-md mx-auto px-6 pb-8 pt-6 flex flex-col items-center gap-3">
             {onEdit && (

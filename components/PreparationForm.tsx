@@ -985,12 +985,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                 </div>
                 {data.hasGift && (
                     <div className="bg-luxury-paper border-t-2 border-[#D4C5A5] p-8 space-y-6 animate-fade-in">
-                        <div className="flex items-start gap-3 p-4 bg-luxury-ink/5 rounded-lg border border-luxury-ink/10">
-                            <span className="text-luxury-gold-dark text-sm mt-0.5">✦</span>
-                            <p className="text-[10px] text-luxury-ink/70 font-bold leading-relaxed">
-                                <span className="font-extrabold text-luxury-ink">How this works:</span> Your promises and this gift are revealed when your partner tries to close the page — a final surprise that brings them back. It feels like discovering a hidden chapter.
-                            </p>
-                        </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block">Gift Title</label>
                             <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 focus:border-luxury-ink outline-none font-serif-elegant italic text-xl placeholder-luxury-ink/50" placeholder="e.g. Dinner Under the Stars" value={data.giftTitle} onChange={e => updateData({ giftTitle: e.target.value })} />
