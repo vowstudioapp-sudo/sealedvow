@@ -37,9 +37,19 @@ const MUSIC_PRESETS = [
 ];
 
 const DEFAULT_COUPONS: Coupon[] = [
-  { id: 'special', title: 'The Open Invitation', description: 'A quiet morning, or a long walk. Whenever you need me to just be there.', icon: '🕊️', isOpen: false, isSpecial: true },
-  { id: '1', title: 'Dinner at Home', description: 'I\'ll cook your favorite thing. No phones, just us.', icon: '🥂', isOpen: false },
-  { id: '2', title: 'A Day for You', description: 'I take care of everything else. You just breathe.', icon: '🕯️', isOpen: false },
+  { id: 'special', title: '', description: '', icon: '🕊️', isOpen: false, isSpecial: true },
+  { id: '1', title: '', description: '', icon: '🥂', isOpen: false },
+  { id: '2', title: '', description: '', icon: '🕯️', isOpen: false },
+];
+
+// Per-slot placeholder copy for the Three Promises form. Shown as ghost text
+// in the empty title/description inputs. Senders see these as examples; if
+// they leave both fields empty for a slot, the receiver-side gate (in
+// MainExperience) hides that promise card entirely.
+const PROMISE_PLACEHOLDERS: { title: string; description: string }[] = [
+  { title: 'The Open Invitation', description: 'A quiet morning, or a long walk. Whenever you need me to just be there.' },
+  { title: 'Dinner at Home', description: "I'll cook your favorite thing. No phones, just us." },
+  { title: 'A Day for You', description: 'I take care of everything else. You just breathe.' },
 ];
 
 const RITUALS: { id: RevealMethod; title: string; desc: string; icon: string }[] = [
@@ -952,18 +962,20 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                         <div className="flex-1 space-y-4">
                            <div>
                               <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block mb-1">Title</label>
-                              <input 
-                                type="text" 
-                                className="w-full bg-transparent border-b-2 border-luxury-ink/20 py-1 focus:border-luxury-ink outline-none font-serif-elegant italic text-luxury-ink text-xl"
+                              <input
+                                type="text"
+                                className="w-full bg-transparent border-b-2 border-luxury-ink/20 py-1 focus:border-luxury-ink outline-none font-serif-elegant italic text-luxury-ink text-xl placeholder:text-luxury-ink/40"
                                 value={coupon.title}
+                                placeholder={PROMISE_PLACEHOLDERS[idx]?.title}
                                 onChange={e => updateCoupon(idx, 'title', e.target.value)}
                               />
                            </div>
                            <div>
                               <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block mb-1">Description</label>
-                              <textarea 
-                                className="w-full bg-luxury-ink/5 border-2 border-luxury-ink/20 p-4 rounded-lg focus:border-luxury-ink outline-none font-sans text-sm text-luxury-ink leading-relaxed resize-none h-24"
+                              <textarea
+                                className="w-full bg-luxury-ink/5 border-2 border-luxury-ink/20 p-4 rounded-lg focus:border-luxury-ink outline-none font-sans text-sm text-luxury-ink leading-relaxed resize-none h-24 placeholder:text-luxury-ink/40"
                                 value={coupon.description}
+                                placeholder={PROMISE_PLACEHOLDERS[idx]?.description}
                                 onChange={e => updateCoupon(idx, 'description', e.target.value)}
                               />
                            </div>

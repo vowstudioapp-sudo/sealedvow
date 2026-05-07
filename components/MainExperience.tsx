@@ -87,8 +87,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   /* STATE                                                               */
   /* ------------------------------------------------------------------ */
 
-  const [coupons, setCoupons] = useState<Coupon[]>(data.coupons || []);
-  const [currentCouponIndex, setCurrentCouponIndex] = useState(0);
+  const [coupons] = useState<Coupon[]>(data.coupons || []);
   const [isGiftRevealed, setIsGiftRevealed] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
   const [sections, setSections] = useState<number[]>([]);
@@ -129,6 +128,17 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const modalSurfaceResolved = isLightMode ? 'rgba(250,250,250,0.96)' : themeTokens.modalSurface;
   const modalCloseResolved = isLightMode ? 'rgba(44,40,40,0.55)' : themeTokens.modalClose;
 
+  // Promises triptych: only show cards the sender actually wrote. A coupon
+  // counts as "populated" if either title or description has non-whitespace
+  // content. Empty slots are filtered out so the triptych never renders a
+  // blank card frame. The divider snap-section uses the same gate so it
+  // doesn't appear above an empty triptych.
+  const populatedCoupons = useMemo(
+    () => coupons.filter(c => (c.title?.trim() || c.description?.trim())),
+    [coupons]
+  );
+  const hasPopulatedPromises = populatedCoupons.length > 0;
+
   // Derive sealed date once — validated and memoized
   const sealedDate = useMemo(() => {
     if (!data.sealedAt && !data.createdAt) return null;
@@ -147,7 +157,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     if (data.musicType === 'youtube' && data.musicUrl && isYouTubeLink(data.musicUrl)) count++;
     if (data.memoryBoard && data.memoryBoard.length >= 1) count++;
     if (data.sacredLocation) count++;
-    if (!isPreview && coupons.length > 0) count += 2; // promise divider + PromiseStack (each own .snap-section)
+    if (!isPreview && hasPopulatedPromises) count += 2; // promise divider + triptych (each own .snap-section)
     if (!isPreview && data.hasGift) count++;
     if (!isPreview) count++; // final closure (.snap-section wrapper)
     if (isDemoMode && !isPreview) count++;
@@ -159,7 +169,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     data.memoryBoard?.length,
     data.sacredLocation,
     data.hasGift,
-    coupons.length,
+    hasPopulatedPromises,
     isPreview,
     isDemoMode,
   ]);
@@ -263,20 +273,6 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       containerRef.current.style.overflowY = 'scroll';
     }
   }, []);
-
-  const handleNextCoupon = useCallback(() => {
-    if (currentCouponIndex < coupons.length) {
-      setCoupons(prev => {
-        const next = [...prev];
-        next[currentCouponIndex] = { 
-          ...next[currentCouponIndex], 
-          isClaimed: true 
-        };
-        return next;
-      });
-      setTimeout(() => setCurrentCouponIndex(prev => prev + 1), 400);
-    }
-  }, [currentCouponIndex, coupons.length]);
 
   /* ------------------------------------------------------------------ */
   /* RENDER                                                              */
@@ -564,9 +560,9 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
       <>
 
       {/* SECTION: Promise Divider */}
-      {!isPreview && coupons.length > 0 && (
-        <PaperSurface 
-          theme={data.theme || 'obsidian'} 
+      {!isPreview && hasPopulatedPromises && (
+        <PaperSurface
+          theme={data.theme || 'obsidian'}
           as="section"
           className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start"
           style={{ position: 'relative' }}
@@ -584,7 +580,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             >
               What I promise you.
             </p>
-            <div 
+            <div
               className="h-px mx-auto mt-8 w-12"
               style={{ backgroundColor: theme.gold, opacity: 0.2 }}
             />
@@ -592,17 +588,15 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
         </PaperSurface>
       )}
 
-      {/* SECTION: Promises (Coupons) */}
-      {!isPreview && coupons.length > 0 && (
+      {/* SECTION: Promises Triptych */}
+      {!isPreview && hasPopulatedPromises && (
         <PaperSurface
           theme={data.theme || 'obsidian'}
           as="section"
           className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-4 py-20"
         >
           <PromiseStack
-            coupons={coupons}
-            currentCouponIndex={currentCouponIndex}
-            onClaim={handleNextCoupon}
+            coupons={populatedCoupons}
             theme={theme}
           />
         </PaperSurface>
