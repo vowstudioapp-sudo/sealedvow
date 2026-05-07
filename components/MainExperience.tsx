@@ -17,7 +17,7 @@ import { safeUrl } from '../utils/safeUrl';
 import { PaperSurface } from './PaperSurface';
 import { LetterSection } from './experience/LetterSection';
 import { MemoryBoard } from './experience/MemoryBoard';
-import { PromiseStack } from './experience/PromiseStack';
+import { PromiseCard } from './experience/PromiseCard';
 import { GiftReveal } from './experience/GiftReveal';
 import { ReplyComposer } from './experience/ReplyComposer';
 
@@ -95,6 +95,12 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
   const [showReplyComposer, setShowReplyComposer] = useState(false);
   const [locationExpanded, setLocationExpanded] = useState(false);
   const [closureRevealed, setClosureRevealed] = useState(false);
+  // Per-promise reveal: each populated promise card is its own snap-section.
+  // The IntersectionObserver below adds an index to this Set when the
+  // matching `data-section-type="promise-N"` section enters viewport, and
+  // the corresponding PromiseCard reads `isRevealed={revealedPromises.has(idx)}`
+  // to drive its opacity + closureReveal animation. Mirrors closureRevealed.
+  const [revealedPromises, setRevealedPromises] = useState<Set<number>>(() => new Set());
   const [locationCardHover, setLocationCardHover] = useState(false);
   const [demoConversionBtnHover, setDemoConversionBtnHover] = useState(false);
 
@@ -157,7 +163,10 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     if (data.musicType === 'youtube' && data.musicUrl && isYouTubeLink(data.musicUrl)) count++;
     if (data.memoryBoard && data.memoryBoard.length >= 1) count++;
     if (data.sacredLocation) count++;
-    if (!isPreview && hasPopulatedPromises) count++; // promises composition (title + triptych in one .snap-section)
+    // Promises sequence: title section (+1) plus one section per populated
+    // promise (+populatedCoupons.length). Each promise is its own
+    // full-viewport snap-section, encountered by scroll one at a time.
+    if (!isPreview && hasPopulatedPromises) count += 1 + populatedCoupons.length;
     if (!isPreview && data.hasGift) count++;
     if (!isPreview) count++; // final closure (.snap-section wrapper)
     if (isDemoMode && !isPreview) count++;
@@ -170,6 +179,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     data.sacredLocation,
     data.hasGift,
     hasPopulatedPromises,
+    populatedCoupons.length,
     isPreview,
     isDemoMode,
   ]);
@@ -214,8 +224,19 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             if (!isNaN(index)) {
               setActiveSection(index);
             }
-            if (entry.target.getAttribute('data-section-type') === 'closure') {
+            const sectionType = entry.target.getAttribute('data-section-type');
+            if (sectionType === 'closure') {
               setClosureRevealed(true);
+            } else if (sectionType?.startsWith('promise-')) {
+              const promiseIdx = Number(sectionType.slice('promise-'.length));
+              if (!Number.isNaN(promiseIdx)) {
+                setRevealedPromises(prev => {
+                  if (prev.has(promiseIdx)) return prev;
+                  const next = new Set(prev);
+                  next.add(promiseIdx);
+                  return next;
+                });
+              }
             }
           }
         });
@@ -559,20 +580,16 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
       <>
 
-      {/* SECTION: Promises (title + triptych as one composed moment) */}
+      {/* SECTION: Promises Title — emotional framing for the vows that follow */}
       {!isPreview && hasPopulatedPromises && (
         <PaperSurface
           theme={data.theme || 'obsidian'}
           as="section"
-          className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-4 py-20"
+          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start"
           style={{ position: 'relative' }}
         >
           <div id="promises-section" style={{ position: 'absolute', top: 0 }} />
-
-          {/* Emotional framing title — restrained editorial copy, the cards
-              below are its emotional answer. Divider rule + breathing space
-              separate the framing from the triptych within one viewport. */}
-          <div className="text-center px-8 mb-12 md:mb-16">
+          <div className="text-center px-8">
             <p
               style={{
                 fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
@@ -585,17 +602,38 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               What I promise you.
             </p>
             <div
-              className="h-px mx-auto mt-6 w-12"
+              className="h-px mx-auto mt-8 w-12"
               style={{ backgroundColor: theme.gold, opacity: 0.2 }}
             />
           </div>
-
-          <PromiseStack
-            coupons={populatedCoupons}
-            theme={theme}
-          />
         </PaperSurface>
       )}
+
+      {/* SECTIONS: Promise vows — one full-viewport snap-section per
+          populated promise. Each section reveals its card via the central
+          IntersectionObserver, which writes the section's index into
+          `revealedPromises`. The card reads `isRevealed` and animates with
+          the existing closureReveal keyframe. */}
+      {!isPreview && populatedCoupons.map((coupon, idx) => (
+        <section
+          key={coupon.id}
+          data-section-type={`promise-${idx}`}
+          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-4 py-20"
+        >
+          <PaperSurface
+            theme={data.theme || 'obsidian'}
+            as="div"
+            className="flex h-full min-h-0 w-full flex-1 flex-col items-center justify-center"
+          >
+            <PromiseCard
+              coupon={coupon}
+              index={idx}
+              isRevealed={revealedPromises.has(idx)}
+              theme={theme}
+            />
+          </PaperSurface>
+        </section>
+      ))}
 
       {/* SECTION: Gift */}
       {!isPreview && data.hasGift && (
