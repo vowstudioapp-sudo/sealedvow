@@ -14,6 +14,9 @@ export const FEATURES = Object.freeze({
   eidiFamilyRoomEnabled: false,   // Multiple elders contribute
   eidiVaultEnabled: false,        // Yearly Eidi memory vault
 
+  // ── Ritual selection (sender Step 3) ──────
+  ritualsEnabled: false,          // Hides the "Choose Your Ritual" block at PreparationForm Step 3
+
 } as const);
 
 export type FeatureKey = keyof typeof FEATURES;

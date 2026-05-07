@@ -6,6 +6,7 @@ import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useDictation } from '../hooks/useDictation';
 import { CoupleData, Occasion, GiftType, Theme, Coupon, RevealMethod } from '../types.ts';
 import { THEME_LABELS, THEME_ORDER, THEME_SYSTEM } from '../theme/themeSystem';
+import { FEATURES } from '../config/features';
 
 interface Props {
   onComplete: (data: CoupleData) => void;
@@ -262,7 +263,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
               <h1 className="text-3xl md:text-5xl font-serif-elegant italic text-[#E5D0A1] leading-tight animate-fade-in" key={step}>
                 {step === 1 && "You are shaping the foundation"}
                 {(step as number) === 2 && "You are crafting the narrative"}
-                {step === 3 && "You are preparing the ceremony"}
+                {step === 3 && "You are shaping the final experience"}
               </h1>
             )}
 
@@ -789,60 +790,62 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
         {step === 3 && (
           <div className="animate-fade-in space-y-8">
             
-            <div className="bg-[#1C1917] border-2 border-[#3D3530] p-8 md:p-10 rounded-xl relative overflow-hidden group">
-               <div className="relative z-10">
-                 <h3 className="text-[10px] md:text-xs uppercase tracking-[0.4em] text-luxury-gold font-bold mb-2">Choose Your Ritual</h3>
-                 <p className="text-[10px] text-luxury-stone/80 mb-6 font-bold italic">
-                   How would you like them to open this gift? Choose how they'll first open and experience your letter.
-                 </p>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    {RITUALS.map(ritual => {
-                      const isEnabled = ENABLED_RITUALS.includes(ritual.id);
-                      return (
-                      <button
-                        key={ritual.id}
-                        type="button"
-                        disabled={!isEnabled}
-                        onClick={() =>
-                          isEnabled && updateData(prev => ({
-                            revealMethod: ritual.id,
-                            unlockDate: ritual.id === 'vigil' ? prev.unlockDate : null,
-                          }))
-                        }
-                        className={`p-6 rounded-lg text-left border-2 transition-all duration-300 relative overflow-hidden ${
-                          !isEnabled
-                            ? 'opacity-50 cursor-not-allowed border-[#333] bg-transparent'
-                            : data.revealMethod === ritual.id ? 'bg-[#2A2522] border-luxury-gold shadow-lg' : 'bg-transparent border-[#444] hover:border-[#666]'
-                        }`}
-                      >
-                         {!isEnabled && (
-                           <span className="absolute top-3 right-3 text-[8px] uppercase tracking-widest font-bold px-2 py-1 rounded-full border border-white/15 text-white/40">
-                             Coming Soon
-                           </span>
-                         )}
-                         <div className="text-3xl mb-3">{ritual.icon}</div>
-                         <h4 className={`text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2 ${
-                           !isEnabled ? 'text-[#666]' : data.revealMethod === ritual.id ? 'text-luxury-gold' : 'text-[#BBB]'
-                         }`}>{ritual.title}</h4>
-                         <p className="text-[10px] text-white/60 leading-relaxed font-bold">{ritual.desc}</p>
-                      </button>
-                      );
-                    })}
-                 </div>
-
-                 {data.revealMethod === 'vigil' && (
-                   <div className="animate-fade-in bg-black/40 p-6 rounded-lg border border-luxury-gold/40 flex flex-col md:flex-row gap-6 items-center mt-4">
-                       <p className="text-luxury-stone/90 text-sm italic font-bold">When should the vigil end?</p>
-                       <input 
-                          type="datetime-local" 
-                          className="bg-transparent border-2 border-luxury-gold/60 rounded-lg px-4 py-3 text-white text-sm outline-none focus:border-luxury-gold transition-colors"
-                          onChange={(e) => updateData({ unlockDate: e.target.value })}
-                          value={data.unlockDate || ''}
-                       />
+            {FEATURES.ritualsEnabled && (
+              <div className="bg-[#1C1917] border-2 border-[#3D3530] p-8 md:p-10 rounded-xl relative overflow-hidden group">
+                 <div className="relative z-10">
+                   <h3 className="text-[10px] md:text-xs uppercase tracking-[0.4em] text-luxury-gold font-bold mb-2">Choose Your Ritual</h3>
+                   <p className="text-[10px] text-luxury-stone/80 mb-6 font-bold italic">
+                     How would you like them to open this gift? Choose how they'll first open and experience your letter.
+                   </p>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      {RITUALS.map(ritual => {
+                        const isEnabled = ENABLED_RITUALS.includes(ritual.id);
+                        return (
+                        <button
+                          key={ritual.id}
+                          type="button"
+                          disabled={!isEnabled}
+                          onClick={() =>
+                            isEnabled && updateData(prev => ({
+                              revealMethod: ritual.id,
+                              unlockDate: ritual.id === 'vigil' ? prev.unlockDate : null,
+                            }))
+                          }
+                          className={`p-6 rounded-lg text-left border-2 transition-all duration-300 relative overflow-hidden ${
+                            !isEnabled
+                              ? 'opacity-50 cursor-not-allowed border-[#333] bg-transparent'
+                              : data.revealMethod === ritual.id ? 'bg-[#2A2522] border-luxury-gold shadow-lg' : 'bg-transparent border-[#444] hover:border-[#666]'
+                          }`}
+                        >
+                           {!isEnabled && (
+                             <span className="absolute top-3 right-3 text-[8px] uppercase tracking-widest font-bold px-2 py-1 rounded-full border border-white/15 text-white/40">
+                               Coming Soon
+                             </span>
+                           )}
+                           <div className="text-3xl mb-3">{ritual.icon}</div>
+                           <h4 className={`text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2 ${
+                             !isEnabled ? 'text-[#666]' : data.revealMethod === ritual.id ? 'text-luxury-gold' : 'text-[#BBB]'
+                           }`}>{ritual.title}</h4>
+                           <p className="text-[10px] text-white/60 leading-relaxed font-bold">{ritual.desc}</p>
+                        </button>
+                        );
+                      })}
                    </div>
-                 )}
-               </div>
-            </div>
+
+                   {data.revealMethod === 'vigil' && (
+                     <div className="animate-fade-in bg-black/40 p-6 rounded-lg border border-luxury-gold/40 flex flex-col md:flex-row gap-6 items-center mt-4">
+                         <p className="text-luxury-stone/90 text-sm italic font-bold">When should the vigil end?</p>
+                         <input
+                            type="datetime-local"
+                            className="bg-transparent border-2 border-luxury-gold/60 rounded-lg px-4 py-3 text-white text-sm outline-none focus:border-luxury-gold transition-colors"
+                            onChange={(e) => updateData({ unlockDate: e.target.value })}
+                            value={data.unlockDate || ''}
+                         />
+                     </div>
+                   )}
+                 </div>
+              </div>
+            )}
 
             {ENABLE_VIDEO && (
             <div className="bg-[#1C1917] border-2 border-[#3D3530] p-8 rounded-xl">
