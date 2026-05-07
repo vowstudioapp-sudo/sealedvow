@@ -438,6 +438,9 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           <p className="text-[10px] uppercase tracking-widest text-luxury-ink/70 mb-4 font-bold max-w-sm mx-auto">
                             Upload up to 10 photos for a scattered polaroid collage.
                           </p>
+                          <p className="text-[10px] italic text-luxury-stone/60 max-w-sm mx-auto leading-relaxed font-serif-elegant">
+                            A single caption can make a photo unforgettable.
+                          </p>
                         </div>
                         
                         <div className="flex flex-col items-center">
