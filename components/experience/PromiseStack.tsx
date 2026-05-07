@@ -40,13 +40,8 @@ export const PromiseStack: React.FC<PromiseStackProps> = ({ coupons, theme }) =>
         {coupons.map((coupon, index) => (
           <div
             key={coupon.id}
-            className="relative flex flex-col justify-between w-full max-w-sm md:max-w-none md:w-72 md:h-[26rem] mx-auto md:mx-0 p-6 md:p-8 rounded-sm border"
-            style={{
-              backgroundColor: 'var(--theme-board-bg, #F2ECE4)',
-              color: 'var(--theme-text, #2D2424)',
-              borderColor: `${theme.gold}40`,
-              boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.5)',
-            }}
+            className="main-experience-promise-card relative flex flex-col justify-between w-full max-w-sm md:max-w-none md:w-72 md:h-[26rem] mx-auto md:mx-0 p-6 md:p-8 rounded-sm border"
+            style={{ ['--card-border-color' as string]: `${theme.gold}40` } as React.CSSProperties}
           >
             <div className="main-experience-coupon-texture" />
 
@@ -59,10 +54,7 @@ export const PromiseStack: React.FC<PromiseStackProps> = ({ coupons, theme }) =>
               <h3 className="font-serif-elegant italic text-xl md:text-2xl mb-5 leading-tight">
                 {coupon.title}
               </h3>
-              <div
-                className="w-8 h-0.5 mx-auto opacity-10 mb-5"
-                style={{ backgroundColor: theme.text }}
-              />
+              <div className="w-8 h-0.5 mx-auto opacity-10 mb-5 bg-current" />
               <p className="font-sans text-sm leading-relaxed opacity-70">
                 {coupon.description}
               </p>
