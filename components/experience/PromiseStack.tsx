@@ -35,13 +35,12 @@ export const PromiseStack: React.FC<PromiseStackProps> = ({ coupons, theme }) =>
   if (coupons.length === 0) return null;
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-6">
-      <div className="flex flex-col md:flex-row md:items-stretch justify-center gap-6 md:gap-8">
+    <div className="w-full max-w-4xl mx-auto px-6">
+      <div className="flex flex-col md:flex-row md:items-start justify-center gap-6 md:gap-8">
         {coupons.map((coupon, index) => (
           <div
             key={coupon.id}
-            className="main-experience-promise-card relative flex flex-col justify-between w-full max-w-sm md:max-w-none md:w-72 md:h-[26rem] mx-auto md:mx-0 p-6 md:p-8 rounded-sm border"
-            style={{ ['--card-border-color' as string]: `${theme.gold}40` } as React.CSSProperties}
+            className="main-experience-promise-card relative flex flex-col w-full max-w-sm md:max-w-none md:w-72 mx-auto md:mx-0 min-h-[20rem] md:min-h-[26rem] p-6 md:p-8 rounded-sm border"
           >
             <div className="main-experience-coupon-texture" />
 
@@ -50,7 +49,11 @@ export const PromiseStack: React.FC<PromiseStackProps> = ({ coupons, theme }) =>
               <span className="text-2xl">{coupon.icon}</span>
             </div>
 
-            <div className="text-center relative z-10 my-6">
+            {/* Content block grows to fill min-height floor and centers itself
+                vertically between the eyebrow row and the card's bottom edge.
+                With min-h floors (not fixed h), longer content extends the
+                card downward naturally — editorial rhythm, not a forced grid. */}
+            <div className="text-center relative z-10 flex-1 flex flex-col justify-center my-6">
               <h3 className="font-serif-elegant italic text-xl md:text-2xl mb-5 leading-tight">
                 {coupon.title}
               </h3>
@@ -59,11 +62,6 @@ export const PromiseStack: React.FC<PromiseStackProps> = ({ coupons, theme }) =>
                 {coupon.description}
               </p>
             </div>
-
-            {/* Spacer to keep eyebrow at top, content vertically centered, and
-                a small bottom breathing room. The flex justify-between handles
-                vertical distribution; this empty slot anchors the bottom. */}
-            <div className="relative z-10" aria-hidden="true" />
           </div>
         ))}
       </div>

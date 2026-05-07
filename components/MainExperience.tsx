@@ -157,7 +157,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
     if (data.musicType === 'youtube' && data.musicUrl && isYouTubeLink(data.musicUrl)) count++;
     if (data.memoryBoard && data.memoryBoard.length >= 1) count++;
     if (data.sacredLocation) count++;
-    if (!isPreview && hasPopulatedPromises) count += 2; // promise divider + triptych (each own .snap-section)
+    if (!isPreview && hasPopulatedPromises) count++; // promises composition (title + triptych in one .snap-section)
     if (!isPreview && data.hasGift) count++;
     if (!isPreview) count++; // final closure (.snap-section wrapper)
     if (isDemoMode && !isPreview) count++;
@@ -559,16 +559,20 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
 
       <>
 
-      {/* SECTION: Promise Divider */}
+      {/* SECTION: Promises (title + triptych as one composed moment) */}
       {!isPreview && hasPopulatedPromises && (
         <PaperSurface
           theme={data.theme || 'obsidian'}
           as="section"
-          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start"
+          className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-4 py-20"
           style={{ position: 'relative' }}
         >
           <div id="promises-section" style={{ position: 'absolute', top: 0 }} />
-          <div className="text-center px-8">
+
+          {/* Emotional framing title — restrained editorial copy, the cards
+              below are its emotional answer. Divider rule + breathing space
+              separate the framing from the triptych within one viewport. */}
+          <div className="text-center px-8 mb-12 md:mb-16">
             <p
               style={{
                 fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
@@ -581,20 +585,11 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
               What I promise you.
             </p>
             <div
-              className="h-px mx-auto mt-8 w-12"
+              className="h-px mx-auto mt-6 w-12"
               style={{ backgroundColor: theme.gold, opacity: 0.2 }}
             />
           </div>
-        </PaperSurface>
-      )}
 
-      {/* SECTION: Promises Triptych */}
-      {!isPreview && hasPopulatedPromises && (
-        <PaperSurface
-          theme={data.theme || 'obsidian'}
-          as="section"
-          className="snap-section min-h-screen w-full flex flex-col items-center justify-center snap-start px-4 py-20"
-        >
           <PromiseStack
             coupons={populatedCoupons}
             theme={theme}

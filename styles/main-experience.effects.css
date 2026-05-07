@@ -674,16 +674,20 @@
    LetterSection card, etc. for the same hybrid pattern). This class owns
    only the cinematic surface treatment.
 
-   Per-letter theme support flows through three CSS custom properties:
-   - --theme-board-bg / --theme-text are set by .main-experience-container
-     (MainExperience root) and inherited.
-   - --card-border-color is set inline on each card (gold + alpha) because
-     it is computed from the theme's gold token at component-render time.
+   The visual feel matches the original carousel-era .main-experience-coupon
+   parchment (warm board background + full-opacity gold border + paper-shadow)
+   so the cards read as authored vows separated cleanly from the dark
+   receiver atmosphere.
+
+   Per-letter theme support flows entirely through the existing
+   --theme-board-bg / --theme-text / --theme-gold custom-property cascade,
+   set on .main-experience-container (MainExperience root) at lines 286-292.
+   No additional inline-style theme bridge is needed on the card.
 */
 .main-experience-promise-card {
   background-color: var(--theme-board-bg, #F2ECE4);
   color: var(--theme-text, #2D2424);
-  border-color: var(--card-border-color, rgba(229, 208, 161, 0.25));
+  border-color: var(--theme-gold, #E5D0A1);
   box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.5);
 }
 
