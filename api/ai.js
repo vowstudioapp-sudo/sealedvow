@@ -683,9 +683,18 @@ export default async function handler(req, res) {
   // limit during KV outages, allowing unbounded AI cost during incidents.
   // Why `incremented` flag: we only roll back the quota if the increment
   // actually succeeded — guards against negative counters when KV is unstable.
-  const RATE_LIMIT_MAX = 10;
+  const IS_DEV = process.env.NODE_ENV !== 'production';
+  const RATE_LIMIT_MAX = IS_DEV ? 1000 : 10;
   const RATE_LIMIT_WINDOW_SECONDS = 3600;
   const successRateKey = `ai_rate_success:${actorKey}`;
+
+  if (IS_DEV) {
+    console.log('[AI] Dev rate limit active', {
+      actorKey,
+      RATE_LIMIT_MAX,
+      nodeEnv: process.env.NODE_ENV,
+    });
+  }
 
   let incremented = false;
 
