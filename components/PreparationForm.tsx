@@ -376,7 +376,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
             <button
               type="button"
               onClick={phase > 1 ? goBackPhase : back}
-              className="hidden lg:block absolute -left-36 top-1/2 -translate-y-1/2 px-6 py-3 rounded-full bg-luxury-sandstone text-luxury-ink hover:bg-luxury-sandstone/80 transition-all duration-300 text-[10px] uppercase tracking-[0.2em] font-bold whitespace-nowrap shadow-lg"
+              className="hidden lg:block absolute -left-36 top-1/2 -translate-y-1/2 px-6 py-3 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all duration-300 text-[10px] uppercase tracking-[0.2em] font-bold whitespace-nowrap shadow-lg"
             >
               ← Back
             </button>
@@ -791,7 +791,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
               <button
                 type="button"
                 onClick={phase > 1 ? goBackPhase : back}
-                className="px-8 py-3 rounded-full bg-luxury-sandstone text-luxury-ink hover:bg-luxury-sandstone/80 transition-all text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold shadow-lg"
+                className="px-8 py-3 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold shadow-lg"
               >
                 ← Back
               </button>
@@ -1052,7 +1052,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
         <div className={`pt-8 pb-20 flex justify-between items-center border-t border-white/10 ${(step as number) === 2 ? "hidden" : ""}`}>
            {step > 1 ? (
-             <button type="button" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); back(); }} className="px-12 py-5 rounded-full bg-luxury-sandstone text-luxury-ink hover:bg-luxury-sandstone/80 transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs font-bold shadow-2xl">
+             <button type="button" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); back(); }} className="px-12 py-5 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs font-bold shadow-2xl">
                ← Back
              </button>
            ) : <div></div>}
