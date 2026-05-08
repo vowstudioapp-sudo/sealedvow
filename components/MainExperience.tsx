@@ -757,7 +757,7 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
             </div>
 
             <div className="mt-8" style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}>
-              <p className="text-[7px] uppercase tracking-[0.3em]" style={{ color: read.muted }}>This is how people are choosing to say it this year.</p>
+              <p className="text-[10px] uppercase tracking-[0.3em]" style={{ color: read.muted }}>This is how people are choosing to say it this year.</p>
             </div>
 
           </div>

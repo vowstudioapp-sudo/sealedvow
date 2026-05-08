@@ -146,7 +146,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
 
         <button
           onClick={onClose}
-          className="mt-12 text-[8px] uppercase tracking-[0.4em] text-white/55 hover:text-white/80 transition-colors"
+          className="mt-12 text-[10px] uppercase tracking-[0.4em] text-white/55 hover:text-white/80 transition-colors"
           style={{ animation: 'closureReveal 0.8s ease-out 3s both' }}
         >
           Return
@@ -187,7 +187,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
         placeholder="Write what you feel..."
         maxLength={500}
         rows={6}
-        className="w-full max-w-md bg-transparent rounded-none p-5 text-white/80 text-sm leading-relaxed resize-none focus:outline-none placeholder-white/15"
+        className="w-full max-w-md bg-transparent rounded-none p-5 text-white/80 text-sm leading-relaxed resize-none focus:outline-none placeholder-white/45"
         style={{
           fontFamily: '"Playfair Display", "Georgia", "Times New Roman", serif',
           fontStyle: 'italic',
@@ -198,7 +198,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
       />
 
       <p
-        className="mt-2 text-[8px] text-white/55 tracking-wide self-end max-w-md w-full text-right"
+        className="mt-2 text-[10px] text-white/55 tracking-wide self-end max-w-md w-full text-right"
         style={{ animation: 'closureReveal 0.6s ease-out 1s both' }}
       >
         {replyText.length}/500
@@ -240,7 +240,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
 
         <button
           onClick={onClose}
-          className="text-[8px] uppercase tracking-[0.4em] text-white/55 hover:text-white/80 transition-colors"
+          className="text-[10px] uppercase tracking-[0.4em] text-white/55 hover:text-white/80 transition-colors"
         >
           Not now
         </button>

@@ -65,7 +65,7 @@ export const SharePackage: React.FC<Props> = ({ data, sessionKey, shareSlug, onP
           </div>
         </div>
 
-        <h2 className="text-[9px] md:text-[10px] uppercase tracking-[0.45em] text-luxury-gold-dark font-bold mb-2">Cryptographically Sealed</h2>
+        <h2 className="text-[9px] md:text-[10px] uppercase tracking-[0.45em] text-luxury-ink/80 font-bold mb-2">Cryptographically Sealed</h2>
         <h1 className="text-2xl md:text-4xl font-serif-elegant italic text-luxury-ink mb-3">The Private Key</h1>
 
         <div className="w-14 h-1 bg-luxury-gold/50 mx-auto mb-4 rounded-full"></div>
@@ -76,7 +76,7 @@ export const SharePackage: React.FC<Props> = ({ data, sessionKey, shareSlug, onP
 
         {/* RECIPIENT LINK */}
         <div className="mb-6">
-          <label className="block text-[9px] font-bold text-luxury-ink/60 uppercase tracking-[0.2em] mb-2">Link for {data.recipientName}</label>
+          <label className="block text-[9px] font-bold text-luxury-ink/80 uppercase tracking-[0.2em] mb-2">Link for {data.recipientName}</label>
           <div
             className="bg-[#1C1917] rounded-lg p-3 border-2 border-luxury-gold/40 text-left relative group cursor-pointer hover:border-luxury-gold transition-colors shadow-inner"
             onClick={handleCopy}
@@ -136,7 +136,7 @@ export const SharePackage: React.FC<Props> = ({ data, sessionKey, shareSlug, onP
             <p className="text-[9px] md:text-[10px] text-luxury-stone/80 leading-relaxed font-serif-elegant italic font-bold">
               "Your message is encrypted in transit and at rest. Access is restricted to automated delivery systems only. No humans, no AI training."
             </p>
-            <div className="flex justify-center gap-2 text-[8px] uppercase tracking-widest text-luxury-ink/50 font-bold mt-1">
+            <div className="flex justify-center gap-2 text-[10px] uppercase tracking-widest text-luxury-ink/70 font-bold mt-1">
               <span>AES-256 Storage</span>
               <span>•</span>
               <span>TLS 1.3 Transit</span>
@@ -147,7 +147,7 @@ export const SharePackage: React.FC<Props> = ({ data, sessionKey, shareSlug, onP
         </div>
 
         <div className="mt-6">
-          <button onClick={onPreview} className="text-[10px] md:text-xs text-luxury-ink/60 hover:text-luxury-ink font-bold uppercase tracking-[0.3em] transition-colors border-b-2 border-transparent hover:border-luxury-ink/30 pb-1">
+          <button onClick={onPreview} className="text-[10px] md:text-xs text-luxury-ink/80 hover:text-luxury-ink font-bold uppercase tracking-[0.3em] transition-colors border-b-2 border-transparent hover:border-luxury-ink/30 pb-1">
             Preview Receiver View
           </button>
         </div>

@@ -297,7 +297,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                 <div className="text-center border-b border-luxury-ink/20 pb-12">
                   <div className="mb-8">
                      <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 block mb-2">Select Visual Theme</label>
-                     <p className="text-[10px] uppercase tracking-widest text-luxury-ink/60">This sets the colors and atmosphere your partner will see</p>
+                     <p className="text-[10px] uppercase tracking-widest text-luxury-ink/80">This sets the colors and atmosphere your partner will see</p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {THEMES.map(theme => (
@@ -388,7 +388,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                 {phase === 1 && (
                   <>
                 <div className="text-center pt-2 pb-4">
-                  <p className="text-[9px] uppercase tracking-[0.5em] font-bold" style={{ color: '#C5A55A' }}>Phase One</p>
+                  <p className="text-[9px] uppercase tracking-[0.5em] font-bold text-luxury-ink/80">Phase One</p>
                   <h3 className="font-serif-elegant italic text-2xl text-luxury-stone mt-2">Set the atmosphere.</h3>
                 </div>
 
@@ -409,7 +409,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           {media.isUploadingImage ? (
                             <div className="text-center p-6 space-y-3">
                               <div className="w-10 h-10 mx-auto border-2 border-luxury-ink/20 border-t-luxury-gold-dark rounded-full animate-spin" />
-                              <span className="text-[9px] uppercase tracking-[0.2em] text-luxury-ink/60 block font-bold">{media.uploadProgress}%</span>
+                              <span className="text-[9px] uppercase tracking-[0.2em] text-luxury-ink/80 block font-bold">{media.uploadProgress}%</span>
                               <div className="w-16 h-1 bg-luxury-ink/10 rounded-full mx-auto overflow-hidden">
                                 <div className="h-full bg-luxury-gold-dark rounded-full transition-all duration-300" style={{ width: `${media.uploadProgress}%` }} />
                               </div>
@@ -424,7 +424,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           )}
                         </div>
                         <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                        <p className="text-[10px] text-luxury-stone/50 mt-2 text-center leading-relaxed">
+                        <p className="text-[10px] text-luxury-stone/70 mt-2 text-center leading-relaxed">
                           🔒 Your images are stored securely and are only accessible through your private link.
                         </p>
                       </div>
@@ -438,7 +438,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           <p className="text-[10px] uppercase tracking-widest text-luxury-ink/70 mb-4 font-bold max-w-sm mx-auto">
                             Upload up to 10 photos for a scattered polaroid collage.
                           </p>
-                          <p className="text-[10px] italic text-luxury-stone/60 max-w-sm mx-auto leading-relaxed font-serif-elegant">
+                          <p className="text-[10px] italic text-luxury-stone/70 max-w-sm mx-auto leading-relaxed font-serif-elegant">
                             A single caption can make a photo unforgettable.
                           </p>
                         </div>
@@ -552,7 +552,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                 {phase === 2 && (
                   <>
                 <div className="text-center pt-2 pb-4">
-                  <p className="text-[9px] uppercase tracking-[0.5em] font-bold" style={{ color: '#C5A55A' }}>Phase Two</p>
+                  <p className="text-[9px] uppercase tracking-[0.5em] font-bold text-luxury-ink/80">Phase Two</p>
                   <h3 className="font-serif-elegant italic text-2xl text-luxury-stone mt-2">Shape the story.</h3>
                 </div>
 
@@ -568,7 +568,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
                       <div className="space-y-3 group">
                         <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Key Memory to Mention</label>
-                        <p className="text-[9px] italic text-luxury-ink/60 mb-2 font-serif-elegant">This memory becomes the thread running through your letter.</p>
+                        <p className="text-[10px] italic text-luxury-ink/70 mb-2 font-serif-elegant">This memory becomes the thread running through your letter.</p>
                         <textarea className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic h-24 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. When we got lost in Tokyo, or just drinking coffee this morning..." value={data.sharedMoment} onChange={e => updateData({ sharedMoment: e.target.value })} required />
                       </div>
 
@@ -620,7 +620,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                 {phase === 3 && (
                   <>
                 <div className="text-center pt-2 pb-4">
-                  <p className="text-[9px] uppercase tracking-[0.5em] font-bold" style={{ color: '#C5A55A' }}>Phase Three</p>
+                  <p className="text-[9px] uppercase tracking-[0.5em] font-bold text-luxury-ink/80">Phase Three</p>
                   <h3 className="font-serif-elegant italic text-2xl text-luxury-stone mt-2">Write the heart.</h3>
                 </div>
 
@@ -643,7 +643,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                       {writingMode === 'self' ? (
                         <div className="animate-fade-in space-y-4 relative group">
                           <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80">Your Letter</label>
-                          <p className="text-[9px] italic text-luxury-ink/60 mb-2 font-serif-elegant">The heart of the experience — revealed one paragraph at a time.</p>
+                          <p className="text-[10px] italic text-luxury-ink/70 mb-2 font-serif-elegant">The heart of the experience — revealed one paragraph at a time.</p>
                           <div className="relative">
                             <textarea 
                               className="w-full bg-luxury-ink/5 border-l-4 border-luxury-ink/30 pl-6 py-4 pr-12 focus:border-luxury-gold-dark outline-none transition-all font-serif-elegant text-xl italic h-40 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/50" 
@@ -678,7 +678,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                               value={data.senderRawThoughts || ''} 
                               onChange={e => updateData({ senderRawThoughts: e.target.value })} 
                             />
-                            <p className="text-[9px] text-luxury-ink/60 text-right">{(data.senderRawThoughts || '').split(/\s+/).filter(Boolean).length} words</p>
+                            <p className="text-[9px] text-luxury-ink/80 text-right">{(data.senderRawThoughts || '').split(/\s+/).filter(Boolean).length} words</p>
                           </div>
                           <div className="space-y-4">
                             <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80">Relationship Tone</label>
@@ -729,7 +729,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                                 </button>
                                 <div>
                                   <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-luxury-ink">Voice Note Recorded</p>
-                                  <p className="text-[10px] font-bold text-luxury-ink/60">
+                                  <p className="text-[10px] font-bold text-luxury-ink/80">
                                     {isPreviewPlaying ? 'Playing...' : 'Ready to include in package.'}
                                   </p>
                                 </div>
@@ -924,7 +924,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                             <span className="text-xl">🎵</span>
                             <span>Soundtrack (YouTube)</span>
                         </label>
-                        <span className="text-[10px] text-luxury-ink/60 font-bold italic">
+                        <span className="text-[10px] text-luxury-ink/70 font-bold italic">
                             This plays throughout the experience — from the opening to your final words.
                         </span>
                     </div>
@@ -960,14 +960,14 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
             <div className="bg-gradient-to-br from-luxury-paper to-luxury-sandstone border-2 border-[#C5B498] p-8 md:p-12 rounded-xl shadow-sm">
                 <p className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/70 mb-2">Three Promises</p>
-                <p className="text-[9px] italic text-luxury-ink/60 mb-6 font-serif-elegant">Shown after the letter — your final promises, presented as elegant cards.</p>
+                <p className="text-[10px] italic text-luxury-ink/70 mb-6 font-serif-elegant">Shown after the letter — your final promises, presented as elegant cards.</p>
                 <div className="space-y-8">
                   {data.coupons?.map((coupon, idx) => (
                     <div key={coupon.id} className="flex gap-4 items-start border-b-2 border-luxury-ink/10 pb-6 last:border-0">
-                        <div className="pt-2 text-sm font-bold text-luxury-gold-dark">{idx + 1}</div>
+                        <div className="pt-2 text-sm font-bold text-luxury-ink/80">{idx + 1}</div>
                         <div className="flex-1 space-y-4">
                            <div>
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block mb-1">Title</label>
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/80 block mb-1">Title</label>
                               <input
                                 type="text"
                                 className="w-full bg-transparent border-b-2 border-luxury-ink/20 py-1 focus:border-luxury-ink outline-none font-serif-elegant italic text-luxury-ink text-xl placeholder:text-luxury-ink/40"
@@ -977,7 +977,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                               />
                            </div>
                            <div>
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block mb-1">Description</label>
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/80 block mb-1">Description</label>
                               <textarea
                                 className="w-full bg-luxury-ink/5 border-2 border-luxury-ink/20 p-4 rounded-lg focus:border-luxury-ink outline-none font-sans text-sm text-luxury-ink leading-relaxed resize-none h-24 placeholder:text-luxury-ink/40"
                                 value={coupon.description}
@@ -1004,15 +1004,15 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                 {data.hasGift && (
                     <div className="bg-luxury-paper border-t-2 border-[#D4C5A5] p-8 space-y-6 animate-fade-in">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block">Gift Title</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/80 block">Gift Title</label>
                             <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 focus:border-luxury-ink outline-none font-serif-elegant italic text-xl placeholder-luxury-ink/50" placeholder="e.g. Dinner Under the Stars" value={data.giftTitle} onChange={e => updateData({ giftTitle: e.target.value })} />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block">Why This Matters</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/80 block">Why This Matters</label>
                             <textarea className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 focus:border-luxury-ink outline-none font-serif-elegant italic text-base placeholder-luxury-ink/50 resize-none h-16 leading-relaxed" placeholder="Because you once said you've always wanted to…" value={data.giftNote || ''} onChange={e => updateData({ giftNote: e.target.value })} />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block">Booking or Surprise Link <span className="text-luxury-ink/40 normal-case italic">(optional)</span></label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/80 block">Booking or Surprise Link <span className="text-luxury-ink/40 normal-case italic">(optional)</span></label>
                             <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 focus:border-luxury-ink outline-none text-base placeholder-luxury-ink/50" placeholder="e.g. https://booking-confirmation.com/..." value={data.giftLink} onChange={e => updateData({ giftLink: e.target.value })} />
                         </div>
                     </div>
