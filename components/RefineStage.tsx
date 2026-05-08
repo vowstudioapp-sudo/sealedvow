@@ -276,7 +276,7 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack, onUpdateLet
           <button
             type="button"
             onClick={handleRegenerate}
-            className="px-6 py-2.5 rounded-full border border-luxury-ink/70 bg-transparent text-luxury-ink hover:bg-luxury-ink/5 hover:border-luxury-ink transition-colors text-[10px] uppercase tracking-[0.3em] font-bold"
+            className="px-6 py-2.5 rounded-full bg-luxury-sandstone text-luxury-ink hover:bg-luxury-sandstone/80 transition-all text-[10px] uppercase tracking-[0.3em] font-bold"
           >
             Regenerate Draft
           </button>
@@ -285,7 +285,7 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack, onUpdateLet
         <div className="flex flex-col md:flex-row gap-6 pt-8 border-t border-luxury-ink/20">
           <button
             onClick={onBack}
-            className="flex-1 py-4 rounded-full border border-luxury-ink/70 bg-transparent text-luxury-ink hover:bg-luxury-ink/5 hover:border-luxury-ink transition-colors font-bold text-[10px] tracking-[0.4em] uppercase"
+            className="flex-1 py-4 rounded-full bg-luxury-sandstone text-luxury-ink hover:bg-luxury-sandstone/80 transition-all transform active:scale-[0.98] font-bold text-[10px] tracking-[0.4em] uppercase shadow-xl"
           >
             ← Back to Details
           </button>
