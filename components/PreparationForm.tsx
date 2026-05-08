@@ -11,7 +11,6 @@ import { useMediaUploads } from '../hooks/useMediaUploads';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useDictation } from '../hooks/useDictation';
 import { CoupleData, Occasion, GiftType, Theme, Coupon, RevealMethod } from '../types.ts';
-import { THEME_LABELS, THEME_ORDER, THEME_SYSTEM } from '../theme/themeSystem';
 import { FEATURES } from '../config/features';
 import DraftResumeModal from './DraftResumeModal';
 import { consumeIntentionalEntry } from '../utils/intentionalEntry';
@@ -34,13 +33,6 @@ const CORE_OCCASIONS: { id: Occasion; label: string; icon: string; defaultTone: 
 
 // FESTIVAL OCCASIONS — Removed as Eid now has dedicated flow via OccasionSelector
 // Festivals are handled at the occasion selection screen level, not in this form
-
-const THEMES: { id: Theme; label: string; color: string; desc: string }[] = THEME_ORDER.map((id) => ({
-  id,
-  label: THEME_LABELS[id].label,
-  color: THEME_SYSTEM[id].accent,
-  desc: THEME_LABELS[id].description,
-}));
 
 const MUSIC_PRESETS = [
   { id: 'piano', label: 'Eternal Piano (Satie)', url: 'https://archive.org/download/gymnopedie-no-1-by-kevin-macleod/Gymnopedie_No_1.mp3' },
@@ -394,32 +386,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
               <div className="absolute inset-0 opacity-[0.06] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/paper.png')] rounded-xl"></div>
               <div className="relative z-10 space-y-12">
                 
-                <div className="text-center border-b border-luxury-ink/20 pb-12">
-                  <div className="mb-8">
-                     <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 block mb-2">Select Visual Theme</label>
-                     <p className="text-[10px] uppercase tracking-widest text-luxury-ink/60">This sets the colors and atmosphere your partner will see</p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {THEMES.map(theme => (
-                      <button
-                        key={theme.id}
-                        type="button"
-                        onClick={() => updateData({ theme: theme.id })}
-                        className={`relative overflow-hidden p-6 rounded-xl border transition-all duration-300 group text-left ${
-                          data.theme === theme.id ? 'border-luxury-gold shadow-lg bg-[#1C1917]' : 'border-luxury-ink/30 hover:border-luxury-gold/60 bg-[#F0ECE4]/30'
-                        }`}
-                      >
-                        <div className="w-4 h-4 rounded-full mb-4 shadow-sm border border-black/10" style={{ backgroundColor: theme.color }}></div>
-                        <span className={`block text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-1 ${data.theme === theme.id ? 'text-[#E5D0A1]' : 'text-luxury-ink'}`}>
-                          {theme.label}
-                        </span>
-                        <span className={`text-[10px] ${data.theme === theme.id ? 'text-luxury-stone/80' : 'text-luxury-ink/70'}`}>{theme.desc}</span>
-                        {data.theme === theme.id && <div className="absolute top-4 right-4 text-luxury-gold text-xs">★</div>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
                   <div className="space-y-4 group">
                     <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Recipient's Name</label>
