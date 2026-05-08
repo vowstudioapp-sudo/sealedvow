@@ -67,6 +67,7 @@ const EidPreparationForm = lazy(() =>
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
+import { writeDraftFromExternal } from './hooks/usePreparationPersistence';
 import { getDemoData } from './data/demoData.ts';
 
 import { THEME_ORDER, THEME_SYSTEM } from './theme/themeSystem';
@@ -1050,17 +1051,26 @@ const App: React.FC = () => {
           )}
 
           {stage === AppStage.REFINE && data && (
-            <RefineStage 
-              data={data} 
+            <RefineStage
+              data={data}
               onSave={(finalLetter, enrichedData) => {
                 if (!data) return;
                 const updated: CoupleData = hydrateCoupleData({ ...data, ...enrichedData, finalLetter });
                 setData(updated);
                 setIsCreatorPreview(true);
-                safeSetStage(AppStage.ENVELOPE); 
+                safeSetStage(AppStage.ENVELOPE);
                 writePersistedCoupleData(updated, () => setStorageError(true));
               }}
               onBack={() => safeSetStage(AppStage.PREPARE)}
+              onUpdateLetter={(letter) => {
+                // Mirror the AI-generated (or manually edited) letter back into
+                // App state AND the form draft in localStorage. PreparationForm
+                // is unmounted during REFINE, so its persistence hook can't see
+                // this change — writeDraftFromExternal merges into the existing
+                // draft (preserving step) so Back-to-Details restores fully.
+                setData(prev => (prev ? { ...prev, finalLetter: letter } : prev));
+                writeDraftFromExternal({ finalLetter: letter });
+              }}
             />
           )}
 

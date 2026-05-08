@@ -46,11 +46,44 @@ const STRUCTURED_TEXT_FIELDS: (keyof CoupleData)[] = [
   'sessionId',
 ];
 
+// Media fields safe to restore. Storage URLs are stable across sessions
+// in this product. audio/video remain excluded as a conservative measure
+// pending separate validation; aiImageUrl is server-regenerable.
+const MEDIA_FIELDS_RESTORED: (keyof CoupleData)[] = [
+  'memoryBoard',
+  'userImageUrl',
+];
+
 function selectiveHydrate(stored: Partial<CoupleData>): Partial<CoupleData> {
   const safe: Partial<CoupleData> = {};
-  const allowedFields = [...TEXT_SAFE_FIELDS, ...STRUCTURED_TEXT_FIELDS];
+  const allowedFields = [
+    ...TEXT_SAFE_FIELDS,
+    ...STRUCTURED_TEXT_FIELDS,
+    ...MEDIA_FIELDS_RESTORED,
+  ];
   for (const field of allowedFields) {
     if (field in stored && stored[field] !== undefined) {
+      // Defensive validation for memoryBoard — drop malformed photos
+      // (no url, wrong shape) instead of letting them crash the renderer.
+      if (field === 'memoryBoard' && Array.isArray(stored.memoryBoard)) {
+        safe.memoryBoard = stored.memoryBoard.filter(
+          (photo) =>
+            photo &&
+            typeof photo === 'object' &&
+            typeof photo.url === 'string' &&
+            photo.url.length > 0
+        );
+        continue;
+      }
+
+      // Defensive validation for userImageUrl — drop empty strings.
+      if (field === 'userImageUrl' && typeof stored.userImageUrl === 'string') {
+        if (stored.userImageUrl.length > 0) {
+          safe.userImageUrl = stored.userImageUrl;
+        }
+        continue;
+      }
+
       // @ts-expect-error — index assignment across keyof union
       safe[field] = stored[field];
     }
@@ -149,4 +182,17 @@ export function clearPreparationDraft(): void {
   } catch (err) {
     console.warn('[usePreparationPersistence] Clear failed:', err);
   }
+}
+
+// External-write helper for components that own form data outside the
+// PreparationForm hook (e.g. RefineStage feeding the AI draft back via
+// App.tsx). Reads the existing draft, merges in `updates`, writes back
+// preserving the existing step. No-ops if no draft exists yet — we
+// don't create orphan drafts from the refine layer.
+export function writeDraftFromExternal(updates: Partial<CoupleData>): void {
+  const existing = readDraft();
+  if (!existing || !existing.data) return;
+  const merged = { ...existing.data, ...updates } as CoupleData;
+  const step: StepValue = existing.step ?? 1;
+  writeDraft(merged, step);
 }

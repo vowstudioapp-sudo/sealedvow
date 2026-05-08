@@ -6,9 +6,13 @@ interface Props {
   data: CoupleData;
   onSave: (finalLetter: string, enrichedData?: Partial<CoupleData>) => void;
   onBack: () => void;
+  // Propagates the in-progress letter back to the parent so it survives
+  // Back-to-Details navigation. Called after AI generation succeeds and
+  // on textarea blur (to capture manual edits).
+  onUpdateLetter: (letter: string) => void;
 }
 
-export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
+export const RefineStage: React.FC<Props> = ({ data, onSave, onBack, onUpdateLetter }) => {
   const [letter, setLetter] = useState(data.finalLetter || '');
   const [loading, setLoading] = useState(data.writingMode === 'assisted' && !data.finalLetter);
   const [isPackaging, setIsPackaging] = useState(false);
@@ -45,6 +49,10 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
       setTimeout(() => {
         setLetter(draft);
         setLoading(false);
+        // Propagate to parent so Back-to-Details preserves the draft and
+        // future RefineStage entries skip regeneration (data.finalLetter
+        // is non-empty → useEffect's `!data.finalLetter` gate is false).
+        onUpdateLetter(draft);
       }, 300);
     } catch (err) {
       if (draftIntervalRef.current) clearInterval(draftIntervalRef.current);
@@ -53,7 +61,7 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
     } finally {
       setRetrying(false);
     }
-  }, [data]);
+  }, [data, onUpdateLetter]);
 
   const handleRetry = () => {
     setRetrying(true);
@@ -64,6 +72,17 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
     setError(null);
     setLetter(''); // empty textarea for user to type into
     setLoading(false);
+  };
+
+  // Explicit user request for a fresh AI draft. Resets the
+  // hasGeneratedRef gate, clears local + parent letter, then fires
+  // fetchDraft. The success path's onUpdateLetter call writes the
+  // new draft back to parent + localStorage.
+  const handleRegenerate = () => {
+    hasGeneratedRef.current = false;
+    setLetter('');
+    onUpdateLetter('');
+    fetchDraft();
   };
 
   useEffect(() => {
@@ -246,17 +265,31 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack }) => {
           className="w-full bg-transparent border-none focus:ring-0 p-0 font-serif-elegant text-xl md:text-2xl leading-[1.8] text-luxury-ink italic h-[50vh] resize-none placeholder:text-luxury-ink/40"
           value={letter}
           onChange={(e) => setLetter(e.target.value)}
+          // Propagate manual edits to parent on blur so they survive
+          // Back-to-Details navigation. onChange stays local for typing
+          // performance.
+          onBlur={(e) => onUpdateLetter(e.target.value)}
           placeholder="Write your letter here…"
         />
-        
+
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={handleRegenerate}
+            className="px-6 py-2.5 rounded-full border border-luxury-ink/70 bg-transparent text-luxury-ink hover:bg-luxury-ink/5 hover:border-luxury-ink transition-colors text-[10px] uppercase tracking-[0.3em] font-bold"
+          >
+            Regenerate Draft
+          </button>
+        </div>
+
         <div className="flex flex-col md:flex-row gap-6 pt-8 border-t border-luxury-ink/20">
-          <button 
+          <button
             onClick={onBack}
-            className="flex-1 py-4 text-luxury-ink/80 text-xs font-bold uppercase tracking-widest hover:text-luxury-ink transition-colors rounded-full hover:bg-luxury-ink/10"
+            className="flex-1 py-4 rounded-full border border-luxury-ink/70 bg-transparent text-luxury-ink hover:bg-luxury-ink/5 hover:border-luxury-ink transition-colors font-bold text-[10px] tracking-[0.4em] uppercase"
           >
             ← Back to Details
           </button>
-          <button 
+          <button
             onClick={handleFinalize}
             className="flex-[2] py-4 bg-luxury-wine text-white font-bold text-[10px] tracking-[0.4em] uppercase rounded-full shadow-xl hover:bg-black transition-all transform active:scale-[0.98]"
           >
