@@ -747,6 +747,10 @@ export default async function handler(req, res) {
   const killSwitch = await safeKV(() => kv.get('ai_kill_switch'));
 
   if (process.env.AI_DISABLED === 'true' || killSwitch === true || killSwitch === 'true') {
+    console.error('[AI] 503 reason: PATH_C — kill switch active', {
+      AI_DISABLED_env: process.env.AI_DISABLED,
+      killSwitch_redis: killSwitch,
+    });
     return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
   }
 
@@ -798,6 +802,11 @@ export default async function handler(req, res) {
     null
   );
   if (!results) {
+    console.error('[AI] 503 reason: PATH_D — KV pipeline read failed (cost-limit gates)', {
+      globalDailyKey,
+      actorDailyKey,
+      burstKey,
+    });
     return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
   }
   const [globalRaw, actorRaw, burstRaw] = results;
@@ -811,6 +820,18 @@ export default async function handler(req, res) {
   if (ratio >= HARD_BLOCK ||
       actorCount >= DAILY_AI_REQUEST_CAP_PER_ACTOR ||
       burstCount >= GLOBAL_BURST_CAP_PER_MIN) {
+    console.error('[AI] 503 reason: PATH_E — cost/burst threshold tripped', {
+      ratio,
+      HARD_BLOCK,
+      ratio_tripped: ratio >= HARD_BLOCK,
+      actorCount,
+      DAILY_AI_REQUEST_CAP_PER_ACTOR,
+      actorCount_tripped: actorCount >= DAILY_AI_REQUEST_CAP_PER_ACTOR,
+      burstCount,
+      GLOBAL_BURST_CAP_PER_MIN,
+      burstCount_tripped: burstCount >= GLOBAL_BURST_CAP_PER_MIN,
+      actorKey,
+    });
     return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
   }
 
@@ -837,6 +858,11 @@ export default async function handler(req, res) {
   const updatedGlobal = await safeKV(() => kv.incrby(globalDailyKey, unitCost), null);
 
   if (updatedGlobal === null) {
+    console.error('[AI] 503 reason: PATH_F — KV global incrby failed (pre-debit)', {
+      globalDailyKey,
+      unitCost,
+      action,
+    });
     return res.status(503).json({ ok: false, error: 'Service temporarily unavailable' });
   }
 
