@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePreparationState } from '../hooks/usePreparationState';
+import { usePreparationPersistence, clearPreparationDraft } from '../hooks/usePreparationPersistence';
 import { useMediaUploads } from '../hooks/useMediaUploads';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useDictation } from '../hooks/useDictation';
@@ -67,7 +68,28 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   const [error, setError] = useState<string | null>(null);
   
   const { step, data, updateData, next, back } = usePreparationState(DEFAULT_COUPONS);
-  
+
+  const { hydratedData } = usePreparationPersistence(data);
+
+  const hasHydratedRef = useRef(false);
+  useEffect(() => {
+    if (hasHydratedRef.current) return;
+    if (hydratedData) {
+      updateData(hydratedData);
+    }
+    hasHydratedRef.current = true;
+  }, [hydratedData, updateData]);
+
+  // iOS keyboard cover fix — scroll focused textarea into view after
+  // keyboard finishes animating (~250ms). 'instant' (default) avoids
+  // smooth-scroll/keyboard-animation double-jump.
+  const handleTextareaFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    const target = e.target;
+    setTimeout(() => {
+      target.scrollIntoView({ block: 'center' });
+    }, 300);
+  };
+
   // Read occasion from URL parameter and pre-fill on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -240,6 +262,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
       if (previewAudioRef.current) {
         previewAudioRef.current.pause();
       }
+      clearPreparationDraft();
       onComplete({ ...data, writingMode });
     }
   };
@@ -531,7 +554,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                                       value={photo.caption}
                                       onChange={e => updateMemoryCaption(idx, e.target.value)}
                                       onPointerDown={(e) => e.stopPropagation()}
-                                      className="w-full bg-transparent border-b border-transparent hover:border-luxury-ink/20 text-center text-[11px] font-romantic text-luxury-ink outline-none focus:border-luxury-gold transition-colors pb-1 placeholder-luxury-ink/30"
+                                      className="w-full bg-transparent border-b border-transparent hover:border-luxury-ink/20 text-center text-[16px] font-romantic text-luxury-ink outline-none focus:border-luxury-gold transition-colors pb-1 placeholder-luxury-ink/30"
                                       maxLength={25}
                                     />
                                   </div>
@@ -569,7 +592,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                       <div className="space-y-3 group">
                         <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Key Memory to Mention</label>
                         <p className="text-[9px] italic text-luxury-ink/60 mb-2 font-serif-elegant">This memory becomes the thread running through your letter.</p>
-                        <textarea className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic h-24 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. When we got lost in Tokyo, or just drinking coffee this morning..." value={data.sharedMoment} onChange={e => updateData({ sharedMoment: e.target.value })} required />
+                        <textarea className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic h-24 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. When we got lost in Tokyo, or just drinking coffee this morning..." value={data.sharedMoment} onChange={e => updateData({ sharedMoment: e.target.value })} onFocus={handleTextareaFocus} required />
                       </div>
 
                       {!showLocationFields ? (
@@ -672,11 +695,12 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           <div className="space-y-4">
                             <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80">Your Words</label>
                             <p className="text-[10px] text-luxury-ink/50 leading-relaxed -mt-2">Write a few lines in your own words. Don't worry about grammar or structure. Just say what you feel.</p>
-                            <textarea 
-                              className="w-full bg-luxury-ink/5 border-l-4 border-luxury-ink/30 pl-6 py-4 pr-4 focus:border-luxury-gold-dark outline-none transition-all font-serif-elegant text-lg italic h-32 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/40" 
-                              placeholder="I just want to say that... the way you... I feel like..." 
-                              value={data.senderRawThoughts || ''} 
-                              onChange={e => updateData({ senderRawThoughts: e.target.value })} 
+                            <textarea
+                              className="w-full bg-luxury-ink/5 border-l-4 border-luxury-ink/30 pl-6 py-4 pr-4 focus:border-luxury-gold-dark outline-none transition-all font-serif-elegant text-lg italic h-32 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/40"
+                              placeholder="I just want to say that... the way you... I feel like..."
+                              value={data.senderRawThoughts || ''}
+                              onChange={e => updateData({ senderRawThoughts: e.target.value })}
+                              onFocus={handleTextareaFocus}
                             />
                             <p className="text-[9px] text-luxury-ink/60 text-right">{(data.senderRawThoughts || '').split(/\s+/).filter(Boolean).length} words</p>
                           </div>
@@ -983,6 +1007,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                                 value={coupon.description}
                                 placeholder={PROMISE_PLACEHOLDERS[idx]?.description}
                                 onChange={e => updateCoupon(idx, 'description', e.target.value)}
+                                onFocus={handleTextareaFocus}
                               />
                            </div>
                         </div>
