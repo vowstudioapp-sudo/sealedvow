@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { CoupleData } from '../types';
 
 const STORAGE_KEY = 'vday_data_draft';
@@ -7,9 +7,12 @@ const STORAGE_KEY = 'vday_data_draft';
 const CURRENT_SCHEMA_VERSION = 1;
 const DEFAULT_DEBOUNCE_MS = 1000;
 
+type StepValue = 1 | 2 | 3;
+
 interface StoredDraft {
   version: number;
   data: Partial<CoupleData>;
+  step?: StepValue;
   savedAt: string;
 }
 
@@ -55,7 +58,12 @@ function selectiveHydrate(stored: Partial<CoupleData>): Partial<CoupleData> {
   return safe;
 }
 
-function readDraft(): Partial<CoupleData> | null {
+interface DraftPeek {
+  data: Partial<CoupleData> | null;
+  step: StepValue | null;
+}
+
+function readDraft(): DraftPeek | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -72,19 +80,27 @@ function readDraft(): Partial<CoupleData> | null {
       return null;
     }
     if (typeof parsed.data !== 'object' || parsed.data === null) return null;
-    return selectiveHydrate(parsed.data);
+    const safe = selectiveHydrate(parsed.data);
+    // step is optional for backward compat with PR #7 drafts (no step field).
+    // Caller treats null as "use default step 1".
+    const step: StepValue | null =
+      parsed.step === 1 || parsed.step === 2 || parsed.step === 3
+        ? parsed.step
+        : null;
+    return { data: safe, step };
   } catch (err) {
     console.warn('[usePreparationPersistence] Read failed:', err);
     return null;
   }
 }
 
-function writeDraft(data: CoupleData): void {
+function writeDraft(data: CoupleData, step: StepValue): void {
   if (typeof window === 'undefined') return;
   try {
     const payload: StoredDraft = {
       version: CURRENT_SCHEMA_VERSION,
       data,
+      step,
       savedAt: new Date().toISOString(),
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -95,20 +111,22 @@ function writeDraft(data: CoupleData): void {
   }
 }
 
-export interface PersistenceResult {
-  hydratedData: Partial<CoupleData> | null;
+// One-shot synchronous read for use at component mount, before the
+// state hook initializes. Returns { data: null, step: null } if no
+// draft exists or the stored draft is incompatible / malformed.
+export function peekDraft(): DraftPeek {
+  return readDraft() ?? { data: null, step: null };
 }
 
+// Ongoing-write-only hook. The hook does NOT hydrate — use peekDraft()
+// at component mount to seed initial state. The hook persists (data, step)
+// to localStorage on every change with debounce.
 export function usePreparationPersistence(
   data: CoupleData,
+  step: StepValue,
   options: { debounceMs?: number; enabled?: boolean } = {}
-): PersistenceResult {
+): void {
   const { debounceMs = DEFAULT_DEBOUNCE_MS, enabled = true } = options;
-
-  const [hydratedData] = useState<Partial<CoupleData> | null>(() => {
-    if (!enabled) return null;
-    return readDraft();
-  });
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -116,14 +134,12 @@ export function usePreparationPersistence(
     if (!enabled) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      writeDraft(data);
+      writeDraft(data, step);
     }, debounceMs);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [data, debounceMs, enabled]);
-
-  return { hydratedData };
+  }, [data, step, debounceMs, enabled]);
 }
 
 export function clearPreparationDraft(): void {

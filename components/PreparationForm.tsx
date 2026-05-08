@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePreparationState } from '../hooks/usePreparationState';
-import { usePreparationPersistence, clearPreparationDraft } from '../hooks/usePreparationPersistence';
+import { usePreparationPersistence, peekDraft } from '../hooks/usePreparationPersistence';
 import { useMediaUploads } from '../hooks/useMediaUploads';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useDictation } from '../hooks/useDictation';
@@ -67,18 +67,29 @@ const ENABLE_VIDEO = false;
 export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   const [error, setError] = useState<string | null>(null);
   
-  const { step, data, updateData, next, back } = usePreparationState(DEFAULT_COUPONS);
+  // Read any saved draft once on mount, BEFORE state hook init.
+  // useRef ensures the read runs exactly once (initializer fires only on
+  // the first render); subsequent renders return the same captured peek.
+  const initialDraftRef = useRef(peekDraft());
 
-  const { hydratedData } = usePreparationPersistence(data);
+  const { step, data, updateData, next, back } = usePreparationState(
+    DEFAULT_COUPONS,
+    initialDraftRef.current.step ?? 1,
+  );
 
+  usePreparationPersistence(data, step);
+
+  // One-shot data hydration. Step is hydrated via usePreparationState's
+  // initialStep arg above; this effect merges the text-safe field values
+  // from the saved draft into form state on mount only.
   const hasHydratedRef = useRef(false);
   useEffect(() => {
     if (hasHydratedRef.current) return;
-    if (hydratedData) {
-      updateData(hydratedData);
+    if (initialDraftRef.current.data) {
+      updateData(initialDraftRef.current.data);
     }
     hasHydratedRef.current = true;
-  }, [hydratedData, updateData]);
+  }, [updateData]);
 
   // iOS keyboard cover fix — scroll focused textarea into view after
   // keyboard finishes animating (~250ms). 'instant' (default) avoids
@@ -262,7 +273,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
       if (previewAudioRef.current) {
         previewAudioRef.current.pause();
       }
-      clearPreparationDraft();
       onComplete({ ...data, writingMode });
     }
   };
@@ -363,15 +373,13 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
           <div className="relative">
 
             {/* ═══ Desktop Side Buttons — absolute, beside the card ═══ */}
-            {phase > 1 && (
-              <button
-                type="button"
-                onClick={goBackPhase}
-                className="hidden lg:block absolute -left-36 top-1/2 -translate-y-1/2 px-6 py-3 rounded-full border border-luxury-stone/30 text-luxury-stone/60 hover:text-luxury-gold hover:border-luxury-gold/50 transition-all duration-300 text-[10px] uppercase tracking-[0.2em] font-bold whitespace-nowrap"
-              >
-                ← Back
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={phase > 1 ? goBackPhase : back}
+              className="hidden lg:block absolute -left-36 top-1/2 -translate-y-1/2 px-6 py-3 rounded-full border border-luxury-stone/30 text-luxury-stone/60 hover:text-luxury-gold hover:border-luxury-gold/50 transition-all duration-300 text-[10px] uppercase tracking-[0.2em] font-bold whitespace-nowrap"
+            >
+              ← Back
+            </button>
             {phase < 3 ? (
               <button
                 type="button"
@@ -781,15 +789,13 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
             {/* ═══ MOBILE BOTTOM NAVIGATION ═══ */}
             <div className="lg:hidden flex justify-between items-center px-2 py-4 mt-4">
-              {phase > 1 ? (
-                <button
-                  type="button"
-                  onClick={goBackPhase}
-                  className="text-[10px] md:text-xs uppercase tracking-[0.2em] text-luxury-stone hover:text-luxury-gold transition-colors font-bold px-4 py-2"
-                >
-                  ← Back
-                </button>
-              ) : <div />}
+              <button
+                type="button"
+                onClick={phase > 1 ? goBackPhase : back}
+                className="text-[10px] md:text-xs uppercase tracking-[0.2em] text-luxury-stone hover:text-luxury-gold transition-colors font-bold px-4 py-2"
+              >
+                ← Back
+              </button>
               
               {phase < 3 ? (
                 <button

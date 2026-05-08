@@ -10,8 +10,11 @@ import { CoupleData, Occasion, Coupon } from '../types';
  *
  * FINAL — Production Ready
  */
-export function usePreparationState(initialCoupons: Coupon[] = []) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+export function usePreparationState(
+  initialCoupons: Coupon[] = [],
+  initialStep: 1 | 2 | 3 = 1,
+) {
+  const [step, setStep] = useState<1 | 2 | 3>(initialStep);
 
   const [data, setData] = useState<CoupleData>(() => ({
     sessionId: crypto.randomUUID(),
