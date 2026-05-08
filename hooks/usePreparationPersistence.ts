@@ -184,6 +184,92 @@ export function clearPreparationDraft(): void {
   }
 }
 
+// Hand-rolled list (Patch 1). Every field here is EMPTY by default in
+// usePreparationState's initial data. The heuristic checks ≥2 non-empty.
+// Adding fields with default values to this list would defeat the
+// heuristic — modal would appear for users who haven't done anything
+// meaningful.
+//
+// NOT included: 'theme', 'occasion', 'writingMode', 'musicType',
+// 'revealMethod', 'hasGift', 'giftType', 'relationshipIntent', 'coupons'
+// — all have defaults set on fresh state.
+const MEANINGFUL_DRAFT_FIELDS: (keyof CoupleData)[] = [
+  'recipientName',
+  'senderName',
+  'sharedMoment',
+  'senderRawThoughts',
+  'finalLetter',
+  'memoryBoard',
+  'userImageUrl',
+  'audio',
+];
+
+const MEANINGFUL_CONTENT_THRESHOLD = 2;
+
+export interface DraftMetadata {
+  recipientName: string;
+  step: StepValue;
+  wordCount: number;
+  photoCount: number;
+  hasVoiceNote: boolean;
+  hasCoverImage: boolean;
+  savedAt: string;
+  hasMeaningfulContent: boolean;
+}
+
+// Returns metadata about the saved draft, or null if none exists.
+// Does not mutate state. Used by PreparationForm to decide whether to
+// show the resume modal vs silent-restore vs start-empty.
+export function getDraftMetadata(): DraftMetadata | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredDraft;
+    if (parsed.version !== CURRENT_SCHEMA_VERSION) return null;
+    if (!parsed.data) return null;
+
+    const data = parsed.data as Partial<CoupleData>;
+
+    let meaningfulFieldCount = 0;
+    for (const field of MEANINGFUL_DRAFT_FIELDS) {
+      const value = data[field];
+      if (typeof value === 'string') {
+        if (value.trim().length > 0) meaningfulFieldCount++;
+      } else if (Array.isArray(value)) {
+        if (value.length > 0) meaningfulFieldCount++;
+      } else if (value !== null && value !== undefined && value !== false) {
+        meaningfulFieldCount++;
+      }
+    }
+    const hasMeaningfulContent =
+      meaningfulFieldCount >= MEANINGFUL_CONTENT_THRESHOLD;
+
+    const writingText = data.finalLetter || data.senderRawThoughts || '';
+    const wordCount = writingText.trim()
+      ? writingText.trim().split(/\s+/).length
+      : 0;
+
+    const photoCount = Array.isArray(data.memoryBoard)
+      ? data.memoryBoard.length
+      : 0;
+
+    return {
+      recipientName: data.recipientName || '',
+      step: parsed.step ?? 1,
+      wordCount,
+      photoCount,
+      hasVoiceNote: Boolean(data.audio),
+      hasCoverImage: Boolean(data.userImageUrl),
+      savedAt: parsed.savedAt,
+      hasMeaningfulContent,
+    };
+  } catch (err) {
+    console.warn('[getDraftMetadata] failed:', err);
+    return null;
+  }
+}
+
 // External-write helper for components that own form data outside the
 // PreparationForm hook (e.g. RefineStage feeding the AI draft back via
 // App.tsx). Reads the existing draft, merges in `updates`, writes back

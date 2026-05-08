@@ -1,5 +1,43 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { CoupleData, Occasion, Coupon } from '../types';
+
+// Single source of truth for the fresh-state shape. Used by both the
+// initial useState() factory and resetPreparationState — same code path,
+// no behavioral drift between mount and reset.
+const buildInitialData = (initialCoupons: Coupon[]): CoupleData => ({
+  sessionId: crypto.randomUUID(),
+
+  recipientName: '',
+  senderName: '',
+  timeShared: '',
+  relationshipIntent: 'Deeply romantic, grateful, and present.',
+  sharedMoment: '',
+
+  occasion: 'anniversary',
+  writingMode: 'assisted',
+  finalLetter: '',
+  senderRawThoughts: '',
+
+  theme: 'obsidian',
+
+  hasGift: false,
+  giftType: 'gastronomy',
+  giftTitle: '',
+  giftLink: '',
+
+  coupons: initialCoupons,
+
+  musicType: 'preset',
+  musicUrl: '',
+
+  revealMethod: 'immediate',
+  unlockDate: null,
+
+  locationMemory: '',
+  manualMapLink: '',
+
+  memoryBoard: [],
+});
 
 /**
  * usePreparationState
@@ -16,40 +54,7 @@ export function usePreparationState(
 ) {
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
 
-  const [data, setData] = useState<CoupleData>(() => ({
-    sessionId: crypto.randomUUID(),
-
-    recipientName: '',
-    senderName: '',
-    timeShared: '',
-    relationshipIntent: 'Deeply romantic, grateful, and present.',
-    sharedMoment: '',
-
-    occasion: 'anniversary',
-    writingMode: 'assisted',
-    finalLetter: '',
-    senderRawThoughts: '',
-
-    theme: 'obsidian',
-
-    hasGift: false,
-    giftType: 'gastronomy',
-    giftTitle: '',
-    giftLink: '',
-
-    coupons: initialCoupons,
-
-    musicType: 'preset',
-    musicUrl: '',
-
-    revealMethod: 'immediate',
-    unlockDate: null,
-
-    locationMemory: '',
-    manualMapLink: '',
-
-    memoryBoard: [],
-  }));
+  const [data, setData] = useState<CoupleData>(() => buildInitialData(initialCoupons));
 
   // ---------------------------------------------------------------------------
   // SAFE PATCH UPDATE (NO STATE LOSS)
@@ -101,6 +106,19 @@ export function usePreparationState(
   const back = () =>
     setStep(s => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s));
 
+  // ---------------------------------------------------------------------------
+  // RESET — for the "Begin again" flow in DraftResumeModal (PR #11).
+  // Uses the SAME default-state factory as the initial useState call, so
+  // reset is just "what would the hook return on a fresh mount". No new
+  // sessionId logic is introduced — buildInitialData calls crypto.randomUUID()
+  // because the original initial state did. Same code path, same behavior.
+  // Caller is responsible for clearing localStorage separately.
+  // ---------------------------------------------------------------------------
+  const resetPreparationState = useCallback(() => {
+    setData(buildInitialData(initialCoupons));
+    setStep(1);
+  }, [initialCoupons]);
+
   return {
     step,
     data,
@@ -112,5 +130,7 @@ export function usePreparationState(
     next,
     back,
     setStep,
+
+    resetPreparationState,
   };
 }

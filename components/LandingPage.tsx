@@ -6,6 +6,7 @@ import { MyLettersModal } from './MyLettersModal';
 import { UserMenu } from './UserMenu';
 import { AtmosphericShell } from './AtmosphericShell';
 import { useAuth } from '../hooks/useAuth';
+import { markIntentionalEntry } from '../utils/intentionalEntry';
 
 interface Props {
   onEnter: () => void;
@@ -107,6 +108,10 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   }, [showLogin]);
 
   const handleEnter = () => {
+    // PR #11 — flags this navigation as a fresh-letter intent so
+    // PreparationForm shows the resume modal (if a meaningful saved
+    // draft exists) instead of silently restoring it.
+    markIntentionalEntry();
     window.location.href = "/create";
   };
 
