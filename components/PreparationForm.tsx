@@ -1,13 +1,23 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePreparationState } from '../hooks/usePreparationState';
-import { usePreparationPersistence, peekDraft } from '../hooks/usePreparationPersistence';
+import {
+  usePreparationPersistence,
+  peekDraft,
+  getDraftMetadata,
+  clearPreparationDraft,
+} from '../hooks/usePreparationPersistence';
 import { useMediaUploads } from '../hooks/useMediaUploads';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useDictation } from '../hooks/useDictation';
 import { CoupleData, Occasion, GiftType, Theme, Coupon, RevealMethod } from '../types.ts';
 import { THEME_LABELS, THEME_ORDER, THEME_SYSTEM } from '../theme/themeSystem';
 import { FEATURES } from '../config/features';
+import DraftResumeModal from './DraftResumeModal';
+import { consumeIntentionalEntry } from '../utils/intentionalEntry';
+import { isWithinLastMinutes } from '../utils/relativeTime';
+
+const SILENT_RESTORE_WINDOW_MINUTES = 10;
 
 interface Props {
   onComplete: (data: CoupleData) => void;
@@ -72,7 +82,32 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   // the first render); subsequent renders return the same captured peek.
   const initialDraftRef = useRef(peekDraft());
 
-  const { step, data, updateData, next, back } = usePreparationState(
+  // PR #11 — Decide on mount whether to show the resume modal, silent-
+  // restore, or start empty. Computed once via useMemo (empty deps).
+  // consumeIntentionalEntry has a side effect (clears the sessionStorage
+  // flag) — that's intentional, fires exactly once per mount.
+  const initialDecision = useMemo(() => {
+    const metadata = getDraftMetadata();
+    if (!metadata) return { mode: 'empty' as const };
+    if (!metadata.hasMeaningfulContent) {
+      return { mode: 'silent-restore' as const, metadata };
+    }
+    if (consumeIntentionalEntry()) {
+      return { mode: 'show-modal' as const, metadata };
+    }
+    if (isWithinLastMinutes(metadata.savedAt, SILENT_RESTORE_WINDOW_MINUTES)) {
+      return { mode: 'silent-restore' as const, metadata };
+    }
+    return { mode: 'show-modal' as const, metadata };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [showModal, setShowModal] = useState(initialDecision.mode === 'show-modal');
+  const [hydrationDeferred, setHydrationDeferred] = useState(
+    initialDecision.mode === 'show-modal',
+  );
+
+  const { step, data, updateData, next, back, resetPreparationState } = usePreparationState(
     DEFAULT_COUPONS,
     initialDraftRef.current.step ?? 1,
   );
@@ -82,14 +117,38 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   // One-shot data hydration. Step is hydrated via usePreparationState's
   // initialStep arg above; this effect merges the text-safe field values
   // from the saved draft into form state on mount only.
+  // PR #11 — gated on hydrationDeferred so the modal flow can decide
+  // whether to apply hydration (Continue) or skip it (Begin Again).
   const hasHydratedRef = useRef(false);
   useEffect(() => {
     if (hasHydratedRef.current) return;
+    if (hydrationDeferred) return;
     if (initialDraftRef.current.data) {
       updateData(initialDraftRef.current.data);
     }
     hasHydratedRef.current = true;
-  }, [updateData]);
+  }, [updateData, hydrationDeferred]);
+
+  // PR #11 modal handlers.
+  const handleContinue = () => {
+    setShowModal(false);
+    setHydrationDeferred(false); // gated effect now fires + applies saved data
+  };
+
+  const handleBeginAgain = () => {
+    // Order matters:
+    // 1. Clear localStorage FIRST so persistence's auto-save can't pick
+    //    up reset state and re-write stale fields.
+    // 2. Reset in-memory state.
+    // 3. Mark hydration complete so the gated effect doesn't re-apply
+    //    the stale hydratedData (still in scope from peekDraft).
+    // 4. Close modal.
+    clearPreparationDraft();
+    resetPreparationState();
+    hasHydratedRef.current = true;
+    setShowModal(false);
+    setHydrationDeferred(false);
+  };
 
   // iOS keyboard cover fix — scroll focused textarea into view after
   // keyboard finishes animating (~250ms). 'instant' (default) avoids
@@ -278,6 +337,14 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   };
 
   return (
+    <>
+      {showModal && initialDecision.mode === 'show-modal' && (
+        <DraftResumeModal
+          metadata={initialDecision.metadata}
+          onContinue={handleContinue}
+          onBeginAgain={handleBeginAgain}
+        />
+      )}
     <div className={`mx-auto ${(step as number) === 2 ? 'max-w-5xl p-4 mt-2 mb-4' : 'max-w-3xl p-4 md:p-12 mt-4 mb-32'}`}>
       <div className={`text-center animate-fade-in ${(step as number) === 2 ? 'mb-2' : 'mb-16'}`}>
         {step !== 2 && (
@@ -1066,5 +1133,6 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
         </div>
       </form>
     </div>
+    </>
   );
 };

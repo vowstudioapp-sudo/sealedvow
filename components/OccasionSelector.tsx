@@ -1,10 +1,18 @@
 import React from "react";
 import { motion } from "framer-motion";
 import "../styles/occasion-selector.css";
+import { markIntentionalEntry } from "../utils/intentionalEntry";
 
 export const OccasionSelector: React.FC = () => {
 
   const go = (path: string) => {
+    // PR #11 — picking an occasion is a fresh-letter intent. Mark before
+    // SPA navigation so PreparationForm sees the flag on its next mount
+    // and shows the resume modal if a meaningful draft exists. Only
+    // fires for /letter/create paths; "/" (back) doesn't need it.
+    if (path.startsWith("/letter/create")) {
+      markIntentionalEntry();
+    }
     window.history.pushState({}, "", path);
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
