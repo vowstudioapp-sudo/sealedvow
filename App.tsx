@@ -1102,6 +1102,8 @@ const App: React.FC = () => {
                 theme={experienceData.theme || 'obsidian'}
                 onOpen={handleEnvelopeOpen}
                 onInteract={handleEnvelopeInteract}
+                isPreview={isCreatorPreview}
+                onThemeChange={isCreatorPreview ? (t: Theme) => setData(prev => (prev ? { ...prev, theme: t } : prev)) : undefined}
               />
             </div>
           )}

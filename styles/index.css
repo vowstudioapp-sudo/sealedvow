@@ -59,6 +59,12 @@
       var(--sv-surface-navy-1) 35%,
       var(--sv-surface-navy-2) 65%,
       var(--sv-surface-navy-3) 100%);
+    /* Atmospheric easing for theme transitions (Phase B): when AtmosphericShell
+       receives a new themed background via inline style, the world drifts into
+       the new mood instead of snapping. 400ms matches the upper bound of the
+       prompt's 200-400ms atmospheric range — the page is a slower-feeling
+       surface than discrete elements (seal disc, text). */
+    transition: background 400ms ease-out;
   }
 
   /* Content sits above the texture layers. Exclude grain/vignette
