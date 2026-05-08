@@ -102,11 +102,27 @@ const MAX_REQUESTS = 10; // per IP per minute
 // ===============================
 // COST CONTROL CONFIG
 // All overridable via env. Defaults sized for current load profile.
+//
+// IS_DEV relaxation: when NODE_ENV !== 'production', per-actor and
+// burst defaults are massively raised so a single dev's local
+// hammering doesn't exhaust the same shared quotas. Production
+// defaults are unchanged. Env-var overrides always win, regardless
+// of IS_DEV — only the FALLBACK default is dev-aware.
+// HARD_BLOCK ratio + KV fail-closed behavior are intentionally NOT
+// relaxed: they're cost protection, not user-facing throttling.
 // ===============================
+const IS_DEV = process.env.NODE_ENV !== 'production';
+
 const HOURLY_AI_CAP_PER_ACTOR = Number(process.env.HOURLY_AI_CAP_PER_ACTOR || 10);
-const DAILY_AI_REQUEST_CAP_PER_ACTOR = Number(process.env.DAILY_AI_REQUEST_CAP_PER_ACTOR || 12);
-const GLOBAL_DAILY_UNIT_CAP = Number(process.env.GLOBAL_DAILY_UNIT_CAP || 3000);
-const GLOBAL_BURST_CAP_PER_MIN = Number(process.env.GLOBAL_BURST_CAP_PER_MIN || 20);
+const DAILY_AI_REQUEST_CAP_PER_ACTOR = Number(
+  process.env.DAILY_AI_REQUEST_CAP_PER_ACTOR || (IS_DEV ? 100000 : 12)
+);
+const GLOBAL_DAILY_UNIT_CAP = Number(
+  process.env.GLOBAL_DAILY_UNIT_CAP || (IS_DEV ? 3000000 : 3000)
+);
+const GLOBAL_BURST_CAP_PER_MIN = Number(
+  process.env.GLOBAL_BURST_CAP_PER_MIN || (IS_DEV ? 100000 : 20)
+);
 
 const SOFT_CAP_THRESHOLD = Number(process.env.SOFT_CAP_THRESHOLD || 0.70);
 const DEGRADE_LEVEL_1 = Number(process.env.DEGRADE_LEVEL_1 || 0.80);
@@ -637,12 +653,15 @@ export default async function handler(req, res) {
   }
 
   // ── EXPENSIVE-ACTION DAILY LIMIT (audio — 3 per day per user) ──
+  // Currently dead-gated (generateAudioLetter is not in ALLOWED_ACTIONS),
+  // but kept future-proof: dev gets effectively unlimited so we can iterate
+  // when audio is re-enabled.
   const EXPENSIVE_ACTIONS = ['generateAudioLetter'];
   if (EXPENSIVE_ACTIONS.includes(req.body?.action)) {
     const { limited: expensiveLimited } = await rateLimit(req, {
       keyPrefix: `ai_expensive_${actorKey}`,
       windowSeconds: 86400,
-      max: 3,
+      max: IS_DEV ? 100000 : 3,
     });
     if (expensiveLimited) {
       return res.status(429).json({ ok: false, error: 'Daily limit reached for this feature' });
@@ -683,7 +702,7 @@ export default async function handler(req, res) {
   // limit during KV outages, allowing unbounded AI cost during incidents.
   // Why `incremented` flag: we only roll back the quota if the increment
   // actually succeeded — guards against negative counters when KV is unstable.
-  const IS_DEV = process.env.NODE_ENV !== 'production';
+  // IS_DEV is hoisted to module scope (see top of file). Re-using it here.
   const RATE_LIMIT_MAX = IS_DEV ? 1000 : 10;
   const RATE_LIMIT_WINDOW_SECONDS = 3600;
   const successRateKey = `ai_rate_success:${actorKey}`;
