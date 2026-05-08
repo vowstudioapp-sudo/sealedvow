@@ -579,8 +579,8 @@
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--sv-crimson);
+  letter-spacing: 0.12em;
+  color: #E04B68; /* increased luminance for readability on deep-plum bg */
   opacity: 1;
   margin-bottom: 14px;
   text-align: center;
