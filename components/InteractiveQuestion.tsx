@@ -1,11 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CoupleData } from '../types';
+import { CoupleData, Theme } from '../types';
 import { OCCASION_OPENING_LINES } from '@/content/occasionLines';
 import {
   getCinematicLayer,
   iqThemeFromSystem,
+  THEME_ORDER,
   THEME_SYSTEM,
 } from '../theme/themeSystem';
+
+/* ------------------------------------------------------------------ */
+/* THEME INDICATOR OPACITY CALIBRATION (PR #15, migrated PR #17)        */
+/* Per-theme inactive/active opacity, balanced for perceptual brightness*/
+/* so no inactive dot dominates the active one. Crimson/velvet pulled   */
+/* down (high inherent brightness); pearl pushed up (low brightness).   */
+/* Active state cue is opacity ONLY — no scale change, no glow.         */
+/* ------------------------------------------------------------------ */
+const THEME_INDICATOR_OPACITY: Record<Theme, { inactive: number; active: number }> = {
+  obsidian:  { inactive: 0.25, active: 0.48 },
+  velvet:    { inactive: 0.20, active: 0.42 },
+  crimson:   { inactive: 0.18, active: 0.40 },
+  midnight:  { inactive: 0.20, active: 0.42 },
+  evergreen: { inactive: 0.22, active: 0.45 },
+  pearl:     { inactive: 0.32, active: 0.55 },
+};
 
 /* ------------------------------------------------------------------ */
 /* TYPES                                                               */
@@ -14,6 +31,11 @@ import {
 interface Props {
   data: CoupleData;
   onAccept: () => void;
+  // PR #17: sender preview only. When both are provided, the canonical
+  // ignite-phase seal-break renders an atmospheric theme-indicator row.
+  // Receivers leave both undefined; the row never appears for them.
+  isPreview?: boolean;
+  onThemeChange?: (theme: Theme) => void;
 }
 
 type Phase =
@@ -37,7 +59,7 @@ const ACCEPT_DELAY_REMOTE = 2000;
 /* COMPONENT                                                           */
 /* ------------------------------------------------------------------ */
 
-export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
+export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept, isPreview = false, onThemeChange }) => {
   const tc = iqThemeFromSystem(data.theme);
   const themeRow = THEME_SYSTEM[data.theme ?? 'obsidian'] ?? THEME_SYSTEM.obsidian;
   const cinematic = useMemo(() => getCinematicLayer(themeRow), [data.theme]);
@@ -315,15 +337,50 @@ export const InteractiveQuestion: React.FC<Props> = ({ data, onAccept }) => {
 
         {energy > 0 && (
           <div className="mt-6 w-32 h-px overflow-hidden rounded-full" style={{ backgroundColor: cinematic.readability.muted }}>
-            <div 
+            <div
               className="h-full transition-all"
-              style={{ 
+              style={{
                 backgroundColor: tc.gold,
                 opacity: 0.5,
                 width: `${progress * 100}%`,
                 transition: holding ? 'width 0.05s linear' : 'width 0.3s ease-out',
-              }} 
+              }}
             />
+          </div>
+        )}
+
+        {/* PR #17 — Atmospheric theme indicators (sender preview only).
+            Migrated from the deleted Envelope.tsx. Six dots, each carrying
+            its theme's accent color at calibrated low opacity. Active state
+            cue = opacity bump only (no scale, no glow, no motion). Tap target
+            is invisible 44×44; visible mark is 6px dot. ARIA labels only.
+            Hidden for receivers (gated by isPreview + onThemeChange presence). */}
+        {isPreview && typeof onThemeChange === 'function' && (
+          <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-8">
+            {THEME_ORDER.map((t) => {
+              const isActive = data.theme === t;
+              const accent = THEME_SYSTEM[t].accent;
+              const opacity = THEME_INDICATOR_OPACITY[t][isActive ? 'active' : 'inactive'];
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  aria-label={`Theme: ${t}`}
+                  aria-pressed={isActive}
+                  onClick={() => onThemeChange(t)}
+                  className="w-11 h-11 flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer"
+                >
+                  <span
+                    className="block rounded-full w-1.5 h-1.5"
+                    style={{
+                      backgroundColor: accent,
+                      opacity,
+                      transition: 'opacity 300ms ease-out',
+                    }}
+                  />
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

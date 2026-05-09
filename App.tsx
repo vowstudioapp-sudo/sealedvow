@@ -17,10 +17,6 @@ const RefineStage = lazy(() =>
   import('./components/RefineStage.tsx').then(m => ({ default: m.RefineStage }))
 );
 
-const Envelope = lazy(() =>
-  import('./components/Envelope.tsx').then(m => ({ default: m.Envelope }))
-);
-
 const MainExperience = lazy(() =>
   import('./components/MainExperience.tsx').then(m => ({ default: m.MainExperience }))
 );
@@ -99,7 +95,6 @@ const ensureExhaustiveStage = (stage: AppStage): void => {
     case AppStage.PAYMENT:
     case AppStage.SHARE:
     case AppStage.PERSONAL_INTRO:
-    case AppStage.ENVELOPE:
     case AppStage.QUESTION:
     case AppStage.SOULMATE_SYNC:
     case AppStage.MAIN_EXPERIENCE:
@@ -111,12 +106,13 @@ const ensureExhaustiveStage = (stage: AppStage): void => {
 };
 
 // Refresh-resilience (PR #16): the sender stages we persist + restore. Other
-// stages (LANDING, PERSONAL_INTRO, SOULMATE_SYNC, MASTER_CONTROL, SHARE) are
-// not part of the authoring loop and are intentionally not persisted.
+// stages (LANDING, SOULMATE_SYNC, MASTER_CONTROL, SHARE) are not part of the
+// authoring loop and are intentionally not persisted. PERSONAL_INTRO is
+// included as of PR #17 — the unified canonical sender intro.
 const PERSISTABLE_SENDER_STAGES: ReadonlySet<AppStage> = new Set([
   AppStage.PREPARE,
   AppStage.REFINE,
-  AppStage.ENVELOPE,
+  AppStage.PERSONAL_INTRO,
   AppStage.QUESTION,
   AppStage.MAIN_EXPERIENCE,
   AppStage.PAYMENT,
@@ -212,7 +208,6 @@ const resolveStage = (state: StageResolverState): AppStage => {
 
   if (isDevPreview && preview) {
     if (preview === 'intro' || preview === 'receiver') return AppStage.PERSONAL_INTRO;
-    if (preview === 'envelope') return AppStage.QUESTION;
     if (preview === 'letter' || preview === 'main') return AppStage.MAIN_EXPERIENCE;
     return AppStage.LANDING;
   }
@@ -333,8 +328,8 @@ const App: React.FC = () => {
   });
   const [data, setData] = useState<CoupleData | null>(() => {
     // Hydrate data only when a valid post-PREPARE stage was restored — that
-    // way RefineStage / Envelope / etc. have something to render on the very
-    // first paint instead of flashing blank until the resolver effect runs.
+    // way RefineStage / PersonalIntro / etc. have something to render on the
+    // very first paint instead of flashing blank until the resolver effect runs.
     // PREPARE-form data continues to flow through PreparationForm's own peek.
     if (getRouteType() !== 'LETTER_CREATE') return null;
     if (!initialDraft.data || !initialDraft.stage) return null;
@@ -365,10 +360,11 @@ const App: React.FC = () => {
   const [isFadingOut, setIsFadingOut] = useState(false);
   
   const [isCreatorPreview, setIsCreatorPreview] = useState(() => {
-    // PR #16: any post-PREPARE sender stage we restore is by definition a
-    // creator-preview surface — receiver flow lives at /{shareCode}, never on
-    // /letter/create. ENVELOPE + MAIN_EXPERIENCE gate their render on this
-    // flag; without restoring it, refresh-on-ENVELOPE would show blank.
+    // Any post-PREPARE sender stage we restore is by definition a creator-
+    // preview surface — receiver flow lives at /{shareCode}, never on
+    // /letter/create. The banner overlay on PERSONAL_INTRO and the theme dots
+    // on QUESTION's ignite phase both gate on this flag; without restoring it,
+    // a refresh mid-preview would render the receiver chrome on the sender.
     if (getRouteType() !== 'LETTER_CREATE') return false;
     if (!initialDraft.stage || initialDraft.stage === AppStage.PREPARE) return false;
     return PERSISTABLE_SENDER_STAGES.has(initialDraft.stage);
@@ -451,7 +447,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  // DEV PREVIEW — ?preview=receiver|intro|envelope (→ seal card)|letter
+  // DEV PREVIEW — ?preview=receiver|intro|letter
   useEffect(() => {
     if (import.meta.env.DEV) {
       const params = new URLSearchParams(window.location.search);
@@ -538,7 +534,6 @@ const App: React.FC = () => {
       setIsFadingOut(true);
 
       if (preview === 'intro') safeSetStage(AppStage.PERSONAL_INTRO);
-      else if (preview === 'envelope') safeSetStage(AppStage.QUESTION);
       else if (preview === 'letter' || preview === 'main') safeSetStage(AppStage.MAIN_EXPERIENCE);
       else if (preview === 'receiver') safeSetStage(AppStage.PERSONAL_INTRO);
     }
@@ -671,25 +666,6 @@ const App: React.FC = () => {
         applyColor(STUDIO_BG_COLOR);
         break;
       }
-      case AppStage.ENVELOPE: {
-        if (!experienceData) {
-          applyColor('#050505');
-          break;
-        }
-
-        if (previousStageRef.current === AppStage.REFINE) {
-          document.body.style.transition = 'background-color 2s ease-in-out';
-          applyColor('#000000');
-          timeoutId = window.setTimeout(() => {
-            applyColor(THEME_BG_COLORS[experienceData.theme]);
-          }, 600);
-        } else if (previousStageRef.current === AppStage.SHARE) {
-          applyColor(THEME_BG_COLORS[experienceData.theme]);
-        } else {
-          applyColor(THEME_BG_COLORS[experienceData.theme]);
-        }
-        break;
-      }
       case AppStage.REFINE: {
         if (previousStageRef.current === AppStage.MAIN_EXPERIENCE) {
           applyColor(STUDIO_BG_COLOR);
@@ -770,11 +746,6 @@ const App: React.FC = () => {
     }).catch(() => {});
   }, [stage, isReceiverLink, experienceData, isDemoMode]);
 
-  useEffect(() => {
-    if (!isReceiverLink || isCreatorPreview) return;
-    if (stage !== AppStage.ENVELOPE) return;
-    safeSetStage(AppStage.QUESTION);
-  }, [isReceiverLink, isCreatorPreview, stage]);
   // ── /HOISTED ────────────────────────────────────────────────────────
 
   if (hasEidPayload) {
@@ -810,7 +781,10 @@ const App: React.FC = () => {
                 sessionKey={sessionKey}
                 shareSlug={shareSlug}
                 onPreview={() => {
-                  safeSetStage(AppStage.ENVELOPE);
+                  // Eid renders <EidExperience/> for any non-PAYMENT/non-SHARE
+                  // stage, so the value here is a "cycle off SHARE" token. Use
+                  // the unified-flow intro stage to keep the enum surface tidy.
+                  safeSetStage(AppStage.PERSONAL_INTRO);
                   setIsCreatorPreview(false);
                 }}
                 onEdit={() => safeSetStage(AppStage.PREPARE)}
@@ -947,30 +921,6 @@ const App: React.FC = () => {
 
   const handleEnterStudio = () => {
     window.location.href = "/create";
-  };
-
-  const handleEnvelopeInteract = () => {
-    // Envelope interaction logic
-  };
-
-  const handleEnvelopeOpen = () => {
-    // Fire-and-forget open beacon for real receiver URLs only.
-    // Skip demo paths and anything without a valid 8-char session suffix
-    // (e.g., sender preview where the URL has been rewritten to '/').
-    const path = window.location.pathname;
-    if (!path.startsWith('/demo/')) {
-      const parts = path.replace(/^\//, '').replace(/\/$/, '').split('-');
-      const key = parts[parts.length - 1];
-      if (key && /^[a-z0-9]{8}$/i.test(key)) {
-        fetch('/api/letters/mark-opened', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionKey: key }),
-        }).catch(() => {});
-      }
-    }
-    safeSetStage(AppStage.QUESTION);
   };
 
   const handleQuestionAccepted = () => {
@@ -1126,7 +1076,10 @@ const App: React.FC = () => {
                 const updated: CoupleData = hydrateCoupleData({ ...data, ...enrichedData, finalLetter });
                 setData(updated);
                 setIsCreatorPreview(true);
-                safeSetStage(AppStage.ENVELOPE);
+                // PR #17: sender preview enters the unified canonical flow
+                // (PERSONAL_INTRO → QUESTION → MAIN_EXPERIENCE) — the same
+                // sequence the receiver gets, with preview chrome on top.
+                safeSetStage(AppStage.PERSONAL_INTRO);
                 writePersistedCoupleData(updated, () => setStorageError(true));
               }}
               onBack={() => safeSetStage(AppStage.PREPARE)}
@@ -1147,40 +1100,40 @@ const App: React.FC = () => {
           )}
 
           {stage === AppStage.PERSONAL_INTRO && experienceData && (
-            <PersonalIntro
-              recipientName={experienceData.recipientName}
-              theme={experienceData.theme}
-              isDemoMode={isDemoMode}
-              onThemeChange={isDemoMode ? (t: Theme) => setData(prev => (prev ? { ...prev, theme: t } : prev)) : undefined}
-              onComplete={() => {
-                safeSetStage(AppStage.QUESTION);
-              }}
-            />
-          )}
-
-          {stage === AppStage.ENVELOPE && experienceData && isCreatorPreview && (
-            <div className="animate-fade-in w-full min-h-screen">
-              <div className="fixed top-0 left-0 z-[100] w-full border-b border-luxury-gold/20 bg-[#1C1917] py-3 text-center text-luxury-gold shadow-lg">
-                <p className="animate-pulse text-[10px] font-bold uppercase tracking-[0.4em]">
-                  Previewing Receiver Experience
-                </p>
-              </div>
-              <Envelope
+            <>
+              {isCreatorPreview && (
+                <div className="fixed top-0 left-0 z-[300] w-full border-b border-luxury-gold/20 bg-[#1C1917] py-3 text-center text-luxury-gold shadow-lg">
+                  <p className="animate-pulse text-[10px] font-bold uppercase tracking-[0.4em]">
+                    Previewing Receiver Experience
+                  </p>
+                </div>
+              )}
+              <PersonalIntro
                 recipientName={experienceData.recipientName}
-                theme={experienceData.theme || 'obsidian'}
-                onOpen={handleEnvelopeOpen}
-                onInteract={handleEnvelopeInteract}
-                isPreview={isCreatorPreview}
-                onThemeChange={isCreatorPreview ? (t: Theme) => setData(prev => (prev ? { ...prev, theme: t } : prev)) : undefined}
+                theme={experienceData.theme}
+                isDemoMode={isDemoMode}
+                onThemeChange={isDemoMode ? (t: Theme) => setData(prev => (prev ? { ...prev, theme: t } : prev)) : undefined}
+                onComplete={() => {
+                  safeSetStage(AppStage.QUESTION);
+                }}
               />
-            </div>
+            </>
           )}
 
           {stage === AppStage.QUESTION && experienceData && (
             <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
-              <InteractiveQuestion 
-                 data={experienceData} 
-                 onAccept={handleQuestionAccepted} 
+              {isCreatorPreview && (
+                <div className="fixed top-0 left-0 z-[300] w-full border-b border-luxury-gold/20 bg-[#1C1917] py-3 text-center text-luxury-gold shadow-lg">
+                  <p className="animate-pulse text-[10px] font-bold uppercase tracking-[0.4em]">
+                    Previewing Receiver Experience
+                  </p>
+                </div>
+              )}
+              <InteractiveQuestion
+                 data={experienceData}
+                 onAccept={handleQuestionAccepted}
+                 isPreview={isCreatorPreview}
+                 onThemeChange={isCreatorPreview ? (t: Theme) => setData(prev => (prev ? { ...prev, theme: t } : prev)) : undefined}
               />
             </div>
           )}
@@ -1253,14 +1206,18 @@ const App: React.FC = () => {
 
           {stage === AppStage.SHARE && data && sessionKey && shareSlug && (
             <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
-              <SharePackage 
-                data={data} 
+              <SharePackage
+                data={data}
                 sessionKey={sessionKey}
                 shareSlug={shareSlug}
                 onPreview={() => {
-                   safeSetStage(AppStage.ENVELOPE);
-                   setIsCreatorPreview(false); 
-                }} 
+                   // Post-share re-preview: routes into the canonical receiver
+                   // experience (no banner / no theme dots, since
+                   // isCreatorPreview=false matches the "see what they'll see"
+                   // intent of this button).
+                   safeSetStage(AppStage.PERSONAL_INTRO);
+                   setIsCreatorPreview(false);
+                }}
                 onEdit={() => safeSetStage(AppStage.PREPARE)}
               />
             </div>
