@@ -13,12 +13,42 @@
 // ============================================================================
 
 import crypto from 'crypto';
+import admin from 'firebase-admin';
 import { adminDb, guardPost, rateLimit } from './lib/middleware.js';
 import { getSessionUser } from './lib/auth.js';
 import { validateCoupleData as parseCoupleData } from '../lib/coupleDataValidator.js';
 import { extractRequestId } from './lib/requestId.js';
 
 const MIN_PRICE_PAISE = 24900;  // ₹249 — single price floor
+
+// PR #18a: atomic-with-success draft completion. Called from BOTH the founder
+// branch and the Razorpay branch AFTER the existing payment-success multi-path
+// write resolves. Internal try/catch swallows errors — payment success must
+// NOT regress on a draft-write failure. No-op if the user was guest at
+// payment time, or never explicitly saved a draft, or has no ACTIVE draft.
+async function markActiveDraftCompleted(senderUid) {
+  if (!senderUid) return;
+  try {
+    const draftsSnap = await adminDb
+      .ref(`users/${senderUid}/drafts`)
+      .orderByChild('persistenceStatus')
+      .equalTo('ACTIVE')
+      .once('value');
+    const drafts = draftsSnap.val() || {};
+    const activeDraftId = Object.keys(drafts)[0]; // single-ACTIVE invariant ⇒ ≤1
+    if (!activeDraftId) return;
+    await adminDb
+      .ref(`users/${senderUid}/drafts/${activeDraftId}`)
+      .update({
+        draftState: 'COMPLETED',
+        updatedAt: admin.database.ServerValue.TIMESTAMP,
+      });
+    // persistenceStatus stays ACTIVE — COMPLETED is a draftState, not a status.
+    // 18d may add a sweep that transitions COMPLETED drafts to a final status.
+  } catch (err) {
+    console.error('[verify-payment] draft completion write failed:', err.message);
+  }
+}
 
 function generateShortId() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -208,6 +238,10 @@ export default async function handler(req, res) {
 
       await adminDb.ref().update(updates);
       await tokenRef.remove().catch(() => {});
+
+      // PR #18a — atomic-with-success: mark the user's ACTIVE draft COMPLETED.
+      // No-op for guests; helper internally swallows errors.
+      await markActiveDraftCompleted(senderUid);
 
       const senderSlug = slugify(sanitized.senderName || 'sender');
       const receiverSlug = slugify(sanitized.recipientName || 'receiver');
@@ -494,6 +528,11 @@ export default async function handler(req, res) {
       }
       throw writeError; // bubble up to outer catch at line 491
     }
+
+    // PR #18a — atomic-with-success: mark the user's ACTIVE draft COMPLETED.
+    // No-op for guests; helper internally swallows errors. Placed AFTER the
+    // multi-path write succeeds so it never fires on payment failure.
+    await markActiveDraftCompleted(senderUid);
 
     // 7. RETURN SHARE URL
     const senderSlug = slugify(sanitized.senderName || 'sender');

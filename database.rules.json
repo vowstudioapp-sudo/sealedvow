@@ -1,6 +1,15 @@
 {
   "rules": {
     ".read": false,
-    ".write": false
+    ".write": false,
+    "users": {
+      "$uid": {
+        "drafts": {
+          ".indexOn": ["persistenceStatus"],
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": false
+        }
+      }
+    }
   }
 }

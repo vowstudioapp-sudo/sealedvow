@@ -64,6 +64,7 @@ import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
 import { writeDraftFromExternal, peekDraft, writeStage, clearPreparationDraft } from './hooks/usePreparationPersistence';
+import { useDraftStateObserver } from './hooks/useDraftStateObserver';
 import { getDemoData } from './data/demoData.ts';
 
 import { THEME_ORDER, THEME_SYSTEM } from './theme/themeSystem';
@@ -429,6 +430,16 @@ const App: React.FC = () => {
   const updateData = (patch: Partial<CoupleData>) => {
     setData(prev => (prev ? { ...prev, ...patch } : prev));
   };
+
+  // PR #18a: dormant mount of the cross-device draft observer. The hook's
+  // early-return short-circuits on `!enabled || !draftId` BEFORE any candidate
+  // computation, so this costs zero work per render. 18b activates it by
+  // changing the two literals below to source from real auth/draft state.
+  useDraftStateObserver({
+    uiStage: stage,
+    draftId: null,        // 18b: source from saved draft when present
+    enabled: false,       // 18b: source from auth state + draft-existence check
+  });
 
   useEffect(() => {
     const onPopState = () => {
