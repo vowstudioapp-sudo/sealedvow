@@ -13,19 +13,44 @@
 //     anywhere in the data tree
 //   - step not 1/2/3
 //   - draftState / persistenceStatus not in their respective enums
-//   - top-level data string fields > 500 chars (10000 for known long-form)
+//   - top-level data string fields exceeding tiered length caps:
+//       finalLetter / senderRawThoughts → 10000 (long-form text)
+//       userImageUrl / aiImageUrl / musicUrl / giftLink / manualMapLink → 2000
+//         (Firebase Storage signed URLs run 600-900 chars typical, up to
+//          ~1500 for v4 signed URLs — 2000 leaves headroom but still rejects
+//          pathological payloads. URL allowlist refinement at payment-time
+//          validator is the actual security control; this is a DoS bound.)
+//       all other string fields → 500
 //
 // Returns { ok: true } or { ok: false, reason: '<MACHINE_CODE>' }.
+// On STRING_TOO_LONG, the reason includes the offending field name as
+// `STRING_TOO_LONG:<field>` for diagnostic efficiency.
 // ============================================================================
 
 const MAX_DATA_BYTES = 100_000;
 const MAX_SHORT_STRING = 500;
+const MAX_URL_STRING = 2_000;
 const MAX_LONG_STRING = 10_000;
 
 // Long-form CoupleData fields that legitimately exceed 500 chars. Cap matches
 // the existing MAX_TEXT_LENGTH in lib/coupleDataValidator.js (full validator
 // at payment time stays the canonical gate).
 const LONG_FORM_FIELDS = new Set(['finalLetter', 'senderRawThoughts']);
+
+// Top-level URL-bearing fields. Need a higher cap than the 500-char default
+// because Firebase Storage signed URLs (used by /api/upload-media for cover
+// images, etc.) are typically 600-900 chars due to the embedded RSA-SHA256
+// signature. Nested URLs (memoryBoard[].url, audio.url, video.url,
+// sacredLocation.googleMapsUri) are not validated here — they're inside
+// arrays/objects, gated only by MAX_DATA_BYTES. Payment-time validator
+// handles per-field nested URL validation.
+const URL_FIELDS = new Set([
+  'userImageUrl',
+  'aiImageUrl',
+  'musicUrl',
+  'giftLink',
+  'manualMapLink',
+]);
 
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -83,12 +108,18 @@ export function validateDraftWrite({ data, step, draftState, persistenceStatus }
     return { ok: false, reason: 'PROTOTYPE_POLLUTION' };
   }
 
-  // top-level string field length cap
+  // top-level string field length cap (tiered)
   for (const [key, val] of Object.entries(data)) {
     if (typeof val === 'string') {
-      const cap = LONG_FORM_FIELDS.has(key) ? MAX_LONG_STRING : MAX_SHORT_STRING;
+      const cap = LONG_FORM_FIELDS.has(key)
+        ? MAX_LONG_STRING
+        : URL_FIELDS.has(key)
+          ? MAX_URL_STRING
+          : MAX_SHORT_STRING;
       if (val.length > cap) {
-        return { ok: false, reason: 'STRING_TOO_LONG' };
+        // Field-name suffix aids triage when the reject surfaces in logs
+        // or error responses. Format: STRING_TOO_LONG:<fieldName>.
+        return { ok: false, reason: `STRING_TOO_LONG:${key}` };
       }
     }
   }
