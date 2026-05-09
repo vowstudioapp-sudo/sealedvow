@@ -63,7 +63,7 @@ const EidPreparationForm = lazy(() =>
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
-import { writeDraftFromExternal, peekDraft, writeStage, clearPreparationDraft } from './hooks/usePreparationPersistence';
+import { writeDraftFromExternal, peekDraft, writeStage, writeDraftId, clearPreparationDraft } from './hooks/usePreparationPersistence';
 import { useDraftStateObserver } from './hooks/useDraftStateObserver';
 import type { DraftState, PersistenceStatus } from './types/draft';
 import { DRAFT_STATE_ORDER } from './types/draft';
@@ -385,7 +385,7 @@ const App: React.FC = () => {
   // authenticated fetches. It flips true only AFTER /api/auth/session has
   // minted the cookie; gating the hydration effect on `authUser?.uid`
   // alone races onAuthStateChanged ahead of the cookie-set.
-  const { user: authUser, serverSessionReady } = useAuth();
+  const { user: authUser, loading: authLoading, serverSessionReady } = useAuth();
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   // PR #18b — variant of the sign-in modal. Default 'payment' preserves the
   // byte-identical UX for the existing payment-context call sites.
@@ -403,10 +403,23 @@ const App: React.FC = () => {
   // useState hooks would risk an interleaved render where the observer
   // activates with draftId set but seedDraftState still null, producing a
   // redundant /transition write for the current UIStage.
+  //
+  // PR #21 — lazy initializer reads the optimistic draftId hint from
+  // localStorage synchronously. This closes the post-mount race window where
+  // the user could click save before /list hydration completed and trigger a
+  // 409 ACTIVE_DRAFT_EXISTS. Cloud /list remains canonical; on hint vs cloud
+  // mismatch, hydration overwrites the hint (cloud wins). seedDraftState
+  // stays null until hydration populates it from cloud — the observer's
+  // activation may fire one /transition with stale state in the brief
+  // window before hydration completes (silent 409 if backward, accepted if
+  // forward; not user-visible either way).
   const [draftRecord, setDraftRecord] = useState<{
     draftId: string | null;
     seedDraftState: DraftState | null;
-  }>({ draftId: null, seedDraftState: null });
+  }>(() => ({
+    draftId: peekDraft().draftId,
+    seedDraftState: null,
+  }));
 
   // PR #18b — variant + onCancel are additive. Existing payment call sites
   // pass only `action` (variant defaults to 'payment', onCancel undefined),
@@ -588,6 +601,11 @@ const App: React.FC = () => {
         // the next /transition for the same state as a noop (same_state).
         setDraftRecord({ draftId: json.draftId, seedDraftState: draftStateToSend });
 
+        // PR #21 — mirror the just-confirmed draftId to localStorage as the
+        // optimistic hint. On the next page reload, the lazy initializer for
+        // draftRecord will read this and avoid the post-mount race window.
+        writeDraftId(json.draftId);
+
         // PR #18b CP3.5 — set the settled-state anchor. No auto-dismiss
         // timer; the affordance now renders the receipt as long as the
         // session holds it. Re-saves refresh the timestamp; sign-out clears.
@@ -625,33 +643,46 @@ const App: React.FC = () => {
   // arrives after user B has signed in. RTDB writes happen exclusively
   // through the observer (transitions) and the explicit save handler.
   useEffect(() => {
+    // PR #21 follow-up — Firebase still rehydrating its initial auth state.
+    // `authLoading` is true on cold mount until onAuthStateChanged fires once.
+    // Treating undefined-during-rehydration as a confirmed sign-out (the prior
+    // behavior — gate was only `!capturedUid`) wiped the localStorage draftId
+    // hint that the lazy initializer at draftRecord just loaded, reopening
+    // the post-mount race window PR #21 was meant to close. Hold the effect
+    // until Firebase has resolved one way or the other.
+    if (authLoading) return;
+
     const capturedUid = authUser?.uid;
 
-    // Sign-out (or unauthenticated): clear EVERYTHING — draftRecord plus
-    // the settled-state anchor (lastSaveSuccessAt) plus any pending error.
-    // Without this, the link would still render "Saved {time}" after sign-
-    // out, contradicting the affordance state.
+    // Confirmed sign-out: Firebase has resolved AND there is no user. Clear
+    // EVERYTHING — draftRecord, settled-state anchor, pending error, and the
+    // localStorage hint. Without the hint clear, a subsequent sign-in by a
+    // different user would briefly populate draftRecord with the prior
+    // user's stale draftId (cloud-wins reconciliation corrects it, but
+    // starting clean is preferable).
     if (!capturedUid) {
       setDraftRecord({ draftId: null, seedDraftState: null });
       setLastSaveSuccessAt(null);
       setLastSaveError(null);
+      writeDraftId(null);
       return;
     }
 
-    // Mid-sign-in window (cookie not yet established): clear draftRecord
-    // only. lastSaveSuccessAt is null at this point anyway (no save can
-    // succeed before sign-in completes), but preserve the slot to avoid
-    // any future code path that might set it pre-session.
-    if (!serverSessionReady) {
-      setDraftRecord({ draftId: null, seedDraftState: null });
-      return;
-    }
+    // Mid-sign-in window (Firebase has the user, our session cookie is not
+    // yet minted). Hold draftRecord as-is — the lazy initializer's hint
+    // carries through. Clearing here would reopen the pre-PR-#21 race: a
+    // save POST during this window would omit draftId and trip the single-
+    // ACTIVE invariant on the server. If the user does click save in this
+    // window, the optimistic draftId rides along and either succeeds once
+    // the cookie lands or surfaces a 401 the user can retry.
+    if (!serverSessionReady) return;
 
-    // Reset first so a previous user's draft never persists visibly during
-    // the window between sign-in and /list resolution. Strict-mode double
-    // invocation produces a benign double-clear; the cleanup discards the
-    // first in-flight response.
-    setDraftRecord({ draftId: null, seedDraftState: null });
+    // PR #21 follow-up — do NOT reset draftRecord before /list. The lazy
+    // initializer populated it with the optimistic localStorage hint;
+    // preserve that through the round-trip. Cloud-wins reconciliation
+    // below either confirms (overwrites with same id), replaces (different
+    // id), or clears (no ACTIVE found) — all three branches handle the
+    // initial-hint state correctly.
 
     let cancelled = false;
     fetch('/api/drafts/list', {
@@ -672,7 +703,15 @@ const App: React.FC = () => {
           (d: { persistenceStatus?: PersistenceStatus }) =>
             d?.persistenceStatus === 'ACTIVE',
         );
-        if (activeDrafts.length === 0) return;
+        if (activeDrafts.length === 0) {
+          // PR #21 — cloud has no ACTIVE draft for this user. Any
+          // localStorage hint is stale (cloud was the source of truth and
+          // it now disagrees). Clear the hint and any draftRecord that may
+          // have been optimistically populated by the lazy initializer.
+          setDraftRecord({ draftId: null, seedDraftState: null });
+          writeDraftId(null);
+          return;
+        }
 
         // Match server's findActiveDraftForUser semantics: chronologically
         // oldest ACTIVE wins. /list returns sorted by updatedAt desc, so we
@@ -694,6 +733,11 @@ const App: React.FC = () => {
           draftId: oldest.draftId,
           seedDraftState: oldest.draftState,
         });
+        // PR #21 — cloud-wins reconciliation. Mirror the cloud's draftId
+        // into the localStorage hint. If the prior hint matched, this is a
+        // no-op write; if it differed (stale hint from a previous session
+        // or different cloud state), this overwrites it. Cloud is canonical.
+        writeDraftId(oldest.draftId);
         // PR #18b CP3.5 — seed lastSaveSuccessAt from the cloud's updatedAt
         // so the rehydrated session immediately renders the settled-state
         // anchor ("Saved {relative time}") instead of the action affordance.
@@ -709,7 +753,7 @@ const App: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [authUser?.uid, serverSessionReady]);
+  }, [authUser?.uid, authLoading, serverSessionReady]);
 
   // PR #18b — Observer is LIVE. Activates when the user is signed in AND a
   // draftRecord has been hydrated (or just-saved in CP2). The hook's early
