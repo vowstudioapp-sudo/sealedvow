@@ -464,7 +464,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                       <div className="flex flex-col items-center space-y-6 w-full pb-10 border-b border-luxury-ink/20">
                         <label className="text-xs font-bold uppercase tracking-[0.2em] text-luxury-stone/90 text-center">
                           The Cover Image (Optional)
-                          <span className="block text-[10px] text-luxury-stone/80 mt-2 font-normal normal-case tracking-normal max-w-sm mx-auto leading-relaxed">
+                          <span className="block text-[11px] text-luxury-ink/75 mt-2 font-normal normal-case tracking-normal max-w-sm mx-auto leading-relaxed">
                             This single photo will be the <strong>main cinematic background</strong> for the letter itself.
                           </span>
                         </label>
@@ -487,7 +487,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           )}
                         </div>
                         <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
-                        <p className="text-[10px] text-luxury-stone/50 mt-2 text-center leading-relaxed">
+                        <p className="text-[11px] text-luxury-ink/65 mt-2 text-center leading-relaxed font-medium">
                           🔒 Your images are stored securely and are only accessible through your private link.
                         </p>
                       </div>
@@ -501,7 +501,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           <p className="text-[10px] uppercase tracking-widest text-luxury-ink/70 mb-4 font-bold max-w-sm mx-auto">
                             Upload up to 10 photos for a scattered polaroid collage.
                           </p>
-                          <p className="text-[10px] italic text-luxury-stone/60 max-w-sm mx-auto leading-relaxed font-serif-elegant">
+                          <p className="text-xs italic text-luxury-ink/75 max-w-sm mx-auto leading-relaxed font-serif-elegant">
                             A single caption can make a photo unforgettable.
                           </p>
                         </div>
@@ -631,7 +631,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
                       <div className="space-y-3 group">
                         <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Key Memory to Mention</label>
-                        <p className="text-[9px] italic text-luxury-ink/60 mb-2 font-serif-elegant">This memory becomes the thread running through your letter.</p>
+                        <p className="text-xs italic text-luxury-ink/75 mb-2 font-serif-elegant">This memory becomes the thread running through your letter.</p>
                         <textarea className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic h-24 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. When we got lost in Tokyo, or just drinking coffee this morning..." value={data.sharedMoment} onChange={e => updateData({ sharedMoment: e.target.value })} onFocus={handleTextareaFocus} required />
                       </div>
 
@@ -657,7 +657,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                           <div>
                             <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Your Sacred Place</label>
                             <input type="text" className="w-full bg-white/50 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. The exact spot we met, or the Eiffel Tower" value={data.locationMemory} onChange={e => updateData({ locationMemory: e.target.value })} />
-                            <p className="text-[10px] text-luxury-stone/70 italic text-right mt-1 font-bold">Featured within the letter — tap to view it on a full-screen map.</p>
+                            <p className="text-[11px] text-luxury-ink/70 italic text-right mt-1 font-medium">Featured within the letter — tap to view it on a full-screen map.</p>
                           </div>
                           <div>
                             <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Google Maps Link (Optional)</label>
@@ -668,7 +668,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                               value={data.manualMapLink || ''} 
                               onChange={e => updateData({ manualMapLink: e.target.value })} 
                             />
-                            <p className="text-[10px] text-luxury-stone/70 italic text-right mt-1 font-bold">If provided, we will use this exact location instead of searching.</p>
+                            <p className="text-[11px] text-luxury-ink/70 italic text-right mt-1 font-medium">If provided, we will use this exact location instead of searching.</p>
                           </div>
                         </div>
                       )}
@@ -734,7 +734,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                         <div className="animate-fade-in space-y-6">
                           <div className="space-y-4">
                             <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80">Your Words</label>
-                            <p className="text-[10px] text-luxury-ink/50 leading-relaxed -mt-2">Write a few lines in your own words. Don't worry about grammar or structure. Just say what you feel.</p>
+                            <p className="text-xs text-luxury-ink/70 leading-relaxed -mt-2">Write a few lines in your own words. Don't worry about grammar or structure. Just say what you feel.</p>
                             <textarea
                               className="w-full bg-luxury-ink/5 border-l-4 border-luxury-ink/30 pl-6 py-4 pr-4 focus:border-luxury-gold-dark outline-none transition-all font-serif-elegant text-lg italic h-32 resize-none leading-relaxed text-luxury-ink placeholder-luxury-ink/40"
                               placeholder="I just want to say that... the way you... I feel like..."
@@ -771,11 +771,11 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                                 {audio.isRecording ? `Recording... ${audio.formatTime(audio.recordingTime)}` : 'Tap to Record Voice Note'}
                               </p>
                               {!audio.isRecording && (
-                                <div className="mt-3 text-center opacity-60 max-w-sm mx-auto">
-                                  <p className="text-[10px] font-serif-elegant italic text-luxury-ink">
+                                <div className="mt-3 text-center max-w-sm mx-auto">
+                                  <p className="text-xs font-serif-elegant italic text-luxury-ink/75">
                                     "Even a few seconds in your real voice can mean more than perfect words."
                                   </p>
-                                  <p className="text-[8px] uppercase tracking-widest text-luxury-ink/50 mt-2 font-bold">
+                                  <p className="text-[10px] uppercase tracking-wider text-luxury-ink/65 mt-2 font-bold">
                                     Optional — you can skip this
                                   </p>
                                 </div>
@@ -985,7 +985,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                             <span className="text-xl">🎵</span>
                             <span>Soundtrack (YouTube)</span>
                         </label>
-                        <span className="text-[10px] text-luxury-ink/60 font-bold italic">
+                        <span className="text-[11px] text-luxury-ink/70 font-medium italic">
                             This plays throughout the experience — from the opening to your final words.
                         </span>
                     </div>
@@ -1021,7 +1021,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
 
             <div className="bg-gradient-to-br from-luxury-paper to-luxury-sandstone border-2 border-[#C5B498] p-8 md:p-12 rounded-xl shadow-sm">
                 <p className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/70 mb-2">Three Promises</p>
-                <p className="text-[9px] italic text-luxury-ink/60 mb-6 font-serif-elegant">Shown after the letter — your final promises, presented as elegant cards.</p>
+                <p className="text-xs italic text-luxury-ink/75 mb-6 font-serif-elegant">Shown after the letter — your final promises, presented as elegant cards.</p>
                 <div className="space-y-8">
                   {data.coupons?.map((coupon, idx) => (
                     <div key={coupon.id} className="flex gap-4 items-start border-b-2 border-luxury-ink/10 pb-6 last:border-0">
