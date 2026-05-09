@@ -14,6 +14,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { CoupleData, Coupon, Theme } from '../types';
 import { experienceTheme, getCinematicLayer, THEME_SYSTEM, UI_PALETTE } from '../theme/themeSystem';
 import { safeUrl } from '../utils/safeUrl';
+import { formatRelativeTime } from '../utils/relativeTime';
 import { PaperSurface } from './PaperSurface';
 import { LetterSection } from './experience/LetterSection';
 import { MemoryBoard } from './experience/MemoryBoard';
@@ -31,6 +32,13 @@ interface Props {
   isDemoMode?: boolean;
   onPayment?: () => void;
   onEdit?: () => void;
+  // PR #18b — explicit "Save and continue later" wiring. Rendered ONLY
+  // under isPreview AND only by sender (receiver path passes none of
+  // these). CP4 consumes these to render the top-right utility container.
+  onSaveAndContinueLater?: () => void;
+  lastSaveSuccessAt?: number | null;
+  lastSaveError?: string | null;
+  clearLastSaveError?: () => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,7 +90,17 @@ function formatCaption(raw?: string): string | null {
 /* COMPONENT                                                           */
 /* ------------------------------------------------------------------ */
 
-export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDemoMode = false, onPayment, onEdit }) => {
+export const MainExperience: React.FC<Props> = ({
+  data,
+  isPreview = false,
+  isDemoMode = false,
+  onPayment,
+  onEdit,
+  onSaveAndContinueLater,
+  lastSaveSuccessAt,
+  lastSaveError,
+  clearLastSaveError,
+}) => {
   /* ------------------------------------------------------------------ */
   /* STATE                                                               */
   /* ------------------------------------------------------------------ */
@@ -773,6 +791,62 @@ export const MainExperience: React.FC<Props> = ({ data, isPreview = false, isDem
           theme={theme}
           onClose={() => setShowReplyComposer(false)}
         />
+      )}
+
+      {/* PR #18b CP4 — Persistence affordance (top-right ownership whisper).
+          Renders ONLY in sender preview mode (gated identically to the bottom
+          CTA stack). Receivers (isPreview=false in PR #17's unified flow)
+          never see this container.
+
+          Shape B per LETTERS doctrine: link transformation only, NO continuity
+          line. Continuity narration ("Yours to return to, on any device.")
+          belongs to the LETTERS surface; in-flow surfaces (this one,
+          RefineStage) just need the per-surface receipt. RefineStage is the
+          inaugural-save surface and keeps the continuity line as the user's
+          first encounter with the model; this surface is a return-trip
+          opportunity and stays minimal.
+
+          Quieter than RefineStage's affordance: opacity tier dropped one
+          step (gold/60 default → gold/40 settled vs RefineStage's /70 → /50),
+          text-xs (vs RefineStage's text-sm), corner placement (vs centered
+          footer). Reads as ambient ownership whisper, not narration.
+
+          z-index 320: above cinematic background, below the bottom CTA stack
+          (z-[400]) so the payment surface remains visually dominant if the
+          regions ever overlap. Within the spec'd [300, 350] range. */}
+      {isPreview && (onPayment || onEdit) && (
+        <div className="fixed top-4 right-6 z-[320] text-right">
+          {(() => {
+            const isErrored = !!lastSaveError;
+            const isSettled = !isErrored && lastSaveSuccessAt != null;
+            const linkLabel = isSettled
+              ? `Saved ${formatRelativeTime(new Date(lastSaveSuccessAt as number).toISOString())}`
+              : 'Save and continue later';
+            const linkOpacity = isSettled ? 'text-luxury-gold/40' : 'text-luxury-gold/60';
+            return (
+              <button
+                type="button"
+                onClick={onSaveAndContinueLater}
+                className={`font-serif-elegant italic text-xs ${linkOpacity} hover:text-luxury-gold hover:underline underline-offset-4 bg-transparent border-none p-0 cursor-pointer transition-colors duration-200`}
+              >
+                {linkLabel}
+              </button>
+            );
+          })()}
+
+          {/* Error feedback — necessary infrastructure (silent failure would
+              leave the user with no signal). Same restraint as RefineStage:
+              tap to dismiss, no retry button, no alert-box energy. */}
+          {lastSaveError && (
+            <p
+              className="font-serif-elegant italic text-xs text-luxury-gold/60 mt-2 cursor-pointer"
+              onClick={clearLastSaveError}
+              aria-live="polite"
+            >
+              {lastSaveError}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Creator Preview Controls — Modify + Seal & Deliver */}

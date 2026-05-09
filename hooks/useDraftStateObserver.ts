@@ -1,17 +1,26 @@
 // ============================================================================
-// /hooks/useDraftStateObserver.ts — Client-side draft-state observer (PR #18a)
+// /hooks/useDraftStateObserver.ts — Client-side draft-state observer (PR #18a;
+// activated in PR #18b)
 //
 // Observes UIStage transitions, derives the candidate DraftState, and fires a
 // /api/drafts/transition call ONLY at milestone boundaries (monotonic). Pure
 // decision logic lives in /hooks/draftStateLogic.ts (testable without React).
 //
-// PR #18a mounts this hook in App.tsx in DORMANT mode (enabled=false,
-// draftId=null) — see Section 10 of the implementation prompt. The early
-// return on !enabled || !draftId short-circuits BEFORE any candidate
-// computation, so dormant mounting costs zero work per render.
+// Activation contract (live as of PR #18b):
+//   - `enabled && !!draftId` → observer is active; transitions write to RTDB.
+//   - Otherwise → early return short-circuits BEFORE any candidate computation,
+//     so the anonymous case (and rapid UIStage churn during cinematic flow when
+//     no draft exists yet) costs zero work per render.
 //
-// 18b is the first caller that activates it by passing real values for
-// `enabled` and `draftId`.
+// Activation seeding (load-bearing for PR #18b's "no redundant /transition
+// after explicit save" guarantee):
+//   - On the render where the observer transitions inactive → active, if
+//     `seedDraftState` is provided, the lastPersistedDraftStateRef is initialized
+//     to that value BEFORE the candidate/monotonicity check runs.
+//   - Without seeding, activation would always fire a /transition for the
+//     current UIStage (because the ref starts at null), producing a same-tick
+//     duplicate write right after /save (or a 409 right after /list hydration
+//     when the cloud is already further along).
 //
 // Race protection — three details that must all be present:
 //   1. previousDraftState captured into a local const BEFORE the optimistic
@@ -32,21 +41,40 @@ interface UseDraftStateObserverArgs {
   uiStage: AppStage;
   draftId: string | null;
   enabled: boolean;
+  // Seed value applied to lastPersistedDraftStateRef on the render where the
+  // observer transitions inactive → active. See "Activation seeding" above.
+  seedDraftState?: DraftState;
 }
 
 export function useDraftStateObserver({
   uiStage,
   draftId,
   enabled,
+  seedDraftState,
 }: UseDraftStateObserverArgs): void {
   const lastPersistedDraftStateRef = useRef<DraftState | null>(null);
   const pendingRequestIdRef = useRef(0);
+  const previouslyActiveRef = useRef(false);
 
   useEffect(() => {
-    // CRITICAL early return — short-circuits BEFORE candidate computation.
-    // Dormant mounting (PR #18a) and rapid UIStage churn during cinematic
-    // auto-advance both rely on this guard to do zero work.
-    if (!enabled || !draftId) return;
+    const isActive = enabled && !!draftId;
+
+    // Inactive — short-circuit BEFORE candidate computation. Reset the
+    // activation tracker so the next activation (if any) re-seeds correctly.
+    if (!isActive) {
+      previouslyActiveRef.current = false;
+      return;
+    }
+
+    // Just-activated edge — seed the persisted-state ref before the monotonic
+    // check runs, so a /save-then-activate or /list-hydrate-then-activate
+    // does not produce a redundant /transition for the current UIStage.
+    if (!previouslyActiveRef.current) {
+      if (seedDraftState !== undefined) {
+        lastPersistedDraftStateRef.current = seedDraftState;
+      }
+      previouslyActiveRef.current = true;
+    }
 
     const decision = decideTransition(uiStage, lastPersistedDraftStateRef.current);
     if (decision.kind !== 'write') return;
@@ -82,5 +110,5 @@ export function useDraftStateObserver({
           lastPersistedDraftStateRef.current = previousDraftState;
         }
       });
-  }, [uiStage, draftId, enabled]);
+  }, [uiStage, draftId, enabled, seedDraftState]);
 }

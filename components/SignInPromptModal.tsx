@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
+// PR #18b — variant prop. 'payment' is the existing behavior (byte-identical
+// copy + Continue as Guest visible). 'persistence' switches the subtitle to
+// the cross-device save framing AND hides the Guest button: Path A forbids
+// guest-owned cloud drafts, so persistence demands sign-in or nothing.
+type SignInPromptVariant = 'payment' | 'persistence';
+
+const PERSISTENCE_SUBTITLE =
+  'Sign in to save your letter and pick it back up on any device.';
+const PAYMENT_SUBTITLE =
+  "Sign in to keep your letter, track when it's opened, and view replies.";
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onContinueAsGuest: () => void;
+  // Effectively unused under variant='persistence' (button hidden); callers
+  // may omit it on the persistence path.
+  onContinueAsGuest?: () => void;
   onSignInSuccess: () => void;
+  variant?: SignInPromptVariant;
 }
 
 export const SignInPromptModal: React.FC<Props> = ({
@@ -13,6 +27,7 @@ export const SignInPromptModal: React.FC<Props> = ({
   onClose,
   onContinueAsGuest,
   onSignInSuccess,
+  variant = 'payment',
 }) => {
   const { signInWithGoogle } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -54,7 +69,7 @@ export const SignInPromptModal: React.FC<Props> = ({
         <button className="lp-modal__close" onClick={onClose} aria-label="Close">✕</button>
         <h2 className="lp-modal__title">Save your letter</h2>
         <p className="lp-modal__sub">
-          Sign in to keep your letter, track when it's opened, and view replies.
+          {variant === 'persistence' ? PERSISTENCE_SUBTITLE : PAYMENT_SUBTITLE}
         </p>
         <div className="lp-modal__rule" />
 
@@ -82,9 +97,11 @@ export const SignInPromptModal: React.FC<Props> = ({
           </p>
         )}
 
-        <button className="lp-btn-guest" onClick={onContinueAsGuest}>
-          Continue as Guest
-        </button>
+        {variant === 'payment' && onContinueAsGuest && (
+          <button className="lp-btn-guest" onClick={onContinueAsGuest}>
+            Continue as Guest
+          </button>
+        )}
       </div>
     </div>
   );

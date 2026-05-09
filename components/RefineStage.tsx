@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CoupleData } from '../types';
 import { generateLoveLetter, generateCoupleMyth, generateCinematicVideo, generateSacredLocation } from '../services/geminiService';
+import { formatRelativeTime } from '../utils/relativeTime';
 
 interface Props {
   data: CoupleData;
@@ -10,9 +11,25 @@ interface Props {
   // Back-to-Details navigation. Called after AI generation succeeds and
   // on textarea blur (to capture manual edits).
   onUpdateLetter: (letter: string) => void;
+  // PR #18b — explicit "Save and continue later" wiring. Optional so that
+  // any future caller without a save handler can omit them. CP3 consumes
+  // these to render the footer-level affordance + Saved indicator + error.
+  onSaveAndContinueLater?: () => void;
+  lastSaveSuccessAt?: number | null;
+  lastSaveError?: string | null;
+  clearLastSaveError?: () => void;
 }
 
-export const RefineStage: React.FC<Props> = ({ data, onSave, onBack, onUpdateLetter }) => {
+export const RefineStage: React.FC<Props> = ({
+  data,
+  onSave,
+  onBack,
+  onUpdateLetter,
+  onSaveAndContinueLater,
+  lastSaveSuccessAt,
+  lastSaveError,
+  clearLastSaveError,
+}) => {
   const [letter, setLetter] = useState(data.finalLetter || '');
   const [loading, setLoading] = useState(data.writingMode === 'assisted' && !data.finalLetter);
   const [isPackaging, setIsPackaging] = useState(false);
@@ -301,6 +318,65 @@ export const RefineStage: React.FC<Props> = ({ data, onSave, onBack, onUpdateLet
       <p className="text-center mt-12 text-[10px] text-luxury-gold font-bold uppercase tracking-[0.6em] italic opacity-80">
         Ready for packaging
       </p>
+
+      {/* PR #18b — Save and continue later. Quiet typographic utility,
+          deliberately separated from the three forward-progression CTAs above
+          ("Preview Experience" wine, "Back to Details" bronze, "Regenerate
+          Draft" bronze). Reads as calm continuity / ownership / optional
+          utility — never as an alternative progression path. */}
+      {onSaveAndContinueLater && (
+        <div className="text-center mt-10 mb-4">
+          {/* CP3.5 — link transforms post-save into a settled receipt.
+              Three states (mutually exclusive):
+                • Default (never saved): "Save and continue later" [gold/70]
+                • Settled (saved, no error): "Saved {relative time}" [gold/50]
+                • Errored: reverts to "Save and continue later" so the
+                  affordance to retry reads as available; error line below.
+              Visual hierarchy: action affordance most prominent → settled
+              receipt secondary → continuity line tertiary. The post-save
+              state must feel SETTLED, not CONFIRMED. */}
+          {(() => {
+            const isErrored = !!lastSaveError;
+            const isSettled = !isErrored && lastSaveSuccessAt != null;
+            const linkLabel = isSettled
+              ? `Saved ${formatRelativeTime(new Date(lastSaveSuccessAt as number).toISOString())}`
+              : 'Save and continue later';
+            // Settled state uses softer opacity to communicate "done /
+            // resting"; default uses higher opacity to communicate "do this".
+            const linkOpacity = isSettled ? 'text-luxury-gold/50' : 'text-luxury-gold/70';
+            return (
+              <button
+                type="button"
+                onClick={onSaveAndContinueLater}
+                className={`font-serif-elegant italic text-sm ${linkOpacity} hover:text-luxury-gold hover:underline underline-offset-4 bg-transparent border-none p-0 cursor-pointer transition-colors duration-200`}
+              >
+                {linkLabel}
+              </button>
+            );
+          })()}
+
+          {/* Continuity line: tertiary opacity (gold/40), only renders in
+              the settled state. Same gold serif italic family. No icon, no
+              badge, no separator. Answers "where is it saved?" once, ambient. */}
+          {!lastSaveError && lastSaveSuccessAt != null && (
+            <p className="font-serif-elegant italic text-xs text-luxury-gold/40 mt-2">
+              Yours to return to, on any device.
+            </p>
+          )}
+
+          {/* Error line: replaces the continuity line when set. Tap to
+              dismiss (clearLastSaveError). Same restrained typography. */}
+          {lastSaveError && (
+            <p
+              className="font-serif-elegant italic text-xs text-luxury-gold/60 mt-2 cursor-pointer"
+              onClick={clearLastSaveError}
+              aria-live="polite"
+            >
+              {lastSaveError}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 };

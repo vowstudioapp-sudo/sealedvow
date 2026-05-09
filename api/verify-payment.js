@@ -35,7 +35,20 @@ async function markActiveDraftCompleted(senderUid) {
       .equalTo('ACTIVE')
       .once('value');
     const drafts = draftsSnap.val() || {};
-    const activeDraftId = Object.keys(drafts)[0]; // single-ACTIVE invariant ⇒ ≤1
+    const draftKeys = Object.keys(drafts);
+    // PR #18b CP5 — defense-in-depth observability. The single-ACTIVE
+    // invariant is enforced at write time in api/drafts/save.js; if more
+    // than one ACTIVE draft is ever discovered here, it points at corruption
+    // (manual DB edit, pre-invariant data, race that bypassed save.js).
+    // Behavior is unchanged: chronologically oldest ACTIVE wins
+    // (Object.keys preserves RTDB push-key insertion order, which is
+    // chronological). The warn-log surfaces the anomaly for triage.
+    if (draftKeys.length > 1) {
+      console.warn(
+        `[verify-payment] Multiple ACTIVE drafts found for uid=${senderUid}; operating on chronologically oldest. count=${draftKeys.length}`,
+      );
+    }
+    const activeDraftId = draftKeys[0]; // single-ACTIVE invariant ⇒ ≤1 normally
     if (!activeDraftId) return;
     await adminDb
       .ref(`users/${senderUid}/drafts/${activeDraftId}`)

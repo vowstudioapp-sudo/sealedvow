@@ -65,6 +65,9 @@ import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
 import { writeDraftFromExternal, peekDraft, writeStage, clearPreparationDraft } from './hooks/usePreparationPersistence';
 import { useDraftStateObserver } from './hooks/useDraftStateObserver';
+import type { DraftState, PersistenceStatus } from './types/draft';
+import { DRAFT_STATE_ORDER } from './types/draft';
+import { UI_STAGE_TO_DRAFT_STATE } from './hooks/draftStateLogic';
 import { getDemoData } from './data/demoData.ts';
 
 import { THEME_ORDER, THEME_SYSTEM } from './theme/themeSystem';
@@ -378,29 +381,67 @@ const App: React.FC = () => {
   const demoSeededRef = useRef(false);
 
   // ── Sign-in prompt at Preview → Payment transition ──
-  const { user: authUser } = useAuth();
+  // PR #18b — `serverSessionReady` is the deterministic gate for
+  // authenticated fetches. It flips true only AFTER /api/auth/session has
+  // minted the cookie; gating the hydration effect on `authUser?.uid`
+  // alone races onAuthStateChanged ahead of the cookie-set.
+  const { user: authUser, serverSessionReady } = useAuth();
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  // PR #18b — variant of the sign-in modal. Default 'payment' preserves the
+  // byte-identical UX for the existing payment-context call sites.
+  const [signInVariant, setSignInVariant] = useState<'payment' | 'persistence'>('payment');
   const pendingActionRef = useRef<(() => void) | null>(null);
+  // PR #18b — onCancel callback passed alongside the deferred action. Lets
+  // the caller (e.g., handleSaveAndContinueLater) clean up its in-flight ref
+  // when the user dismisses the modal without signing in.
+  const pendingCancelRef = useRef<(() => void) | null>(null);
 
-  const runOrPromptSignIn = (action: () => void) => {
+  // PR #18b — Cross-device draft persistence (activation of PR #18a's dormant
+  // observer). draftId + seedDraftState live in a SINGLE state object so that
+  // updates are atomic — the observer's activation seeding depends on both
+  // values being available in the same render. Splitting these across two
+  // useState hooks would risk an interleaved render where the observer
+  // activates with draftId set but seedDraftState still null, producing a
+  // redundant /transition write for the current UIStage.
+  const [draftRecord, setDraftRecord] = useState<{
+    draftId: string | null;
+    seedDraftState: DraftState | null;
+  }>({ draftId: null, seedDraftState: null });
+
+  // PR #18b — variant + onCancel are additive. Existing payment call sites
+  // pass only `action` (variant defaults to 'payment', onCancel undefined),
+  // preserving byte-identical UX. Persistence callers pass 'persistence' to
+  // switch the modal copy/Guest-button visibility, and pass onCancel to be
+  // notified when the user dismisses without signing in.
+  const runOrPromptSignIn = (
+    action: () => void,
+    variant: 'payment' | 'persistence' = 'payment',
+    onCancel?: () => void,
+  ) => {
     if (authUser) {
       action();
-    } else {
-      pendingActionRef.current = action;
-      setShowSignInPrompt(true);
+      return;
     }
+    pendingActionRef.current = action;
+    pendingCancelRef.current = onCancel ?? null;
+    setSignInVariant(variant);
+    setShowSignInPrompt(true);
   };
 
   const commitPendingAction = () => {
     setShowSignInPrompt(false);
     const action = pendingActionRef.current;
     pendingActionRef.current = null;
+    pendingCancelRef.current = null;
     if (action) action();
   };
 
   const cancelPendingAction = () => {
+    const onCancel = pendingCancelRef.current;
     pendingActionRef.current = null;
+    pendingCancelRef.current = null;
     setShowSignInPrompt(false);
+    if (onCancel) onCancel();
   };
 
   const safeSetStage = (nextStage: AppStage) => {
@@ -431,14 +472,257 @@ const App: React.FC = () => {
     setData(prev => (prev ? { ...prev, ...patch } : prev));
   };
 
-  // PR #18a: dormant mount of the cross-device draft observer. The hook's
-  // early-return short-circuits on `!enabled || !draftId` BEFORE any candidate
-  // computation, so this costs zero work per render. 18b activates it by
-  // changing the two literals below to source from real auth/draft state.
+  // ── PR #18b — Explicit "Save and continue later" handler ────────────────
+  // User-triggered ONLY. There is no autosave path — the observer (above)
+  // handles milestone /transition writes; this handler handles the explicit
+  // full-payload /save. saveInFlightRef + mountedRef collectively guarantee
+  // no overlapping saves and no setter-after-unmount.
+  //
+  // PR #18b CP3.5 — lastSaveSuccessAt is now a SETTLED-STATE anchor (not a
+  // transient indicator). Once set, it remains until sign-out or hydration.
+  // The 2.5s auto-dismiss timer from CP2 is removed; the affordance's
+  // settled-receipt rendering communicates persistence on glance.
+  const saveInFlightRef = useRef(false);
+  const mountedRef = useRef(true);
+  const [lastSaveSuccessAt, setLastSaveSuccessAt] = useState<number | null>(null);
+  const [lastSaveError, setLastSaveError] = useState<string | null>(null);
+
+  // Unmount guard for the in-flight save handler. App.tsx is the root and
+  // rarely unmounts in production, but the pattern is correct for tests +
+  // Strict Mode and protects against any future migration that remounts.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const clearLastSaveError = () => {
+    setLastSaveError(null);
+  };
+
+  const handleSaveAndContinueLater = () => {
+    // Concurrency guard — prevent overlapping saves from rapid re-clicks.
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+
+    const action = async () => {
+      // Compute the DraftState to record. Defense-in-depth monotonicity:
+      // if seedDraftState (last persisted) is higher than the UIStage's
+      // candidate, prefer the seed — never regress. Server enforces too.
+      const candidate = UI_STAGE_TO_DRAFT_STATE[stage] ?? 'IN_PROGRESS';
+      const seed = draftRecord.seedDraftState;
+      const draftStateToSend: DraftState =
+        seed !== null && DRAFT_STATE_ORDER[seed] > DRAFT_STATE_ORDER[candidate]
+          ? seed
+          : candidate;
+
+      // Step is the PREPARE form sub-step (1|2|3). Peek the local draft —
+      // it tracks the current sub-step authoritatively (PR #16 schema).
+      // Outside PREPARE, step is meaningless and omitted.
+      const localStep = peekDraft().step;
+      const step = stage === AppStage.PREPARE ? (localStep ?? undefined) : undefined;
+
+      const payload: {
+        draftId?: string;
+        data: Partial<CoupleData> | CoupleData | Record<string, never>;
+        step?: 1 | 2 | 3;
+        draftState: DraftState;
+        persistenceStatus: PersistenceStatus;
+      } = {
+        data: data ?? {},
+        draftState: draftStateToSend,
+        persistenceStatus: 'ACTIVE',
+      };
+      if (draftRecord.draftId) payload.draftId = draftRecord.draftId;
+      if (step !== undefined) payload.step = step;
+
+      try {
+        const res = await fetch('/api/drafts/save', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        // Mount guard — abort silently if the component unmounted mid-flight.
+        if (!mountedRef.current) {
+          saveInFlightRef.current = false;
+          return;
+        }
+
+        if (!res.ok) {
+          setLastSaveError("Couldn't save just now. Your work is still here.");
+          saveInFlightRef.current = false;
+          return;
+        }
+
+        const json = (await res.json()) as { ok?: boolean; draftId?: string; updatedAt?: number };
+
+        if (!mountedRef.current) {
+          saveInFlightRef.current = false;
+          return;
+        }
+
+        if (!json?.ok || !json?.draftId) {
+          setLastSaveError("Couldn't save just now. Your work is still here.");
+          saveInFlightRef.current = false;
+          return;
+        }
+
+        // DraftId identity invariant (Decision #14). If we already have a
+        // draftId and the server returned a different one, refuse the swap.
+        if (draftRecord.draftId && json.draftId !== draftRecord.draftId) {
+          console.warn(
+            `[18b] /save returned draftId=${json.draftId} but currentDraftId=${draftRecord.draftId}; refusing identity swap.`,
+          );
+          setLastSaveError("Couldn't save just now. Your work is still here.");
+          saveInFlightRef.current = false;
+          return;
+        }
+
+        // Success — update draftRecord atomically (single setter, both
+        // fields together) so the observer's activation seeding sees the
+        // matching values in the same render. seedDraftState carries the
+        // state we just told the server about; the observer will treat
+        // the next /transition for the same state as a noop (same_state).
+        setDraftRecord({ draftId: json.draftId, seedDraftState: draftStateToSend });
+
+        // PR #18b CP3.5 — set the settled-state anchor. No auto-dismiss
+        // timer; the affordance now renders the receipt as long as the
+        // session holds it. Re-saves refresh the timestamp; sign-out clears.
+        setLastSaveError(null);
+        setLastSaveSuccessAt(Date.now());
+
+        saveInFlightRef.current = false;
+      } catch {
+        if (mountedRef.current) {
+          setLastSaveError("Couldn't save just now. Your work is still here.");
+        }
+        // Do NOT clear draftRecord. Do NOT auto-retry. User retries by
+        // clicking the action again.
+        saveInFlightRef.current = false;
+      }
+    };
+
+    runOrPromptSignIn(action, 'persistence', () => {
+      // Sign-in cancel path. Silent (Decision #10).
+      saveInFlightRef.current = false;
+    });
+  };
+
+  // PR #18b — Cross-device draft hydration. Gated on BOTH authUser?.uid AND
+  // serverSessionReady. The serverSessionReady gate is load-bearing: without
+  // it, this effect fires when Firebase's onAuthStateChanged updates the
+  // user (which happens immediately when signInWithPopup resolves), but
+  // BEFORE /api/auth/session has minted the session cookie. The fetch then
+  // goes out without a Cookie header and 401s. With the gate, the effect
+  // re-runs once serverSessionReady flips true, and the cookie is in the
+  // jar by then.
+  //
+  // Stale-response protection via cancelled flag + uid-equality re-check
+  // guards against account-switch races where user A's /list response
+  // arrives after user B has signed in. RTDB writes happen exclusively
+  // through the observer (transitions) and the explicit save handler.
+  useEffect(() => {
+    const capturedUid = authUser?.uid;
+
+    // Sign-out (or unauthenticated): clear EVERYTHING — draftRecord plus
+    // the settled-state anchor (lastSaveSuccessAt) plus any pending error.
+    // Without this, the link would still render "Saved {time}" after sign-
+    // out, contradicting the affordance state.
+    if (!capturedUid) {
+      setDraftRecord({ draftId: null, seedDraftState: null });
+      setLastSaveSuccessAt(null);
+      setLastSaveError(null);
+      return;
+    }
+
+    // Mid-sign-in window (cookie not yet established): clear draftRecord
+    // only. lastSaveSuccessAt is null at this point anyway (no save can
+    // succeed before sign-in completes), but preserve the slot to avoid
+    // any future code path that might set it pre-session.
+    if (!serverSessionReady) {
+      setDraftRecord({ draftId: null, seedDraftState: null });
+      return;
+    }
+
+    // Reset first so a previous user's draft never persists visibly during
+    // the window between sign-in and /list resolution. Strict-mode double
+    // invocation produces a benign double-clear; the cleanup discards the
+    // first in-flight response.
+    setDraftRecord({ draftId: null, seedDraftState: null });
+
+    let cancelled = false;
+    fetch('/api/drafts/list', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((json) => {
+        if (cancelled) return;
+        // Stale-response guard: if the auth identity changed mid-flight,
+        // discard. Only the most recent identity's response should hydrate.
+        if (authUser?.uid !== capturedUid) return;
+
+        const drafts = Array.isArray(json?.drafts) ? json.drafts : [];
+        const activeDrafts = drafts.filter(
+          (d: { persistenceStatus?: PersistenceStatus }) =>
+            d?.persistenceStatus === 'ACTIVE',
+        );
+        if (activeDrafts.length === 0) return;
+
+        // Match server's findActiveDraftForUser semantics: chronologically
+        // oldest ACTIVE wins. /list returns sorted by updatedAt desc, so we
+        // re-sort by createdAt asc to recover insertion order.
+        activeDrafts.sort(
+          (
+            a: { createdAt?: number },
+            b: { createdAt?: number },
+          ) => (a.createdAt || 0) - (b.createdAt || 0),
+        );
+        const oldest = activeDrafts[0] as {
+          draftId?: string;
+          draftState?: DraftState;
+          updatedAt?: number;
+        };
+        if (!oldest?.draftId || !oldest?.draftState) return;
+
+        setDraftRecord({
+          draftId: oldest.draftId,
+          seedDraftState: oldest.draftState,
+        });
+        // PR #18b CP3.5 — seed lastSaveSuccessAt from the cloud's updatedAt
+        // so the rehydrated session immediately renders the settled-state
+        // anchor ("Saved {relative time}") instead of the action affordance.
+        if (typeof oldest.updatedAt === 'number') {
+          setLastSaveSuccessAt(oldest.updatedAt);
+        }
+      })
+      .catch(() => {
+        // Silent: background hydration must never surface a UI error.
+        // draftRecord stays cleared; observer remains dormant.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.uid, serverSessionReady]);
+
+  // PR #18b — Observer is LIVE. Activates when the user is signed in AND a
+  // draftRecord has been hydrated (or just-saved in CP2). The hook's early
+  // return on `!enabled || !draftId` keeps the anonymous case (and the brief
+  // window during /list hydration) at zero work per render. The seedDraftState
+  // pass-through prevents a duplicate /transition write on the activation
+  // tick — without it, the observer would always fire for the current
+  // UIStage on first activation because lastPersistedDraftStateRef starts null.
   useDraftStateObserver({
     uiStage: stage,
-    draftId: null,        // 18b: source from saved draft when present
-    enabled: false,       // 18b: source from auth state + draft-existence check
+    draftId: draftRecord.draftId,
+    enabled: !!authUser && !!draftRecord.draftId,
+    seedDraftState: draftRecord.seedDraftState ?? undefined,
   });
 
   useEffect(() => {
@@ -1103,6 +1387,10 @@ const App: React.FC = () => {
                 setData(prev => (prev ? { ...prev, finalLetter: letter } : prev));
                 writeDraftFromExternal({ finalLetter: letter });
               }}
+              onSaveAndContinueLater={handleSaveAndContinueLater}
+              lastSaveSuccessAt={lastSaveSuccessAt}
+              lastSaveError={lastSaveError}
+              clearLastSaveError={clearLastSaveError}
             />
           )}
 
@@ -1189,6 +1477,10 @@ const App: React.FC = () => {
                   onPayment={() => {
                     runOrPromptSignIn(() => safeSetStage(AppStage.PAYMENT));
                   }}
+                  onSaveAndContinueLater={handleSaveAndContinueLater}
+                  lastSaveSuccessAt={lastSaveSuccessAt}
+                  lastSaveError={lastSaveError}
+                  clearLastSaveError={clearLastSaveError}
                 />
               </ReceiverErrorBoundary>
             </div>
@@ -1298,6 +1590,7 @@ const App: React.FC = () => {
         onClose={cancelPendingAction}
         onContinueAsGuest={commitPendingAction}
         onSignInSuccess={commitPendingAction}
+        variant={signInVariant}
       />
     </div>
   );
