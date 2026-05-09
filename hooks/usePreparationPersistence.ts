@@ -1,10 +1,14 @@
 import { useEffect, useRef } from 'react';
-import type { CoupleData } from '../types';
+import type { CoupleData, AppStage } from '../types';
 
 const STORAGE_KEY = 'vday_data_draft';
 // Separate key from App.tsx 'vday_data' (post-finalize). This avoids
 // collision between mid-form drafts and post-refine state.
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
+// v1 drafts (pre-stage) are still readable; missing `stage` reads as undefined
+// and the App-level validity guard falls back to the route default. The next
+// write at v2 silently forward-migrates the on-disk shape.
+const SUPPORTED_SCHEMA_VERSIONS: readonly number[] = [1, 2];
 const DEFAULT_DEBOUNCE_MS = 1000;
 
 type StepValue = 1 | 2 | 3;
@@ -13,6 +17,7 @@ interface StoredDraft {
   version: number;
   data: Partial<CoupleData>;
   step?: StepValue;
+  stage?: AppStage;
   savedAt: string;
 }
 
@@ -94,6 +99,7 @@ function selectiveHydrate(stored: Partial<CoupleData>): Partial<CoupleData> {
 interface DraftPeek {
   data: Partial<CoupleData> | null;
   step: StepValue | null;
+  stage: AppStage | null;
 }
 
 function readDraft(): DraftPeek | null {
@@ -103,12 +109,12 @@ function readDraft(): DraftPeek | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredDraft;
     if (typeof parsed !== 'object' || parsed === null) return null;
-    if (parsed.version !== CURRENT_SCHEMA_VERSION) {
+    if (!SUPPORTED_SCHEMA_VERSIONS.includes(parsed.version)) {
       console.warn(
-        '[usePreparationPersistence] Discarding draft with version',
+        '[usePreparationPersistence] Discarding draft with unsupported version',
         parsed.version,
-        'expected',
-        CURRENT_SCHEMA_VERSION
+        'supported',
+        SUPPORTED_SCHEMA_VERSIONS
       );
       return null;
     }
@@ -120,7 +126,10 @@ function readDraft(): DraftPeek | null {
       parsed.step === 1 || parsed.step === 2 || parsed.step === 3
         ? parsed.step
         : null;
-    return { data: safe, step };
+    // optional for v1 drafts (no stage field); caller re-validates against data.
+    const stage: AppStage | null =
+      typeof parsed.stage === 'string' ? (parsed.stage as AppStage) : null;
+    return { data: safe, step, stage };
   } catch (err) {
     console.warn('[usePreparationPersistence] Read failed:', err);
     return null;
@@ -130,11 +139,16 @@ function readDraft(): DraftPeek | null {
 function writeDraft(data: CoupleData, step: StepValue): void {
   if (typeof window === 'undefined') return;
   try {
+    // Read-merge: preserve `stage` if a prior writeStage stored one. Without
+    // this, every debounced PreparationForm write would clobber stage back to
+    // undefined, breaking refresh-resume from any post-PREPARE position.
+    const existing = readDraft();
     const payload: StoredDraft = {
       version: CURRENT_SCHEMA_VERSION,
       data,
       step,
       savedAt: new Date().toISOString(),
+      ...(existing?.stage ? { stage: existing.stage } : {}),
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {
@@ -148,7 +162,7 @@ function writeDraft(data: CoupleData, step: StepValue): void {
 // state hook initializes. Returns { data: null, step: null } if no
 // draft exists or the stored draft is incompatible / malformed.
 export function peekDraft(): DraftPeek {
-  return readDraft() ?? { data: null, step: null };
+  return readDraft() ?? { data: null, step: null, stage: null };
 }
 
 // Ongoing-write-only hook. The hook does NOT hydrate — use peekDraft()
@@ -173,6 +187,27 @@ export function usePreparationPersistence(
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [data, step, debounceMs, enabled]);
+}
+
+// Synchronous single-field stage update. Called from App.tsx's safeSetStage on
+// every gated transition. No-ops without an existing draft — stage with no
+// data behind it would fail the App-level validity guard anyway.
+export function writeStage(stage: AppStage): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = readDraft();
+    if (!existing || !existing.data) return;
+    const payload: StoredDraft = {
+      version: CURRENT_SCHEMA_VERSION,
+      data: existing.data as CoupleData,
+      ...(existing.step ? { step: existing.step } : {}),
+      stage,
+      savedAt: new Date().toISOString(),
+    };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('[usePreparationPersistence] Stage write failed:', err);
+  }
 }
 
 export function clearPreparationDraft(): void {
@@ -226,7 +261,7 @@ export function getDraftMetadata(): DraftMetadata | null {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredDraft;
-    if (parsed.version !== CURRENT_SCHEMA_VERSION) return null;
+    if (!SUPPORTED_SCHEMA_VERSIONS.includes(parsed.version)) return null;
     if (!parsed.data) return null;
 
     const data = parsed.data as Partial<CoupleData>;
@@ -273,12 +308,23 @@ export function getDraftMetadata(): DraftMetadata | null {
 // External-write helper for components that own form data outside the
 // PreparationForm hook (e.g. RefineStage feeding the AI draft back via
 // App.tsx). Reads the existing draft, merges in `updates`, writes back
-// preserving the existing step. No-ops if no draft exists yet — we
-// don't create orphan drafts from the refine layer.
+// preserving the existing step + stage. No-ops if no draft exists yet —
+// we don't create orphan drafts from the refine layer.
 export function writeDraftFromExternal(updates: Partial<CoupleData>): void {
-  const existing = readDraft();
-  if (!existing || !existing.data) return;
-  const merged = { ...existing.data, ...updates } as CoupleData;
-  const step: StepValue = existing.step ?? 1;
-  writeDraft(merged, step);
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = readDraft();
+    if (!existing || !existing.data) return;
+    const merged = { ...existing.data, ...updates } as CoupleData;
+    const payload: StoredDraft = {
+      version: CURRENT_SCHEMA_VERSION,
+      data: merged,
+      step: existing.step ?? 1,
+      savedAt: new Date().toISOString(),
+      ...(existing.stage ? { stage: existing.stage } : {}),
+    };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('[usePreparationPersistence] External write failed:', err);
+  }
 }

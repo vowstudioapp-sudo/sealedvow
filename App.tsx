@@ -67,7 +67,7 @@ const EidPreparationForm = lazy(() =>
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
-import { writeDraftFromExternal } from './hooks/usePreparationPersistence';
+import { writeDraftFromExternal, peekDraft, writeStage, clearPreparationDraft } from './hooks/usePreparationPersistence';
 import { getDemoData } from './data/demoData.ts';
 
 import { THEME_ORDER, THEME_SYSTEM } from './theme/themeSystem';
@@ -108,6 +108,29 @@ const ensureExhaustiveStage = (stage: AppStage): void => {
     default:
       assertNever(stage as never);
   }
+};
+
+// Refresh-resilience (PR #16): the sender stages we persist + restore. Other
+// stages (LANDING, PERSONAL_INTRO, SOULMATE_SYNC, MASTER_CONTROL, SHARE) are
+// not part of the authoring loop and are intentionally not persisted.
+const PERSISTABLE_SENDER_STAGES: ReadonlySet<AppStage> = new Set([
+  AppStage.PREPARE,
+  AppStage.REFINE,
+  AppStage.ENVELOPE,
+  AppStage.QUESTION,
+  AppStage.MAIN_EXPERIENCE,
+  AppStage.PAYMENT,
+]);
+
+// Post-PREPARE stages need finalLetter to render anything meaningful; that's
+// also the multi-tab + corrupt-storage backstop.
+const isStageValid = (
+  stage: AppStage,
+  data: Partial<CoupleData> | null,
+): boolean => {
+  if (stage === AppStage.PREPARE) return true;
+  if (!PERSISTABLE_SENDER_STAGES.has(stage)) return false;
+  return typeof data?.finalLetter === 'string' && data.finalLetter.length > 0;
 };
 
 const readPersistedCoupleData = (): CoupleData | null => {
@@ -287,11 +310,38 @@ const App: React.FC = () => {
     return null;
   }, []);
   const isDemoMode = !!demoData;
-  
-  const [stage, setStage] = useState<AppStage>(() =>
-    initialStageForRoute(getRouteType())
+
+  // PR #16: single-source dev-preview flag. Used by the persist-stage gate in
+  // safeSetStage AND the resolver effect below — same value, computed once,
+  // no risk of drift between two URL parses.
+  const previewParam = useMemo(
+    () => (import.meta.env.DEV ? new URLSearchParams(window.location.search).get('preview') : null),
+    [],
   );
-  const [data, setData] = useState<CoupleData | null>(null);
+  const isDevPreview = !!previewParam;
+
+  // Read once on mount; shared by the stage / data / isCreatorPreview initializers below.
+  const initialDraft = useMemo(() => peekDraft(), []);
+
+  const [stage, setStage] = useState<AppStage>(() => {
+    const rt = getRouteType();
+    const fallback = initialStageForRoute(rt);
+    if (rt !== 'LETTER_CREATE') return fallback;
+    if (!initialDraft.stage) return fallback;
+    if (!isStageValid(initialDraft.stage, initialDraft.data)) return fallback;
+    return initialDraft.stage;
+  });
+  const [data, setData] = useState<CoupleData | null>(() => {
+    // Hydrate data only when a valid post-PREPARE stage was restored — that
+    // way RefineStage / Envelope / etc. have something to render on the very
+    // first paint instead of flashing blank until the resolver effect runs.
+    // PREPARE-form data continues to flow through PreparationForm's own peek.
+    if (getRouteType() !== 'LETTER_CREATE') return null;
+    if (!initialDraft.data || !initialDraft.stage) return null;
+    if (initialDraft.stage === AppStage.PREPARE) return null;
+    if (!isStageValid(initialDraft.stage, initialDraft.data)) return null;
+    return hydrateCoupleData(initialDraft.data as CoupleData);
+  });
 
   const experienceData = useMemo(() => {
     if (isReceiverLink) {
@@ -314,7 +364,15 @@ const App: React.FC = () => {
   });
   const [isFadingOut, setIsFadingOut] = useState(false);
   
-  const [isCreatorPreview, setIsCreatorPreview] = useState(false);
+  const [isCreatorPreview, setIsCreatorPreview] = useState(() => {
+    // PR #16: any post-PREPARE sender stage we restore is by definition a
+    // creator-preview surface — receiver flow lives at /{shareCode}, never on
+    // /letter/create. ENVELOPE + MAIN_EXPERIENCE gate their render on this
+    // flag; without restoring it, refresh-on-ENVELOPE would show blank.
+    if (getRouteType() !== 'LETTER_CREATE') return false;
+    if (!initialDraft.stage || initialDraft.stage === AppStage.PREPARE) return false;
+    return PERSISTABLE_SENDER_STAGES.has(initialDraft.stage);
+  });
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
   const [, forceLocationUpdate] = useState(0);
@@ -358,6 +416,18 @@ const App: React.FC = () => {
       previousStageRef.current = prev;
       return nextStage;
     });
+    // PR #16: refresh-resilience persistence. Gate to the standard sender
+    // authoring flow only — receiver, demo, eid, and dev-preview surfaces all
+    // own their own state-restoration paths and must not write to the draft.
+    const inSenderFlow =
+      linkState === LoaderState.NO_LINK &&
+      !isDemoMode &&
+      !isEidFlow &&
+      !isDevPreview &&
+      !isReceiverLink;
+    if (inSenderFlow && PERSISTABLE_SENDER_STAGES.has(nextStage)) {
+      writeStage(nextStage);
+    }
   };
 
   const updateData = (patch: Partial<CoupleData>) => {
@@ -475,9 +545,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const preview = import.meta.env.DEV ? params.get('preview') : null;
-    const isDevPreview = import.meta.env.DEV && !!preview;
+    const preview = previewParam;
     const path = window.location.pathname.replace(/\/+$/, '') || '/';
     const isDemoPath = path.startsWith('/demo/');
     const isDemoEidPath = path === '/demo/eid' || /^\/demo\/eid\/[a-z-]+$/.test(path);
@@ -1164,12 +1232,15 @@ const App: React.FC = () => {
 
           {stage === AppStage.PAYMENT && data && (
             <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
-              <PaymentStage 
-                data={data} 
+              <PaymentStage
+                data={data}
                 onPaymentComplete={(result: { replyEnabled: boolean; sessionKey: string; shareSlug: string }) => {
                   updateData({ replyEnabled: result.replyEnabled, sealedAt: new Date().toISOString() });
                   setSessionKey(result.sessionKey);
                   setShareSlug(result.shareSlug);
+                  // PR #16: letter is finalized — drop the refresh-resilience
+                  // draft so a fresh visit to /letter/create starts at PREPARE.
+                  clearPreparationDraft();
                   safeSetStage(AppStage.SHARE);
                 }}
                 onBack={() => {
