@@ -47,33 +47,11 @@ export const OccasionSelector: React.FC = () => {
         transition={{ duration: 0.6, delay: 0.4 }}
       >
         
-        {/* Birthday */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-        >
-          <div className="occasion-card occasion-card--birthday" onClick={() => go("/letter/create?occasion=birthday")}>
-            <div className="occasion-card__glow" />
-            <div className="occasion-card__icon">
-              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="8" y="22" width="32" height="18" rx="3"/>
-                <rect x="12" y="16" width="24" height="6" rx="2"/>
-                <line x1="24" y1="16" x2="24" y2="40"/>
-                <path d="M24 10c0-3 2-5 0-7"/>
-                <circle cx="24" cy="13" r="1.5" fill="currentColor" stroke="none"/>
-              </svg>
-            </div>
-            <span className="occasion-card__title">Birthday</span>
-            <span className="occasion-card__subtitle">Celebrate them</span>
-          </div>
-        </motion.div>
-
         {/* Anniversary */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
         >
           <div className="occasion-card occasion-card--anniversary" onClick={() => go("/letter/create?occasion=anniversary")}>
             <div className="occasion-card__glow" />
@@ -89,11 +67,11 @@ export const OccasionSelector: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Just Because */}
+        {/* Unsaid (internal id remains 'just-because' — UI rename only) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.7 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
         >
           <div className="occasion-card occasion-card--justbecause" onClick={() => go("/letter/create?occasion=just-because")}>
             <div className="occasion-card__glow" />
@@ -104,48 +82,8 @@ export const OccasionSelector: React.FC = () => {
                 <path d="M14 24h20"/><path d="M18 18l12 12"/><path d="M30 18l-12 12"/>
               </svg>
             </div>
-            <span className="occasion-card__title">Just Because</span>
-            <span className="occasion-card__subtitle">No reason needed</span>
-          </div>
-        </motion.div>
-
-        {/* Apology */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-        >
-          <div className="occasion-card occasion-card--apology" onClick={() => go("/letter/create?occasion=apology")}>
-            <div className="occasion-card__glow" />
-            <div className="occasion-card__icon">
-              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 28c-4 0-8-3-8-8s4-8 8-8c2 0 4 1 5 2"/>
-                <path d="M32 28c4 0 8-3 8-8s-4-8-8-8c-2 0-4 1-5 2"/>
-                <path d="M20 14c2-2 5-2 8 0"/>
-                <path d="M24 24v8"/><circle cx="24" cy="37" r="2.5"/>
-              </svg>
-            </div>
-            <span className="occasion-card__title">I'm Sorry</span>
-            <span className="occasion-card__subtitle">Make things right</span>
-          </div>
-        </motion.div>
-
-        {/* Thank You */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.9 }}
-        >
-          <div className="occasion-card occasion-card--thankyou" onClick={() => go("/letter/create?occasion=thank-you")}>
-            <div className="occasion-card__glow" />
-            <div className="occasion-card__icon">
-              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M24 42c-8-6-16-12-16-22a10 10 0 0 1 16-8 10 10 0 0 1 16 8c0 10-8 16-16 22z"/>
-                <path d="M20 22l3 3 6-6"/>
-              </svg>
-            </div>
-            <span className="occasion-card__title">Thank You</span>
-            <span className="occasion-card__subtitle">Say it properly</span>
+            <span className="occasion-card__title">Unsaid</span>
+            <span className="occasion-card__subtitle">For the words that have been waiting</span>
           </div>
         </motion.div>
 
