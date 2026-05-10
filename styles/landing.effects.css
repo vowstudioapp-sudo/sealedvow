@@ -663,23 +663,25 @@
 .lp-card {
   flex-shrink: 0;
   scroll-snap-align: center;
-  width: 260px;
-  height: 320px;
+  width: 282px;
+  height: 350px;
   background: color-mix(in srgb, var(--card-accent) 10%, var(--sv-bg-card));
   border: 1px solid color-mix(in srgb, var(--card-accent) 32%, var(--sv-line-soft));
-  border-radius: 18px;
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: 40px 28px;
+  gap: 22px;
+  padding: 44px 32px;
   cursor: pointer;
   position: relative;
   overflow: hidden;
   text-decoration: none;
   transform-style: preserve-3d;
-  box-shadow: inset 0 1px 0 rgba(241, 231, 218, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(241, 231, 218, 0.06),
+    0 24px 60px -28px color-mix(in srgb, var(--card-accent) 22%, transparent);
   transition:
     transform 0.35s ease,
     border-color 0.4s ease,
@@ -691,7 +693,9 @@
   transform: translateY(-4px);
   border-color: color-mix(in srgb, var(--card-accent) 52%, rgba(241, 231, 218, 0.26));
   background: color-mix(in srgb, var(--card-accent) 10%, var(--sv-bg-card));
-  box-shadow: inset 0 1px 0 rgba(241, 231, 218, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(241, 231, 218, 0.1),
+    0 32px 70px -24px color-mix(in srgb, var(--card-accent) 32%, transparent);
 }
 
 .lp-card:focus-visible {
@@ -744,8 +748,8 @@
 
 /* Icon */
 .lp-card__icon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -760,7 +764,7 @@
 
 /* Title */
 .lp-card__title {
-  font-size: 24px;
+  font-size: 26px;
   font-style: italic;
   font-weight: 300;
   color: var(--lp-text-main);
@@ -775,7 +779,7 @@
 
 /* Description */
 .lp-card__desc {
-  font-size: 15.5px;
+  font-size: 16.5px;
   font-style: normal;
   font-weight: 400;
   color: rgba(242,232,213,0.92);
