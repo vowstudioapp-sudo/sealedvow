@@ -279,6 +279,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <p className="lp-s5__sub">ONE LETTER • ONE PERSON</p>
           <p className="lp-s5__price-anchor">₹249 per letter</p>
           <p className="lp-s5__freemium">Write for free. Send it when it matters.</p>
+          <button className="lp-btn-begin" onClick={handleEnter}>CREATE YOUR LETTER</button>
         </div>
       </section>
 
