@@ -168,7 +168,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         <section className="lp-hero" ref={heroRef}>
           <div className="lp-hero__center">
             <h1 className="lp-hero__h1">A letter.<br />Not a text.</h1>
-            <p className="lp-hero__clarity">Write in private. Seal it. Share it through a secure link.</p>
+            <p className="lp-hero__clarity">Some things shouldn't disappear in a chat history.</p>
             <button className="lp-btn-begin" onClick={handleEnter}>CREATE YOUR LETTER</button>
           </div>
           <div className="lp-hero__bottom">
@@ -234,8 +234,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       ══════════════════════════════════════ */}
       <section className="lp-section">
         <div className="lp-fade">
-          <p className="lp-s2__headline">Some things shouldn't<br />disappear in a chat history.</p>
-          <p className="lp-s2__sub">Write them properly.</p>
+          <p className="lp-s2__headline">Write them properly.</p>
         </div>
       </section>
 
@@ -265,6 +264,55 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
             <p className="lp-s4__item">Nothing you write is public.</p>
             <p className="lp-s4__item">Nothing is indexed.</p>
             <p className="lp-s4__item">Nothing can be discovered.</p>
+          </div>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
+          FOUNDER NOTE
+      ══════════════════════════════════════ */}
+      <section className="lp-section lp-section--founder">
+        <div className="lp-fade lp-founder">
+
+          {/* Left: image (45%) */}
+          <div className="lp-founder__media">
+            <img
+              className="lp-founder__image"
+              src="/lp/founder-note.webp"
+              alt="A handwritten letter beside a wax-sealed envelope"
+            />
+          </div>
+
+          {/* Right: text (55%) */}
+          <div className="lp-founder__text">
+            <p className="lp-founder__eyebrow">
+              <span className="lp-founder__eyebrow-dash" aria-hidden="true"></span>
+              A note from the founder
+            </p>
+
+            <h2 className="lp-founder__headline">Why I built this.</h2>
+
+            <div className="lp-founder__body-stack">
+              <p className="lp-founder__body lp-founder__body--first">
+                I built this because a chat message can't carry weight. The things that matter — the years you want remembered properly, the words you've been carrying but couldn't say, the letter meant for one person and nobody else — these don't belong in a thread that scrolls.
+              </p>
+              <p className="lp-founder__body">
+                They belong somewhere quiet. Sealed. Held until the right moment.
+              </p>
+              <p className="lp-founder__body">
+                Most of what we say now disappears the moment it's read. Sealed Vow exists for the things that shouldn't.
+              </p>
+            </div>
+
+            <div className="lp-founder__attribution">
+              <span className="lp-founder__rule" aria-hidden="true"></span>
+              <div className="lp-founder__attribution-text">
+                <span className="lp-founder__name">Ajmal Fahad</span>
+                <span className="lp-founder__role">Founder, Sealed Vow</span>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
