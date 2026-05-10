@@ -22,13 +22,13 @@ interface Props {
   onComplete: (data: CoupleData) => void;
 }
 
-// CORE OCCASIONS — always visible, 365 days a year
+// CORE OCCASIONS — V1: Anniversary + Unsaid only.
+// 'just-because' internal ID retained for the Unsaid tile so the existing
+// AI prompt contract (already calibrated to restrained-intimacy register)
+// requires no rewrite and no historical-data migration.
 const CORE_OCCASIONS: { id: Occasion; label: string; icon: string; defaultTone: string; hint: string }[] = [
-  { id: 'anniversary',   label: 'Anniversary',  icon: '🥂',  hint: 'Celebrate your journey',  defaultTone: 'Nostalgic, proud, and enduring.' },
-  { id: 'birthday',      label: 'Birthday',     icon: '🎂',  hint: 'Mark the day',             defaultTone: 'Warm, celebratory, and deeply glad they exist.' },
-  { id: 'just-because',  label: 'Just Because', icon: '✨',  hint: 'No reason needed',         defaultTone: 'Playful, spontaneous, and affectionate.' },
-  { id: 'apology',       label: 'I\'m Sorry',   icon: '🕯️', hint: 'Make things right',        defaultTone: 'Humble, sincere, and stripped back.' },
-  { id: 'thank-you',     label: 'A Thank You',  icon: '🙏',  hint: 'Say it properly',          defaultTone: 'Appreciative, specific, and admiring.' },
+  { id: 'anniversary',  label: 'Anniversary', icon: '🥂', hint: 'Celebrate your journey',                defaultTone: 'Nostalgic, proud, and enduring.' },
+  { id: 'just-because', label: 'Unsaid',      icon: '✨', hint: 'For the words that have been waiting',  defaultTone: 'Restrained, intimate, finally-spoken. Like saying something that has been waiting to be said.' },
 ];
 
 // FESTIVAL OCCASIONS — Removed as Eid now has dedicated flow via OccasionSelector
@@ -66,6 +66,12 @@ const RITUALS: { id: RevealMethod; title: string; desc: string; icon: string }[]
 const ENABLED_RITUALS: RevealMethod[] = ['immediate'];
 const ENABLE_VIDEO = false;
 
+// V1: occasions removed from the active picker. Fresh URL navigation to
+// /letter/create?occasion=<one-of-these> redirects to the OccasionSelector.
+// Existing drafts saved with these occasion values continue to hydrate
+// normally — the redirect is gated on draft absence (see shouldRedirectAway).
+const REMOVED_OCCASIONS = new Set<string>(['birthday', 'apology', 'thank-you']);
+
 export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   const [error, setError] = useState<string | null>(null);
   
@@ -98,6 +104,38 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   const [hydrationDeferred, setHydrationDeferred] = useState(
     initialDecision.mode === 'show-modal',
   );
+
+  // PR #23 — V1 narrowing: redirect fresh navigation to a removed-occasion
+  // URL away from PreparationForm and onto the OccasionSelector.
+  // Decided synchronously at mount so render returns null instead of
+  // briefly flashing the form before the redirect lands.
+  // Edge cases this protects against:
+  //   - Old drafts with occasion='birthday' resume normally (gated on
+  //     initialDecision.mode === 'empty' so a meaningful draft is never
+  //     yanked out from under a returning user).
+  //   - Redirect loops: replaceState (not pushState) means Back doesn't
+  //     return to /letter/create?occasion=birthday and re-fire.
+  //   - Hydration race: decision is sync-from-URL + sync-from-localStorage;
+  //     no async dependencies. Fires once.
+  const urlOccasionParam = useMemo(
+    () => (typeof window === 'undefined'
+      ? null
+      : new URLSearchParams(window.location.search).get('occasion')),
+    [],
+  );
+  const shouldRedirectAway = useMemo(() => {
+    if (!urlOccasionParam || !REMOVED_OCCASIONS.has(urlOccasionParam)) return false;
+    // Resume case: don't yank a returning user away from their own draft.
+    if (initialDecision.mode !== 'empty') return false;
+    return true;
+  }, [urlOccasionParam, initialDecision.mode]);
+  useEffect(() => {
+    if (!shouldRedirectAway) return;
+    // replaceState matches the codebase SPA pattern (OccasionSelector.go)
+    // and avoids adding /letter/create?occasion=birthday to the back-stack.
+    window.history.replaceState({}, '', '/create');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, [shouldRedirectAway]);
 
   const { step, data, updateData, next, back, resetPreparationState } = usePreparationState(
     DEFAULT_COUPONS,
@@ -152,11 +190,15 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
     }, 300);
   };
 
-  // Read occasion from URL parameter and pre-fill on mount
+  // Read occasion from URL parameter and pre-fill on mount.
+  // PR #23 — Skipped when shouldRedirectAway is true; the redirect effect
+  // above swaps routes to the OccasionSelector and this prefill becomes
+  // moot (the form unmounts immediately).
   useEffect(() => {
+    if (shouldRedirectAway) return;
     const urlParams = new URLSearchParams(window.location.search);
     const occasionParam = urlParams.get('occasion') as Occasion | null;
-    
+
     if (occasionParam) {
       const occasionConfig = CORE_OCCASIONS.find(o => o.id === occasionParam);
       updateData({
@@ -164,7 +206,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
         relationshipIntent: occasionConfig ? occasionConfig.defaultTone : data.relationshipIntent,
       });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shouldRedirectAway]); // eslint-disable-line react-hooks/exhaustive-deps
   
   const media = useMediaUploads({
     sessionId: data.sessionId,
@@ -328,6 +370,11 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
     }
   };
 
+  // PR #23 — When redirecting a fresh removed-occasion URL, render nothing
+  // so the OccasionSelector mount is the only visible state. Eliminates the
+  // form-skeleton flash that an unguarded effect-based redirect would cause.
+  if (shouldRedirectAway) return null;
+
   return (
     <>
       {showModal && initialDecision.mode === 'show-modal' && (
@@ -389,7 +436,7 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
                   <div className="space-y-4 group">
                     <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Recipient's Name</label>
-                    <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. My Wife" value={data.recipientName} onChange={e => updateData({ recipientName: e.target.value })} required />
+                    <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. My Wife / Boyfriend / Partner" value={data.recipientName} onChange={e => updateData({ recipientName: e.target.value })} required />
                   </div>
                   <div className="space-y-4 group">
                     <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Your Name</label>
