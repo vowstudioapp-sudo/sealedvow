@@ -25,6 +25,19 @@ function formatDate(ms: number | null): string {
   });
 }
 
+// V1 occasion display labels. Unknown ids fall back to the raw string so
+// historical letters with removed occasions (birthday/apology/thank-you)
+// still render legibly without forcing a data migration.
+const OCCASION_DISPLAY_LABELS: Record<string, string> = {
+  'anniversary': 'Anniversary',
+  'just-because': 'Unsaid',
+  'eid': 'Eid',
+};
+
+function displayOccasion(occasion: string): string {
+  return OCCASION_DISPLAY_LABELS[occasion] || occasion;
+}
+
 export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }) => {
   const [letters, setLetters] = useState<Letter[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +111,7 @@ export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }
                 <div className="lp-letter-item__main">
                   <div className="lp-letter-item__row">
                     <span className="lp-letter-item__recipient">{letter.recipientName}</span>
-                    <span className="lp-letter-item__occasion">{letter.occasion}</span>
+                    <span className="lp-letter-item__occasion">{displayOccasion(letter.occasion)}</span>
                   </div>
                   <div className="lp-letter-item__meta">
                     <span className="lp-letter-item__date">{formatDate(letter.createdAt)}</span>

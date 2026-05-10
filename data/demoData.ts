@@ -120,55 +120,47 @@ Noor`,
   },
 
   // ═══════════════════════════════════════════════════════════
-  // 3. FRIENDSHIP — Ajmal → Yash
+  // 3. UNSAID — Rohan → Diya
+  // PR #23: replaces the prior friendship fixture (Ajmal → Yash). The Unsaid
+  // register is restrained-intimacy — small noticings, observational voice,
+  // no big declarations. See V1 narrowing doctrine 2026-05-09.
   // ═══════════════════════════════════════════════════════════
   justbecause: {
-    senderName: 'Ajmal',
-    recipientName: 'Yash',
+    senderName: 'Rohan',
+    recipientName: 'Diya',
     occasion: 'just-because',
-    theme: 'midnight',
+    theme: 'velvet',
     writingMode: 'assisted',
-    timeShared: '7 years of chaos',
-    relationshipIntent: 'The one person who never needed a reason to show up.',
-    sharedMoment: 'When you drove 4 hours at 2am because I called and said nothing — you just knew.',
-    myth: 'Seven years. One phone call that said everything without a word.',
-    userImageUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80',
+    timeShared: '8 months',
+    relationshipIntent: 'Eight months of small noticings, finally written down.',
+    sharedMoment: 'The way you hum three notes when you\'re making tea — the same shape every time, and you don\'t know I\'ve noticed.',
+    myth: 'Eight months. One small sound.',
+    userImageUrl: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800&q=80',
     memoryBoard: [
-      { url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=600&q=80', caption: 'The road trip that almost killed us but made us brothers', angle: -6, xOffset: -25, yOffset: 20 },
-      { url: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=600&q=80', caption: 'Celebrating nothing. Our specialty.', angle: 7, xOffset: 40, yOffset: -15 },
-      { url: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600&q=80', caption: 'The startup that failed but the friendship didn\'t', angle: -4, xOffset: -40, yOffset: 35 },
-      { url: 'https://images.unsplash.com/photo-1543807535-eceef0bc6599?w=600&q=80', caption: '3am conversations that fixed nothing and everything', angle: 11, xOffset: 30, yOffset: -35 },
-      { url: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=600&q=80', caption: 'The only person whose bad ideas I still say yes to', angle: -9, xOffset: -5, yOffset: 45 },
+      { url: 'https://images.unsplash.com/photo-1543807535-eceef0bc6599?w=600&q=80', caption: 'The morning I noticed..', angle: -5, xOffset: -20, yOffset: 15 },
+      { url: 'https://images.unsplash.com/photo-1518398046578-8cca57782e17?w=600&q=80', caption: 'Two cups before either of us spoke..', angle: 6, xOffset: 35, yOffset: -10 },
+      { url: 'https://images.unsplash.com/photo-1484723091739-30a097e8f929?w=600&q=80', caption: 'Three notes, same shape..', angle: -3, xOffset: -35, yOffset: 30 },
+      { url: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=600&q=80', caption: 'She doesn\'t know I took this one..', angle: 8, xOffset: 25, yOffset: -25 },
     ],
-    finalLetter: `Yash,
+    finalLetter: `Diya,
 
-I don't write letters. You know that. But some things should exist outside of WhatsApp forwards and Instagram stories.
+I keep thinking about something and never saying it. You hum when you're making tea — not full songs, just three or four notes, the same shape every time. I noticed it the second morning I stayed over and I haven't told you. Eight months on, you still do it, and I still don't know what the song is.
 
-You're the only person who's seen me break down and didn't try to fix it. You just sat there. In the car. At 2am. Four hours from your house. Because I called, said nothing, and you drove anyway.
+I don't know why I'm telling you now. Only that I'd miss it if it stopped. That's all.
 
-That's not friendship. That's something they don't have a word for.
-
-We've built companies that failed, eaten meals we couldn't afford, laughed at things that weren't funny to anyone else. You've never once made me feel like I owed you something for being there.
-
-I owe you anyway. Not money. Not favors. Just this: the acknowledgment that my life is better because you're in it. Louder, messier, more honest.
-
-You're not my brother by blood. You're my brother by every choice that matters.
-
-No occasion. Just overdue honesty.
-
-— Ajmal`,
-    musicType: 'youtube',
-    musicUrl: 'https://www.youtube.com/watch?v=RBumgq5yVrA',
+— Rohan`,
+    musicType: 'preset',
+    musicUrl: 'https://archive.org/download/gymnopedie-no-1-by-kevin-macleod/Gymnopedie_No_1.mp3',
     coupons: [
-      { id: 'c1', title: 'One Business Idea I\'ll Actually Listen To', description: 'Full attention. No eye-rolling. 30 whole minutes.', icon: '💡', isOpen: false },
-      { id: 'c2', title: 'Your Next Trip — I\'m In', description: 'Wherever. Whenever. No excuses this time.', icon: '✈️', isOpen: false },
-      { id: 'c3', title: 'One Honest Conversation', description: 'About the things we keep dodging. No jokes. Just real.', icon: '🤝', isOpen: false },
+      { id: 'c1', title: 'Your Tea, Made Right', description: 'I\'ll learn how you take it. Properly. By next month.', icon: '☕', isOpen: false },
+      { id: 'c2', title: 'A Walk, No Plan', description: 'Same route. Whatever evening. No phone, no errands.', icon: '🚶', isOpen: false },
+      { id: 'c3', title: 'The Song You Hum', description: 'I\'ll find out what it is. And I\'ll learn it.', icon: '🎵', isOpen: false },
     ],
     hasGift: true,
-    giftType: 'spectacle',
-    giftTitle: 'Two Tickets — That Marvel Premiere',
-    giftNote: 'You\'ve been talking about this for three months. Shut up and go.',
-    giftLink: 'https://in.bookmyshow.com/explore/movies-now-showing',
+    giftType: 'treasure',
+    giftTitle: 'The Tea You\'re Always Running Out Of',
+    giftNote: 'I picked up two boxes. So you don\'t notice when one ends.',
+    giftLink: 'https://www.amazon.in/s?k=loose+leaf+tea',
   },
 
   // ═══════════════════════════════════════════════════════════
