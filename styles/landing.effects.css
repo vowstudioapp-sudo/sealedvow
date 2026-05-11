@@ -993,12 +993,14 @@
   letter-spacing: 0.02em;
 }
 
-/* ── Polaroid scatter positions (desktop) ── */
-.lp-polaroid--1 { top: 30px; left:  4%; transform: rotate(-8deg); }
-.lp-polaroid--2 { top:  0;   left: 24%; transform: rotate( 4deg); }
-.lp-polaroid--3 { top: 50px; left: 44%; transform: rotate(-3deg); }
-.lp-polaroid--4 { top: 10px; left: 64%; transform: rotate( 7deg); }
-.lp-polaroid--5 { top: 60px; left: 84%; transform: rotate(-5deg); }
+/* ── Polaroid scatter positions (desktop) ──
+   PR-37: rotation now stored in --rot so the bespoke settle animation's
+   `to` keyframe can interpolate to each polaroid's assigned angle. */
+.lp-polaroid--1 { --rot: -8deg; top: 30px; left:  4%; transform: rotate(var(--rot)); }
+.lp-polaroid--2 { --rot:  4deg; top:  0;   left: 24%; transform: rotate(var(--rot)); }
+.lp-polaroid--3 { --rot: -3deg; top: 50px; left: 44%; transform: rotate(var(--rot)); }
+.lp-polaroid--4 { --rot:  7deg; top: 10px; left: 64%; transform: rotate(var(--rot)); }
+.lp-polaroid--5 { --rot: -5deg; top: 60px; left: 84%; transform: rotate(var(--rot)); }
 
 /* ── Polaroid photo content — abstract gradient moods (no external images) ── */
 .lp-polaroid--1 .lp-polaroid__photo {
@@ -1089,12 +1091,13 @@
     height: 100px;
   }
 
-  /* Mobile scatter — overlapping, varied rotation, intentional placement */
-  .lp-polaroid--1 { top:   0;   left:  2%; transform: rotate(-8deg); }
-  .lp-polaroid--2 { top:  25px; left: 45%; transform: rotate( 5deg); }
-  .lp-polaroid--3 { top: 105px; left:  5%; transform: rotate(-4deg); }
-  .lp-polaroid--4 { top: 125px; left: 48%; transform: rotate( 7deg); }
-  .lp-polaroid--5 { top: 210px; left: 22%; transform: rotate(-3deg); }
+  /* Mobile scatter — overlapping, varied rotation, intentional placement.
+     PR-37: rotation via --rot (overrides the desktop --rot per polaroid). */
+  .lp-polaroid--1 { --rot: -8deg; top:   0;   left:  2%; transform: rotate(var(--rot)); }
+  .lp-polaroid--2 { --rot:  5deg; top:  25px; left: 45%; transform: rotate(var(--rot)); }
+  .lp-polaroid--3 { --rot: -4deg; top: 105px; left:  5%; transform: rotate(var(--rot)); }
+  .lp-polaroid--4 { --rot:  7deg; top: 125px; left: 48%; transform: rotate(var(--rot)); }
+  .lp-polaroid--5 { --rot: -3deg; top: 210px; left: 22%; transform: rotate(var(--rot)); }
 }
 
 @media (max-width: 400px) {
@@ -1108,11 +1111,64 @@
     height: 90px;
   }
 
-  .lp-polaroid--1 { top:   0;   left:  0;   transform: rotate(-8deg); }
-  .lp-polaroid--2 { top:  20px; left: 48%;  transform: rotate( 5deg); }
-  .lp-polaroid--3 { top:  90px; left:  5%;  transform: rotate(-4deg); }
-  .lp-polaroid--4 { top: 110px; left: 50%;  transform: rotate( 7deg); }
-  .lp-polaroid--5 { top: 185px; left: 22%;  transform: rotate(-3deg); }
+  /* Same rotations as the 900px breakpoint; just tighter scatter positions. */
+  .lp-polaroid--1 { top:   0;   left:  0;   transform: rotate(var(--rot)); }
+  .lp-polaroid--2 { top:  20px; left: 48%;  transform: rotate(var(--rot)); }
+  .lp-polaroid--3 { top:  90px; left:  5%;  transform: rotate(var(--rot)); }
+  .lp-polaroid--4 { top: 110px; left: 50%;  transform: rotate(var(--rot)); }
+  .lp-polaroid--5 { top: 185px; left: 22%;  transform: rotate(var(--rot)); }
+}
+
+/* ══════════════════════════════════
+   POLAROID BESPOKE SETTLE — PR-37
+   The ONLY body-section animation in the LP. Polaroids enter
+   discovered, not delivered: each settles into its assigned
+   rotation with a small stagger. Semantic motion — not decorative.
+   Heading + subtitle reveal via the parent .lp-fade; polaroids
+   below use this animation instead.
+══════════════════════════════════ */
+
+/* Pre-reveal: polaroids are invisible, flat, slightly scaled down.
+   Once .lp-memory-board__inner gains the IntersectionObserver's
+   `.visible` class, the polaroidSettle animation runs with stagger. */
+.lp-memory-board__inner:not(.visible) .lp-polaroid {
+  opacity: 0;
+  transform: rotate(0deg) scale(0.96);
+}
+
+.lp-memory-board__inner.visible .lp-polaroid {
+  animation: polaroidSettle 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.lp-memory-board__inner.visible .lp-polaroid--1 { animation-delay:   0ms; }
+.lp-memory-board__inner.visible .lp-polaroid--2 { animation-delay:  90ms; }
+.lp-memory-board__inner.visible .lp-polaroid--3 { animation-delay: 180ms; }
+.lp-memory-board__inner.visible .lp-polaroid--4 { animation-delay: 270ms; }
+.lp-memory-board__inner.visible .lp-polaroid--5 { animation-delay: 360ms; }
+
+@keyframes polaroidSettle {
+  from {
+    opacity: 0;
+    transform: rotate(0deg) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(var(--rot, 0deg)) scale(1);
+  }
+}
+
+/* Reduced-motion fallback — polaroids appear immediately at final state
+   without animation. The global prefers-reduced-motion rule already
+   neutralizes animations and transitions; this override ensures the
+   :not(.visible) initial state doesn't leave them permanently invisible
+   for users who never trigger the IntersectionObserver. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-memory-board__inner:not(.visible) .lp-polaroid,
+  .lp-memory-board__inner.visible .lp-polaroid {
+    opacity: 1;
+    transform: rotate(var(--rot, 0deg));
+    animation: none;
+  }
 }
 
 /* ══════════════════════════════════
@@ -2060,10 +2116,18 @@
 /* ══════════════════════════════════
    FADE-IN ON SCROLL
 ══════════════════════════════════ */
+/* PR-37: Tier 2 motion — softened from the previous 24px / 0.9s
+   "template fade-up" into a quieter settle. Sections now arrive
+   into place rather than visibly animating upward. Editorial-stillness
+   sections (§3, §2, slow, §4) had this class removed entirely in the
+   JSX; the remaining .lp-fade users are composite sections (cards,
+   memory-board heading, §5, founder note). */
 .lp-fade {
   opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.9s ease, transform 0.9s ease;
+  transform: translateY(10px);
+  transition:
+    opacity 0.45s cubic-bezier(0.2, 0.9, 0.3, 1),
+    transform 0.45s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 .lp-fade.visible {
   opacity: 1;
@@ -2139,7 +2203,13 @@
     flex-direction: column;
     width: 100%;
     align-items: center;
-    /* gap: 18px inherited from base */
+    /* PR-37: side breathing room — overrides base clamp(10,2vw,24px)
+       so cards no longer sit ~7px from the viewport edge on iPhone-sized
+       widths. Card max-width 340px stays; this just gives the rail
+       container ~28px each side so cards never reach their ceiling on
+       narrow viewports and feel like editorial objects, not full-bleed
+       widgets. gap: 18px inherited from base. */
+    padding: 4px 28px 0;
   }
 
   .lp-rail__mask {

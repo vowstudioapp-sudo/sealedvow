@@ -269,7 +269,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           SECTION 3 — THE MAGIC
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s3">
-        <div className="lp-s3__block lp-fade">
+        {/* PR-37: Tier 1 editorial stillness — no entrance reveal */}
+        <div className="lp-s3__block">
           <span className="lp-s3__connector">A letter written</span>
           <span className="lp-s3__statement">for one person.</span>
           <span className="lp-s3__connector">Sealed until</span>
@@ -284,7 +285,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           SECTION 2 — PROBLEM
       ══════════════════════════════════════ */}
       <section className="lp-section">
-        <div className="lp-fade">
+        {/* PR-37: Tier 1 editorial stillness — no entrance reveal */}
+        <div>
           <p className="lp-s2__headline">Write them properly.</p>
         </div>
       </section>
@@ -296,7 +298,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           "but how long does that take?")
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--slow">
-        <div className="lp-fade lp-slow">
+        {/* PR-37: Tier 1 editorial stillness — no entrance reveal */}
+        <div className="lp-slow">
           <p className="lp-slow__line">Some letters take ten minutes. Others take an hour.</p>
           <p className="lp-slow__muted">The things people carry for a long time are rarely written all at once.</p>
         </div>
@@ -307,7 +310,8 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           SECTION 4 — PRIVACY
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s4">
-        <div className="lp-fade">
+        {/* PR-37: Tier 1 editorial stillness — no entrance reveal */}
+        <div>
           <p className="lp-s4__main">Private by design.</p>
           <div className="lp-s4__list">
             <p className="lp-s4__item">Nothing you write is public.</p>
