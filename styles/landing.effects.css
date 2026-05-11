@@ -2242,7 +2242,26 @@
   }
 
   .lp-hero { padding: 0 24px; }
-  .lp-section { padding: 100px 24px; }
+
+  /* PR-39: editorial rhythm compression on mobile.
+     Drop the inherited 90vh min-height floor — after PR-37 removed
+     entrance fade-up from §3, §2, §slow, §4, the floor produced
+     200-440px of dead vertical vacuum per editorial section.
+     Editorial sections now compress to 72px padding (Tier "compressed
+     editorial"); §5, founder, memory board keep 100px (Tier "medium /
+     large breathing"). Asymmetric on purpose — not a normalization. */
+  .lp-section {
+    padding: 72px 24px;
+    min-height: auto;
+  }
+
+  .lp-section--s5,
+  .lp-section--founder,
+  .lp-memory-board {
+    padding-top: 100px;
+    padding-bottom: 100px;
+  }
+
   .lp-demo { padding: 100px 24px; }
   .lp-footer { padding: 48px 24px 0; }
   .lp-footer__columns { grid-template-columns: 1fr 1fr; gap: 36px; }
