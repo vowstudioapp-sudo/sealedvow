@@ -1676,6 +1676,20 @@
   border-bottom: 1px solid rgba(242,232,213,0.1);
 }
 
+/* PR-44: optical-centering correction. The grid cells (.lp-footer__col)
+   are wider than their content, and content was inheriting default
+   left text-align. That left the rightmost column's text ending ~250px
+   before the divider's right edge — perceived as right-side detachment.
+   Centering the content inside each column resolves the optical
+   asymmetry without changing grid widths, container max-width, or any
+   other PR-43 architecture. */
+.lp-footer__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
 .lp-footer__col-heading {
   font-size: 9px;
   letter-spacing: 0.28em;
@@ -1693,6 +1707,7 @@
   display: flex;
   flex-direction: column;
   gap: 11px;
+  align-items: center;
 }
 
 .lp-footer__col ul li a,
