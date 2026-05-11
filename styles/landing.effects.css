@@ -1663,9 +1663,15 @@
   display: grid;
   /* PR-40: 4 → 3 columns after Stay-in-the-loop block removed.
      Sealed Vow column retains slight emphasis (1.2fr); Policy +
-     Need Help equal-weight (1fr each). */
+     Need Help equal-weight (1fr each).
+     PR-43: cap content width at 1200px (matches .lp-founder's editorial
+     max-width) and center as a group — fixes the wide-viewport drift
+     where columns scattered across the full footer width with empty
+     trailing space inside each column. */
   grid-template-columns: 1.2fr 1fr 1fr;
   gap: 48px;
+  max-width: 1200px;
+  margin: 0 auto;
   padding-bottom: 56px;
   border-bottom: 1px solid rgba(242,232,213,0.1);
 }
@@ -1720,6 +1726,12 @@
   justify-content: space-between;
   padding: 24px 0 32px;
   gap: 24px;
+  /* PR-43: match the columns row's 1200px centered envelope so the
+     bottom strip (socials / copyright / tagline) aligns with the
+     columns above on wide viewports — no more full-width spread
+     beneath a centered row. */
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .lp-footer__socials {
