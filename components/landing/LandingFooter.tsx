@@ -52,7 +52,18 @@ const LandingFooter: React.FC<Props> = ({ onShowPrivacy, onShowTerms, onShowHelp
           <p className="lp-footer__col-heading">Need Help?</p>
           <ul>
             <li><button onClick={onShowHelp}>Contact Us</button></li>
-            <li><a href="#">FAQs</a></li>
+            <li>
+              <a
+                href="/faq"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.history.pushState({}, '', '/faq');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
+              >
+                FAQs
+              </a>
+            </li>
           </ul>
         </div>
         {/* PR-40: "Stay in the loop" newsletter column removed —

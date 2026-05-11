@@ -3,15 +3,60 @@ import { PrivacyModal } from './PrivacyModal';
 import { TermsModal } from './TermsModal';
 import { HelpModal } from './HelpModal';
 
-const PAGE_TITLE = 'About — Sealed Vow';
-const PAGE_DESCRIPTION = "A short note on what Sealed Vow is, and what it isn't.";
+const PAGE_TITLE = 'FAQ — Sealed Vow';
+const PAGE_DESCRIPTION = 'A few quiet answers about Sealed Vow — what it is, how it works, and why it stays private.';
 
 const navigateTo = (path: string) => {
   window.history.pushState({}, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
 };
 
-export const AboutPage: React.FC = () => {
+type FaqEntry = { q: string; a: string };
+
+const FAQS: FaqEntry[] = [
+  {
+    q: 'What is Sealed Vow?',
+    a: 'A private space for writing letters that are meant to be felt, not rushed.',
+  },
+  {
+    q: 'Who can read the letters?',
+    a: 'Only the person you choose. Your letters are never public.',
+  },
+  {
+    q: 'Is Sealed Vow a messaging app?',
+    a: 'No. It’s built for slower, more intentional communication — the kind people usually leave unsaid.',
+  },
+  {
+    q: 'Do both people need an account?',
+    a: 'Yes. Both people need a Sealed Vow account to send and receive letters securely.',
+  },
+  {
+    q: 'Can I send photos with a letter?',
+    a: 'Yes. Some memories are easier to feel when they’re seen.',
+  },
+  {
+    q: 'Can I edit a letter before it’s opened?',
+    a: 'Yes. Until it’s opened, you can still make changes to what you wrote.',
+  },
+  {
+    q: 'Why are letters locked until opened?',
+    a: 'Because anticipation is part of the experience. Some words deserve a moment of their own.',
+  },
+  {
+    q: 'Is Sealed Vow private?',
+    a: 'Yes. Your letters stay between you and the person they’re meant for.',
+  },
+  {
+    q: 'Why does Sealed Vow feel different from regular messaging apps?',
+    a: 'Because it’s built for slower, more intentional moments — not constant conversation.',
+  },
+  {
+    q: 'Why write letters digitally instead of texting?',
+    a: 'Because some feelings deserve more care than a disappearing message bubble.',
+  },
+];
+
+export const FAQPage: React.FC = () => {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -77,52 +122,30 @@ export const AboutPage: React.FC = () => {
       </nav>
 
       {/* ══════════════════════════════════════
-          ARTICLE
+          ARTICLE — editorial Q&A (no accordions)
       ══════════════════════════════════════ */}
       <main className="lp-about__main">
         <article className="lp-about__article">
-          <h1 className="lp-about__title">About Sealed Vow</h1>
-          <p className="lp-about__eyebrow">A short note on what this is, and what it isn’t.</p>
+          <p className="lp-about__eyebrow" style={{ marginBottom: 14 }}>Questions people ask</p>
+          <h1 className="lp-about__title" style={{ marginBottom: 24 }}>A few things worth knowing.</h1>
 
-          <hr className="lp-about__sep" aria-hidden="true" />
+          <p className="lp-faq-intro">
+            Sealed Vow is intentionally slower and quieter than most apps. These answers explain the experience, the privacy, and the thinking behind it.
+          </p>
 
-          <section className="lp-about__section">
-            <p className="lp-about__p">Sealed Vow is a place to write a letter to one specific person, seal it carefully, and share it through a link only they can open.</p>
-            <p className="lp-about__p">That is all it does.</p>
-            <p className="lp-about__p">There is no feed. No followers. No streaks. No public profiles. No notifications urging you to send more. No way for anyone besides the person you choose to ever see what you wrote.</p>
-            <p className="lp-about__p">If you’ve spent the last decade in apps built around engagement metrics, Sealed Vow will feel quiet by comparison. The quietness is the design.</p>
-          </section>
-
-          <hr className="lp-about__sep" aria-hidden="true" />
-
-          <section className="lp-about__section">
-            <h2 className="lp-about__h2">What it’s for</h2>
-            <p className="lp-about__p">The kind of message you’d handwrite if anyone still handwrote letters.</p>
-            <p className="lp-about__p">An anniversary that deserves more than a forwarded card. The words you’ve been carrying but couldn’t say. The letter to the version of someone you’ve loved for ten years. The thing you’ve been wanting to write for months but couldn’t fit anywhere a chat app would put it.</p>
-            <p className="lp-about__p">The product is restrained, on purpose. It does one thing — make a beautiful, private, deliberate letter — and refuses to do anything else.</p>
-          </section>
-
-          <hr className="lp-about__sep" aria-hidden="true" />
-
-          <section className="lp-about__section">
-            <h2 className="lp-about__h2">Who built it</h2>
-            <p className="lp-about__p">Ajmal Fahad.</p>
-            <p className="lp-about__p">Sealed Vow began as one letter — an anniversary letter, written for one specific person, that didn’t fit comfortably into any existing messaging app. The product grew around the thing that letter needed to become.</p>
-            <p className="lp-about__p">It is built slowly, on purpose. Restraint is the editorial approach we hold ourselves to.</p>
-          </section>
-
-          <hr className="lp-about__sep" aria-hidden="true" />
-
-          <section className="lp-about__section">
-            <h2 className="lp-about__h2">Getting in touch</h2>
-            <p className="lp-about__p">If something here moves you, the best response is to write the letter you’ve been holding.</p>
-            <p className="lp-about__p">If something doesn’t work, write to us anyway — every message is read.</p>
-          </section>
+          <div className="lp-faq-list">
+            {FAQS.map((entry, i) => (
+              <section className="lp-faq-item" key={i}>
+                <h2 className="lp-faq-item__q">{entry.q}</h2>
+                <p className="lp-faq-item__a">{entry.a}</p>
+              </section>
+            ))}
+          </div>
         </article>
       </main>
 
       {/* ══════════════════════════════════════
-          FOOTER — same as LP
+          FOOTER — same as LP (PR-40 layout)
       ══════════════════════════════════════ */}
       <footer className="lp-footer">
         <div className="lp-footer__columns">
@@ -131,8 +154,6 @@ export const AboutPage: React.FC = () => {
             <ul>
               <li><a href="/about" onClick={(e) => { e.preventDefault(); navigateTo('/about'); }}>About Us</a></li>
               <li><a href="/how-it-works" onClick={(e) => { e.preventDefault(); navigateTo('/how-it-works'); }}>How It Works</a></li>
-              {/* PR-40: duplicate "Contact" removed — Contact Us
-                  already lives under the Need Help? column. */}
             </ul>
           </div>
           <div className="lp-footer__col">
@@ -149,8 +170,6 @@ export const AboutPage: React.FC = () => {
               <li><a href="/faq" onClick={(e) => { e.preventDefault(); navigateTo('/faq'); }}>FAQs</a></li>
             </ul>
           </div>
-          {/* PR-40: "Stay in the loop" newsletter column removed —
-              the footer ends quietly, not with email capture. */}
         </div>
         <div className="lp-footer__bottom">
           <div className="lp-footer__socials">
@@ -172,4 +191,4 @@ export const AboutPage: React.FC = () => {
   );
 };
 
-export default AboutPage;
+export default FAQPage;

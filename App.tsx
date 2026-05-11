@@ -65,6 +65,10 @@ const HowItWorksPage = lazy(() =>
   import('./components/HowItWorksPage.tsx').then(m => ({ default: m.HowItWorksPage }))
 );
 
+const FAQPage = lazy(() =>
+  import('./components/FAQPage.tsx').then(m => ({ default: m.FAQPage }))
+);
+
 const EidPreparationForm = lazy(() =>
   import('./components/EidPreparationForm.tsx').then(m => ({ default: m.default }))
 );
@@ -1272,6 +1276,10 @@ const App: React.FC = () => {
 
   if (routeType === 'HOW_IT_WORKS') {
     return <Suspense fallback={null}><HowItWorksPage /></Suspense>;
+  }
+
+  if (routeType === 'FAQ') {
+    return <Suspense fallback={null}><FAQPage /></Suspense>;
   }
 
   const handleEnterStudio = () => {

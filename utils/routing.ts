@@ -16,6 +16,7 @@ export type RouteType =
   | 'LETTER_CREATE'
   | 'ABOUT'
   | 'HOW_IT_WORKS'
+  | 'FAQ'
   | 'DEMO'
   | 'API'
   | 'RECEIVER'
@@ -31,6 +32,7 @@ export function getRouteType(): RouteType {
   if (path === '/letter/create')                 return 'LETTER_CREATE';
   if (path === '/about')                         return 'ABOUT';
   if (path === '/how-it-works')                  return 'HOW_IT_WORKS';
+  if (path === '/faq')                           return 'FAQ';
   if (path === '/eid')                           return 'EID_SELECTOR';
   if (/^\/demo\/eid\/[a-z-]+$/.test(path))       return 'DEMO_EID';
   if (/^\/eid\/[a-z-]+$/.test(path))             return 'EID_PREPARATION';
