@@ -230,6 +230,42 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
 
       {/* ══════════════════════════════════════
+          MEMORY BOARD — visual-variety hypothesis test
+          (PR-35: polaroid scatter between Cards and §3)
+      ══════════════════════════════════════ */}
+      <section className="lp-section lp-memory-board">
+        <div className="lp-fade lp-memory-board__inner">
+          <p className="lp-memory-board__eyebrow">YOUR MOMENTS, FRAMED</p>
+          <h2 className="lp-memory-board__title">A board of things you remember.</h2>
+          <p className="lp-memory-board__subtitle">They scatter like polaroids on a quiet wall.</p>
+
+          <div className="lp-polaroid-stage">
+            <div className="lp-polaroid lp-polaroid--1">
+              <div className="lp-polaroid__photo" aria-hidden="true" />
+              <p className="lp-polaroid__caption">that summer in goa</p>
+            </div>
+            <div className="lp-polaroid lp-polaroid--2">
+              <div className="lp-polaroid__photo" aria-hidden="true" />
+              <p className="lp-polaroid__caption">your birthday, 2024</p>
+            </div>
+            <div className="lp-polaroid lp-polaroid--3">
+              <div className="lp-polaroid__photo" aria-hidden="true" />
+              <p className="lp-polaroid__caption">the morning hike</p>
+            </div>
+            <div className="lp-polaroid lp-polaroid--4">
+              <div className="lp-polaroid__photo" aria-hidden="true" />
+              <p className="lp-polaroid__caption">that quiet night</p>
+            </div>
+            <div className="lp-polaroid lp-polaroid--5">
+              <div className="lp-polaroid__photo" aria-hidden="true" />
+              <p className="lp-polaroid__caption">us, then</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
           SECTION 3 — THE MAGIC
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s3">
