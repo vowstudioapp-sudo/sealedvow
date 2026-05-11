@@ -53,7 +53,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {/* Content */}
         <div className="p-8 md:p-12 max-h-[70vh] overflow-y-auto custom-scrollbar">
             
-            <p className="text-[#888] text-xs mb-10 border-l border-[#D4AF37]/30 pl-4">
+            <p className="text-[#BBB] text-sm leading-relaxed mb-10 border-l border-[#D4AF37]/30 pl-4">
               "By entering the VOW Private Expression Studio, you agree to the following terms. These terms exist to protect your privacy, the integrity of the experience, and the lawful operation of the studio."
             </p>
 
@@ -61,7 +61,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 1 */}
                 <div className="group">
                     <h3 className="text-[#D4AF37] text-[9px] uppercase tracking-[0.2em] font-bold mb-2">01. Acceptance of These Terms</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         By accessing or using VOW (“the Service”), you agree to these Terms. If you do not agree, please do not use the Service.
                     </p>
                 </div>
@@ -69,7 +69,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 2 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">02. What VOW Is (and Is Not)</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         VOW is a private expression studio, a courier of private messages, and a sealed delivery experience. <br/>
                         VOW is <strong className="text-white">not</strong> a social network, a messaging app, a publishing platform, or a public archive.
                     </p>
@@ -78,10 +78,10 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 3 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">03. Your Content & Ownership</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed mb-2">
+                    <p className="text-[#BBB] text-sm leading-relaxed mb-2">
                         You own everything you create on VOW. Your words, images, audio, and memories belong to you. We claim no ownership.
                     </p>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         You grant VOW a temporary, limited license to store, encrypt, and deliver your content only for the purpose of providing the Service. Once delivery is complete (or deletion is requested), that license ends.
                     </p>
                 </div>
@@ -89,7 +89,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 4 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">04. Responsibility for Content</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         You are responsible for what you choose to create and send. You agree not to use VOW to harass, threaten, share illegal content, violate privacy, or impersonate others. VOW does not review content proactively but may act if legally required.
                     </p>
                 </div>
@@ -97,7 +97,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 5 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">05. AI-Assisted Writing</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         If you use writing assistance, AI suggestions are provided as guidance only. You remain fully responsible for the final message. AI is a tool — not an author, advisor, or mediator.
                     </p>
                 </div>
@@ -105,7 +105,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 6 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">06. Scheduled & Locked Deliveries</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         Some messages may be scheduled or temporarily sealed. You acknowledge that delivery timing depends on system availability, minor delays may occur, and once a sealed message is unlocked, it cannot be undone.
                     </p>
                 </div>
@@ -113,7 +113,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 7 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">07. Payments & Refunds</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         Payments are processed via trusted third-party providers; VOW does not store payment details. Due to the personalized nature of the Service, payments are generally non-refundable once a message is generated. Exceptions may be considered for technical failures.
                     </p>
                 </div>
@@ -121,7 +121,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 8 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">08. Availability & Service Changes</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         The Service is provided “as is.” Temporary downtime may occur for maintenance. VOW may update, modify, or discontinue features to improve the experience.
                     </p>
                 </div>
@@ -129,7 +129,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 9 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">09. Limitation of Liability</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         VOW is not responsible for emotional outcomes, recipient reactions, relationship consequences, or losses caused by misuse. Our liability is limited to the amount paid for the specific use of the Service.
                     </p>
                 </div>
@@ -137,7 +137,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 10 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">10. Privacy</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         Your use of VOW is governed by our Privacy Policy, which explains how data is handled, how encryption is applied, and your rights. Privacy is integral to these Terms.
                     </p>
                 </div>
@@ -145,7 +145,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 11 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">11. Termination</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         We reserve the right to suspend access if these Terms are violated or required by law. You may stop using the Service at any time.
                     </p>
                 </div>
@@ -153,7 +153,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 12 */}
                 <div className="group">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">12. Governing Law (India)</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         These Terms are governed by the laws of India. Any disputes shall be subject to the jurisdiction of Indian courts.
                     </p>
                 </div>
@@ -161,7 +161,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Point 13 */}
                 <div className="group border-b border-white/5 pb-6">
                     <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-2">13. Contact</h3>
-                    <p className="text-[#AAA] text-xs leading-relaxed">
+                    <p className="text-[#BBB] text-sm leading-relaxed">
                         For questions about these Terms, contact <span className="text-[#D4AF37]">support@vow.studio</span>.
                     </p>
                 </div>

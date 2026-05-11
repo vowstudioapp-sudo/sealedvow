@@ -61,13 +61,13 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
                    <span className="w-1 h-1 bg-[#D4AF37] rounded-full"></span>
                    The Custody Promise
                 </h3>
-                <p className="text-[#CCC] text-sm leading-relaxed font-sans opacity-80 border-l-2 border-[#D4AF37]/20 pl-4 mb-6">
+                <p className="text-[#DDD] text-base leading-relaxed font-sans border-l-2 border-[#D4AF37]/20 pl-4 mb-6">
                    "We act as a courier, not a reader. Your message is sealed, delivered, and exists only for the intended recipient. We do not open the envelope. Privacy is not a feature here — it is the foundation."
                 </p>
-                
+
                 {/* Explicit Human Reassurance */}
                 <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded text-center">
-                    <p className="text-[#E5D0A1] text-xs font-sans">
+                    <p className="text-[#E5D0A1] text-sm font-sans">
                         "Your message is never reviewed by a human. It is delivered automatically and privately."
                     </p>
                 </div>
@@ -76,10 +76,10 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
             {/* Section 2: What Information We Handle (New) */}
             <section>
                 <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-3">What Information We Handle</h3>
-                <p className="text-[#888] text-xs leading-relaxed mb-4">
+                <p className="text-[#AAA] text-sm leading-relaxed mb-4">
                    We only handle what is necessary to deliver your experience: names of sender and recipient, your written content, optional media, and delivery preferences.
                 </p>
-                <ul className="space-y-2 text-[#AAA] text-xs">
+                <ul className="space-y-2 text-[#BBB] text-sm">
                     <li className="flex gap-3">
                          <span className="text-[#D4AF37] mt-0.5">✦</span>
                          <span>We <strong className="text-white">do not</strong> collect information for advertising, profiling, or resale.</span>
@@ -92,14 +92,14 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 <div className="bg-[#1A1A1A] p-5 rounded border border-white/5">
                    <div className="text-green-400 text-xs mb-2 font-mono">ENCRYPTION: AT_REST</div>
                    <h4 className="text-white text-sm font-bold mb-2">AES-256 Storage</h4>
-                   <p className="text-[#888] text-[10px] leading-relaxed">
+                   <p className="text-[#AAA] text-xs leading-relaxed">
                       Your letters and media are encrypted on our servers using Advanced Encryption Standard (256-bit). Even if physical drives are accessed, the data remains unreadable.
                    </p>
                 </div>
                 <div className="bg-[#1A1A1A] p-5 rounded border border-white/5">
                    <div className="text-green-400 text-xs mb-2 font-mono">ENCRYPTION: IN_TRANSIT</div>
                    <h4 className="text-white text-sm font-bold mb-2">TLS 1.3 Transport</h4>
-                   <p className="text-[#888] text-[10px] leading-relaxed">
+                   <p className="text-[#AAA] text-xs leading-relaxed">
                       From your device to our sanctuary, every byte is tunneled through Transport Layer Security 1.3, preventing any interception during delivery.
                    </p>
                 </div>
@@ -109,11 +109,11 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <section>
                 <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-3">How Writing Assistance Works</h3>
                 
-                <p className="text-[#AAA] text-xs leading-relaxed mb-6 font-sans">
+                <p className="text-[#BBB] text-sm leading-relaxed mb-6 font-sans">
                    VOW uses technology only to help you express what you already feel — then steps out of the way.
                 </p>
 
-                <ul className="space-y-4 text-[#AAA] text-xs">
+                <ul className="space-y-4 text-[#BBB] text-sm">
                     <li className="flex gap-3">
                          <span className="text-[#D4AF37] mt-0.5">✦</span>
                          <span>Your input is processed briefly to help shape the letter. Once the letter is created, that writing context is discarded. AI is used as a temporary tool, not a listener or archive.</span>
@@ -132,7 +132,7 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
             {/* Section 5: What We Do Not Do (Expanded) */}
             <section>
                 <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-3">What We Do Not Do</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[#AAA] text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[#BBB] text-sm">
                     <div className="flex gap-3">
                         <span className="text-red-400">✕</span>
                         <span>Display messages publicly or create social feeds.</span>
@@ -155,10 +155,10 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
             {/* Section 6: Storage, Retention & Rights (Merged) */}
             <section className="pt-6 border-t border-white/5">
                 <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-3">Storage, Retention & Rights</h3>
-                <p className="text-[#888] text-xs leading-relaxed mb-4">
+                <p className="text-[#AAA] text-sm leading-relaxed mb-4">
                    Messages are stored only as long as needed to deliver the experience. Minimal technical logs are retained briefly for security.
                 </p>
-                <p className="text-[#888] text-xs leading-relaxed mb-6">
+                <p className="text-[#AAA] text-sm leading-relaxed mb-6">
                    <strong className="text-[#D4AF37]">Your Rights (India):</strong> In accordance with Indian data protection laws, you have the right to access your data, request correction or deletion, withdraw consent, and request information about how your data is handled.
                 </p>
                 
