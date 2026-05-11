@@ -1318,7 +1318,7 @@
    FOOTER
 ══════════════════════════════════ */
 .lp-footer {
-  background: var(--sv-bg-deep);
+  background: #0D0610;
   border-top: 1px solid var(--sv-line-gold);
   padding: 64px 64px 0;
 }
