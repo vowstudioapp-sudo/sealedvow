@@ -255,6 +255,19 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
 
       {/* ══════════════════════════════════════
+          SLOW ON PURPOSE — editorial pause beat
+          (PR-33: time/effort beat answering §2's implicit
+          "but how long does that take?")
+      ══════════════════════════════════════ */}
+      <section className="lp-section lp-section--slow">
+        <div className="lp-fade lp-slow">
+          <p className="lp-slow__line">Some letters take ten minutes. Others take an hour.</p>
+          <p className="lp-slow__muted">The things people carry for a long time are rarely written all at once.</p>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
           SECTION 4 — PRIVACY
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s4">

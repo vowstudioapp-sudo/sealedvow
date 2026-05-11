@@ -858,6 +858,40 @@
 }
 
 /* ══════════════════════════════════
+   SLOW ON PURPOSE — editorial pause
+   (PR-33: time/effort beat between §2 and §4)
+══════════════════════════════════ */
+.lp-slow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 640px;
+}
+
+.lp-slow__line {
+  font-size: clamp(24px, 3.8vw, 46px);
+  font-style: italic;
+  font-weight: 300;
+  color: rgba(242,232,213,0.88);
+  line-height: 1.4;
+  letter-spacing: 0.025em;
+  margin: 0;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+.lp-slow__muted {
+  font-size: clamp(15px, 1.85vw, 20px);
+  font-style: italic;
+  font-weight: 300;
+  color: rgba(207,198,178,0.62);
+  line-height: 1.65;
+  letter-spacing: 0.04em;
+  margin: 32px 0 0;
+  max-width: 540px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+/* ══════════════════════════════════
    DEMO SECTION (old envelope — kept for compatibility)
 ══════════════════════════════════ */
 .lp-demo {
