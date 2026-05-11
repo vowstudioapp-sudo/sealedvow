@@ -1061,29 +1061,58 @@
   position: relative;
 }
 
-/* ── Mobile / narrow viewport: stack the polaroids ── */
+/* ── Mobile / narrow viewport: keep absolute scatter, smaller scale
+   (PR-36: replaced PR-35's flex-wrap stack with a sized scatter so
+    polaroids preserve their "wall of memories" emotional reading
+    instead of degrading to a single-column feed.) ── */
 @media (max-width: 900px) {
   .lp-memory-board__subtitle {
     margin-bottom: 56px;
   }
   .lp-polaroid-stage {
-    height: auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    justify-content: center;
+    position: relative;
+    height: 380px;
+    max-width: 340px;
+    width: 100%;
+    margin: 0 auto;
+    display: block;
   }
+
   .lp-polaroid {
-    position: static;
-    top: auto; left: auto;
-    transform: rotate(var(--r, -3deg)) !important;
+    position: absolute;
+    /* No !important transform override — per-polaroid scatter
+       transforms below carry the rotation. */
   }
-  .lp-polaroid--1 { --r: -6deg; }
-  .lp-polaroid--2 { --r:  4deg; }
-  .lp-polaroid--3 { --r: -2deg; }
-  .lp-polaroid--4 { --r:  5deg; }
-  .lp-polaroid--5 { --r: -3deg; }
-  .lp-polaroid__photo { width: 160px; height: 160px; }
+
+  .lp-polaroid__photo {
+    width: 100px;
+    height: 100px;
+  }
+
+  /* Mobile scatter — overlapping, varied rotation, intentional placement */
+  .lp-polaroid--1 { top:   0;   left:  2%; transform: rotate(-8deg); }
+  .lp-polaroid--2 { top:  25px; left: 45%; transform: rotate( 5deg); }
+  .lp-polaroid--3 { top: 105px; left:  5%; transform: rotate(-4deg); }
+  .lp-polaroid--4 { top: 125px; left: 48%; transform: rotate( 7deg); }
+  .lp-polaroid--5 { top: 210px; left: 22%; transform: rotate(-3deg); }
+}
+
+@media (max-width: 400px) {
+  .lp-polaroid-stage {
+    max-width: 300px;
+    height: 340px;
+  }
+
+  .lp-polaroid__photo {
+    width: 90px;
+    height: 90px;
+  }
+
+  .lp-polaroid--1 { top:   0;   left:  0;   transform: rotate(-8deg); }
+  .lp-polaroid--2 { top:  20px; left: 48%;  transform: rotate( 5deg); }
+  .lp-polaroid--3 { top:  90px; left:  5%;  transform: rotate(-4deg); }
+  .lp-polaroid--4 { top: 110px; left: 50%;  transform: rotate( 7deg); }
+  .lp-polaroid--5 { top: 185px; left: 22%;  transform: rotate(-3deg); }
 }
 
 /* ══════════════════════════════════
@@ -2100,11 +2129,24 @@
     letter-spacing: 0.02em;
   }
 
+  /* PR-36: cards rail converts from horizontal carousel to vertical
+     stack on mobile. The horizontal pattern was designed for the
+     pre-PR-23 5-occasion era; with 2 cards it forces a swipe-to-see
+     interaction that has no narrative purpose AND captures touch
+     gestures (touch-action: pan-x) so the page stops scrolling
+     vertically when the user's finger lands inside the rail. */
+  .lp-rail__track {
+    flex-direction: column;
+    width: 100%;
+    align-items: center;
+    /* gap: 18px inherited from base */
+  }
+
   .lp-rail__mask {
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
+    /* Mobile: no horizontal scroll. The vertical-stack track no longer
+       needs overflow-x, scroll-snap-type, -webkit-overflow-scrolling,
+       or touch-action: pan-x. Removing them retires Issue 3
+       (gesture capture making page-scroll feel sticky). */
     scrollbar-width: none;
   }
 
@@ -2123,9 +2165,12 @@
   .lp-demo-cards { padding: 80px 0 120px; }
 
   .lp-card {
+    width: 100%;
+    max-width: 340px;
     height: 280px;
     padding: 32px 24px;
     border-radius: 16px;
+    scroll-snap-align: none;
   }
 
   .lp-card::before,
