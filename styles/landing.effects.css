@@ -1353,7 +1353,7 @@
 
 .lp-footer__col ul li a,
 .lp-footer__col ul li button {
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   color: rgba(207,198,178,0.75);
   text-decoration: none;
@@ -1373,7 +1373,7 @@
 }
 
 .lp-footer__subscribe-text {
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   color: rgba(207,198,178,0.72);
   letter-spacing: 0.02em;
@@ -1454,7 +1454,7 @@
 }
 
 .lp-footer__copy {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(242,232,213,0.8);
