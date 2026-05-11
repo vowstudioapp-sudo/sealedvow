@@ -1,95 +1,42 @@
 // ============================================================================
 // /api/test-email.js — TEMPORARY Resend integration smoke-test endpoint
 //
-// Sends a single test email to a hardcoded recipient and returns a JSON
-// success/failure result. Intended for verifying the Resend pipeline only;
-// REMOVE OR GATE before production launch (no auth on this endpoint
-// beyond IP-based rate limiting).
+// Sends the letter-sealed transactional email to a hardcoded recipient
+// using OBVIOUS TEST STUBS for all dynamic fields, so preview verification
+// can never be mistaken for a real receipt.
 //
-// Usage:
-//   POST /api/test-email          → uses default hardcoded recipient
-//   POST /api/test-email          (body: {"to": "you@example.com"})
-//                                 → optional override of recipient
+// Defaults can be overridden per-request via JSON body:
+//   {
+//     "to":              "you@example.com",
+//     "senderName":      "Test Sender",
+//     "formattedAmount": "₹0.00",
+//     "paymentId":       "test_payment_id",
+//     "formattedDate":   "Test Date"
+//   }
+//
+// REMOVE OR GATE this endpoint before production launch — no auth beyond
+// IP-based rate limiting.
 // ============================================================================
 
 import { guardPost, rateLimit, getClientIP } from './lib/middleware.js';
-import { sendEmail } from '../lib/email/sendEmail.js';
+import { sendLetterSealedEmail } from '../lib/email/sendEmail.js';
 
-// Default test recipient. Override per-request via JSON body { "to": "..." }.
-// (Matches the user's email surfaced in the Claude Code project context.)
+// Default recipient. Matches the user's email surfaced in project context.
 const DEFAULT_TEST_RECIPIENT = 'ajmal.fahad@gmail.com';
 
-const TEST_SUBJECT = 'Your message has been sealed.';
-
-// ── Premium dark-editorial brand-voice email template ────────────────────────
-function buildTestHtml(recipientLabel) {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Your message has been sealed.</title>
-</head>
-<body style="margin:0;padding:0;background:#120A16;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#120A16;padding:48px 24px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#1A1220;border:1px solid rgba(212,175,55,0.18);">
-          <tr>
-            <td style="padding:48px 40px 16px;text-align:center;border-bottom:1px solid rgba(212,175,55,0.12);">
-              <p style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:11px;letter-spacing:0.32em;text-transform:uppercase;color:#E7D9B7;">Sealed Vow</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:48px 40px 16px;text-align:center;">
-              <h1 style="margin:0 0 24px;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-style:italic;font-weight:300;line-height:1.35;letter-spacing:0.02em;color:rgba(242,232,213,0.92);">
-                Your message has been sealed.
-              </h1>
-              <p style="margin:0 0 16px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.7;color:rgba(207,198,178,0.78);">
-                It now waits for the person you wrote it for.
-              </p>
-              <p style="margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.7;color:rgba(207,198,178,0.78);">
-                You will know when they open it.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px 40px 48px;text-align:center;">
-              <p style="margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(207,198,178,0.55);">
-                — Sealed Vow
-              </p>
-            </td>
-          </tr>
-        </table>
-        <p style="margin:24px 0 0;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11px;color:rgba(207,198,178,0.42);">
-          Private by design. Nothing public. Ever.
-        </p>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-function buildTestText() {
-  return [
-    'Your message has been sealed.',
-    '',
-    'It now waits for the person you wrote it for.',
-    'You will know when they open it.',
-    '',
-    '— Sealed Vow',
-    'Private by design. Nothing public. Ever.',
-  ].join('\n');
-}
+// Obvious test stubs — NOT realistic values. Anyone glancing at a preview
+// deploy email should immediately see these are non-production.
+const STUB_SENDER_NAME = 'Test Sender';
+const STUB_FORMATTED_AMOUNT = '₹0.00';
+const STUB_PAYMENT_ID = 'test_payment_id';
+const STUB_FORMATTED_DATE = 'Test Date';
 
 export default async function handler(req, res) {
   // Method + content-type guard. guardPost handles OPTIONS preflight + CORS.
   if (!guardPost(req, res)) return;
 
-  // IP-based rate limit — keep the test endpoint cheap to leave open during
-  // verification but unable to be hammered. Soft-fails if Redis is down
-  // (intentional behavior in middleware).
+  // IP-based rate limit — keep test endpoint cheap to leave open during
+  // verification but unable to be hammered. Soft-fails if Redis is down.
   const ip = getClientIP(req);
   const limit = await rateLimit(`test-email:${ip}`, 5, 60); // 5 per minute
   if (limit.limited) {
@@ -100,23 +47,40 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Optional recipient override from JSON body.
-  let recipient = DEFAULT_TEST_RECIPIENT;
-  try {
-    const body = req.body || {};
-    if (typeof body.to === 'string' && body.to.includes('@')) {
-      recipient = body.to.trim();
-    }
-  } catch {
-    // Body parsing handled by guardPost (JSON content-type enforced).
-    // Any unexpected shape just falls back to the default recipient.
-  }
+  // Optional per-request overrides from JSON body.
+  const body = (req.body && typeof req.body === 'object') ? req.body : {};
 
-  const result = await sendEmail({
+  const recipient =
+    (typeof body.to === 'string' && body.to.includes('@'))
+      ? body.to.trim()
+      : DEFAULT_TEST_RECIPIENT;
+
+  const senderName =
+    (typeof body.senderName === 'string' && body.senderName.trim())
+      ? body.senderName.trim()
+      : STUB_SENDER_NAME;
+
+  const formattedAmount =
+    (typeof body.formattedAmount === 'string' && body.formattedAmount.trim())
+      ? body.formattedAmount.trim()
+      : STUB_FORMATTED_AMOUNT;
+
+  const paymentId =
+    (typeof body.paymentId === 'string' && body.paymentId.trim())
+      ? body.paymentId.trim()
+      : STUB_PAYMENT_ID;
+
+  const formattedDate =
+    (typeof body.formattedDate === 'string' && body.formattedDate.trim())
+      ? body.formattedDate.trim()
+      : STUB_FORMATTED_DATE;
+
+  const result = await sendLetterSealedEmail({
     to: recipient,
-    subject: TEST_SUBJECT,
-    html: buildTestHtml(recipient),
-    text: buildTestText(),
+    senderName,
+    formattedAmount,
+    paymentId,
+    formattedDate,
   });
 
   if (!result.ok) {
@@ -132,6 +96,12 @@ export default async function handler(req, res) {
     ok: true,
     id: result.id,
     to: recipient,
-    subject: TEST_SUBJECT,
+    subject: 'Your letter has been sealed.',
+    stubsUsed: {
+      senderName,
+      formattedAmount,
+      paymentId,
+      formattedDate,
+    },
   });
 }
