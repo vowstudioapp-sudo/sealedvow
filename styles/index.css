@@ -35,6 +35,12 @@
     --sv-bg-card:        #24182C;   /* 10% — cards, modals, surfaces on base */
     --sv-bg-ivory:       #F4ECDC;   /* writing surfaces — composer, forms, payment */
 
+    /* LP Atmospheric Phase 1 (PR-34) — unified editorial body tone +
+       single recessed pair for pricing/founder. Used by .lp-section
+       and friends to replace the prior alternating base/deep pattern. */
+    --lp-stage:          #1E1320;   /* unified editorial body tone, matches receiver experience aubergine */
+    --lp-stage-recessed: #120A16;   /* recessed tone for pricing + founder, equals --sv-bg-deep */
+
     /* Ink */
     --sv-ink:            #F1E7DA;
     --sv-ink-soft:       rgba(241, 231, 218, 0.72);

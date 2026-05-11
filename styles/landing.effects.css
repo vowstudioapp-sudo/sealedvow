@@ -561,7 +561,7 @@
 .lp-demo-cards {
   position: relative;
   padding: 120px 0 160px;
-  background: var(--sv-bg-base);
+  background: var(--lp-stage);
   border-top: 1px solid var(--sv-line-gold);
   overflow: hidden;
 }
@@ -824,13 +824,18 @@
   padding: 120px 48px;
   text-align: center;
   position: relative;
-  background: var(--sv-bg-deep);
-  border-top: 1px solid var(--sv-line-gold);
+  background: var(--lp-stage);
+  /* PR-34: default border-top removed. Hairlines are now load-bearing
+     punctuation, applied explicitly only where a tonal break occurs
+     (cards, §5, founder, footer). */
 }
 
-.lp-section--s3 { background: var(--sv-bg-base); }
-.lp-section--s4 { background: var(--sv-bg-deep); }
-.lp-section--s5 { background: var(--sv-bg-base); }
+.lp-section--s3 { background: var(--lp-stage); }
+.lp-section--s4 { background: var(--lp-stage); }
+.lp-section--s5 {
+  background: var(--lp-stage-recessed);
+  border-top: 1px solid var(--sv-line-gold);
+}
 
 .lp-section__num {
   font-size: 8px;
@@ -1124,11 +1129,15 @@
    FOUNDER NOTE — EDITORIAL SPLIT
 ══════════════════════════════════ */
 .lp-section--founder {
+  /* PR-34: explicit recession — pricing closer + founder note share
+     the --lp-stage-recessed tone, forming the LP's tonal descent
+     before the footer. Hairline carries the §5 → Founder break. */
+  background: var(--lp-stage-recessed);
+  border-top: 1px solid var(--sv-line-gold);
   /*
-    OPTIONAL background lift — try WITHOUT first.
+    OPTIONAL background lift — preserved as historical note.
     The image's warm highlights (cream paper, candlelight) likely provide
-    enough self-separation against base aubergine. Only add the gradient
-    below if the image visibly disappears into the background in testing.
+    enough self-separation against the recessed tone.
 
     background: linear-gradient(
       180deg,
