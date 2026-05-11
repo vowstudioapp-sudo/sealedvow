@@ -230,16 +230,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
 
       {/* ══════════════════════════════════════
-          SECTION 2 — PROBLEM
-      ══════════════════════════════════════ */}
-      <section className="lp-section">
-        <div className="lp-fade">
-          <p className="lp-s2__headline">Write them properly.</p>
-        </div>
-      </section>
-
-
-      {/* ══════════════════════════════════════
           SECTION 3 — THE MAGIC
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s3">
@@ -255,6 +245,16 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
 
       {/* ══════════════════════════════════════
+          SECTION 2 — PROBLEM
+      ══════════════════════════════════════ */}
+      <section className="lp-section">
+        <div className="lp-fade">
+          <p className="lp-s2__headline">Write them properly.</p>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
           SECTION 4 — PRIVACY
       ══════════════════════════════════════ */}
       <section className="lp-section lp-section--s4">
@@ -265,6 +265,20 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
             <p className="lp-s4__item">Nothing is indexed.</p>
             <p className="lp-s4__item">Nothing can be discovered.</p>
           </div>
+        </div>
+      </section>
+
+
+      {/* ══════════════════════════════════════
+          SECTION 5 — FINAL CTA
+      ══════════════════════════════════════ */}
+      <section className="lp-section lp-section--s5">
+        <div className="lp-fade">
+          <p className="lp-s5__headline">When the moment deserves<br />more than a message.</p>
+          <p className="lp-s5__sub">ONE LETTER • ONE PERSON</p>
+          <p className="lp-s5__price-anchor">₹249 per letter</p>
+          <p className="lp-s5__freemium">Write for free. Send it when it matters.</p>
+          <button className="lp-btn-begin" onClick={handleEnter}>CREATE YOUR LETTER</button>
         </div>
       </section>
 
@@ -314,20 +328,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
             </div>
 
           </div>
-        </div>
-      </section>
-
-
-      {/* ══════════════════════════════════════
-          SECTION 5 — FINAL CTA
-      ══════════════════════════════════════ */}
-      <section className="lp-section lp-section--s5">
-        <div className="lp-fade">
-          <p className="lp-s5__headline">When the moment deserves<br />more than a message.</p>
-          <p className="lp-s5__sub">ONE LETTER • ONE PERSON</p>
-          <p className="lp-s5__price-anchor">₹249 per letter</p>
-          <p className="lp-s5__freemium">Write for free. Send it when it matters.</p>
-          <button className="lp-btn-begin" onClick={handleEnter}>CREATE YOUR LETTER</button>
         </div>
       </section>
 
