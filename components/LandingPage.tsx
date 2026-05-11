@@ -352,7 +352,18 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
                   About Us
                 </a>
               </li>
-              <li><a href="#">How It Works</a></li>
+              <li>
+                <a
+                  href="/how-it-works"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.history.pushState({}, '', '/how-it-works');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }}
+                >
+                  How It Works
+                </a>
+              </li>
               <li><a href="#">Contact</a></li>
             </ul>
           </div>

@@ -3,15 +3,15 @@ import { PrivacyModal } from './PrivacyModal';
 import { TermsModal } from './TermsModal';
 import { HelpModal } from './HelpModal';
 
-const PAGE_TITLE = 'About — Sealed Vow';
-const PAGE_DESCRIPTION = "A short note on what Sealed Vow is, and what it isn't.";
+const PAGE_TITLE = 'How It Works — Sealed Vow';
+const PAGE_DESCRIPTION = 'A quiet explanation of how Sealed Vow works.';
 
 const navigateTo = (path: string) => {
   window.history.pushState({}, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
 };
 
-export const AboutPage: React.FC = () => {
+export const HowItWorksPage: React.FC = () => {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -81,42 +81,44 @@ export const AboutPage: React.FC = () => {
       ══════════════════════════════════════ */}
       <main className="lp-about__main">
         <article className="lp-about__article">
-          <h1 className="lp-about__title">About Sealed Vow</h1>
-          <p className="lp-about__eyebrow">A short note on what this is, and what it isn’t.</p>
+          <p className="lp-about__eyebrow" style={{ marginBottom: 14 }}>How It Works</p>
+          <h1 className="lp-about__title" style={{ marginBottom: 28 }}>How Sealed Vow works.</h1>
 
-          <hr className="lp-about__sep" aria-hidden="true" />
-
-          <section className="lp-about__section">
-            <p className="lp-about__p">Sealed Vow is a place to write a letter to one specific person, seal it carefully, and share it through a link only they can open.</p>
-            <p className="lp-about__p">That is all it does.</p>
-            <p className="lp-about__p">There is no feed. No followers. No streaks. No public profiles. No notifications urging you to send more. No way for anyone besides the person you choose to ever see what you wrote.</p>
-            <p className="lp-about__p">If you’ve spent the last decade in apps built around engagement metrics, Sealed Vow will feel quiet by comparison. The quietness is the design.</p>
+          <section className="lp-about__section lp-about__section--intro">
+            <p className="lp-about__p">Sealed Vow lets you create a private letter experience for one specific person.</p>
+            <p className="lp-about__p">You can write an anniversary letter, or the kind of words you may have been carrying for a long time but never properly said.</p>
+            <p className="lp-about__p">You add your words, memories, photographs, promises, music, meaningful places, and small details that matter to both of you.</p>
+            <p className="lp-about__p">Everything is then sealed into a private link only they can open.</p>
           </section>
 
           <hr className="lp-about__sep" aria-hidden="true" />
 
           <section className="lp-about__section">
-            <h2 className="lp-about__h2">What it’s for</h2>
-            <p className="lp-about__p">The kind of message you’d handwrite if anyone still handwrote letters.</p>
-            <p className="lp-about__p">An anniversary that deserves more than a forwarded card. The words you’ve been carrying but couldn’t say. The letter to the version of someone you’ve loved for ten years. The thing you’ve been wanting to write for months but couldn’t fit anywhere a chat app would put it.</p>
-            <p className="lp-about__p">The product is restrained, on purpose. It does one thing — make a beautiful, private, deliberate letter — and refuses to do anything else.</p>
+            <h2 className="lp-about__h2">What you do.</h2>
+            <p className="lp-about__p">You write the letter in your own words.</p>
+            <p className="lp-about__p">If you need help shaping what you want to say, assisted writing support can help generate wording more clearly — but everything can still be rewritten, edited, or removed afterward.</p>
+            <p className="lp-about__p">Some letters take ten minutes.</p>
+            <p className="lp-about__p">Others take an hour.</p>
+            <p className="lp-about__p">Sealed Vow is designed to be built slowly.</p>
+            <p className="lp-about__p">Your work is saved as you write. You can leave, return later, and continue from where you stopped.</p>
+            <p className="lp-about__p">The things people carry for a long time are rarely written all at once.</p>
           </section>
 
           <hr className="lp-about__sep" aria-hidden="true" />
 
           <section className="lp-about__section">
-            <h2 className="lp-about__h2">Who built it</h2>
-            <p className="lp-about__p">Ajmal Fahad.</p>
-            <p className="lp-about__p">Sealed Vow began as one letter — an anniversary letter, written for one specific person, that didn’t fit comfortably into any existing messaging app. The product grew around the thing that letter needed to become.</p>
-            <p className="lp-about__p">It is built slowly, on purpose. Restraint is the editorial approach we hold ourselves to.</p>
+            <h2 className="lp-about__h2">What happens after.</h2>
+            <p className="lp-about__p">When the experience is finished, it becomes a private link meant for one specific person.</p>
+            <p className="lp-about__p">You share that link however you normally reach them.</p>
+            <p className="lp-about__p">When they open it, the experience unfolds gradually instead of appearing all at once.</p>
+            <p className="lp-about__p">You will know when they open it.</p>
           </section>
 
           <hr className="lp-about__sep" aria-hidden="true" />
 
           <section className="lp-about__section">
-            <h2 className="lp-about__h2">Getting in touch</h2>
-            <p className="lp-about__p">If something here moves you, the best response is to write the letter you’ve been holding.</p>
-            <p className="lp-about__p">If something doesn’t work, write to us anyway — every message is read.</p>
+            <p className="lp-about__p">Sealed Vow is not built for posting publicly or collecting attention.</p>
+            <p className="lp-about__p">It is simply a quieter way to make someone feel remembered properly.</p>
           </section>
         </article>
       </main>
@@ -177,4 +179,4 @@ export const AboutPage: React.FC = () => {
   );
 };
 
-export default AboutPage;
+export default HowItWorksPage;
