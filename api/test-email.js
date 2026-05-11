@@ -18,7 +18,8 @@
 // IP-based rate limiting.
 // ============================================================================
 
-import { guardPost } from './lib/middleware.js';
+// NOTE: deliberately NO imports from './lib/middleware.js' — see comment
+// block above the handler for the module-load Redis-hang rationale.
 import { sendLetterSealedEmail } from '../lib/email/sendEmail.js';
 
 // Default recipient. Matches the user's email surfaced in project context.
@@ -33,10 +34,19 @@ const STUB_FORMATTED_DATE = 'Test Date';
 
 // TEMPORARY: rate limiting bypassed for preview verification only.
 // This endpoint will be removed or admin-gated before any production wiring.
+// This endpoint also avoids importing from lib/middleware.js because module-load-time
+// Redis init hangs on Preview deployments without KV env vars configured.
 // See PR-45 / PR-45.5 in branch history. Do not copy this pattern to other routes.
 export default async function handler(req, res) {
-  // Method + content-type guard. guardPost handles OPTIONS preflight + CORS.
-  if (!guardPost(req, res)) return;
+  // Inline method + content-type guard (no middleware import — see comment block above)
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  const contentType = req.headers['content-type'] || '';
+  if (!contentType.includes('application/json')) {
+    return res.status(400).json({ error: 'Content-Type must be application/json' });
+  }
 
   // Optional per-request overrides from JSON body.
   const body = (req.body && typeof req.body === 'object') ? req.body : {};
