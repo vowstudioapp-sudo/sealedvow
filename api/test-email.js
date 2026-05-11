@@ -18,7 +18,7 @@
 // IP-based rate limiting.
 // ============================================================================
 
-import { guardPost, rateLimit, getClientIP } from './lib/middleware.js';
+import { guardPost } from './lib/middleware.js';
 import { sendLetterSealedEmail } from '../lib/email/sendEmail.js';
 
 // Default recipient. Matches the user's email surfaced in project context.
@@ -31,21 +31,12 @@ const STUB_FORMATTED_AMOUNT = '₹0.00';
 const STUB_PAYMENT_ID = 'test_payment_id';
 const STUB_FORMATTED_DATE = 'Test Date';
 
+// TEMPORARY: rate limiting bypassed for preview verification only.
+// This endpoint will be removed or admin-gated before any production wiring.
+// See PR-45 / PR-45.5 in branch history. Do not copy this pattern to other routes.
 export default async function handler(req, res) {
   // Method + content-type guard. guardPost handles OPTIONS preflight + CORS.
   if (!guardPost(req, res)) return;
-
-  // IP-based rate limit — keep test endpoint cheap to leave open during
-  // verification but unable to be hammered. Soft-fails if Redis is down.
-  const ip = getClientIP(req);
-  const limit = await rateLimit(`test-email:${ip}`, 5, 60); // 5 per minute
-  if (limit.limited) {
-    res.status(429).json({
-      ok: false,
-      error: 'Rate limit exceeded for /api/test-email',
-    });
-    return;
-  }
 
   // Optional per-request overrides from JSON body.
   const body = (req.body && typeof req.body === 'object') ? req.body : {};
