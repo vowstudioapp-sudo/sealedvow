@@ -82,6 +82,12 @@ async function markActiveDraftCompleted(senderUid) {
  * invocations could theoretically result in two emails (small race window
  * between read and post-send write). Acceptable for V1; full transactional
  * idempotency is deferrable to PR-46.X if duplicate-email events are observed.
+ *
+ * Latency note: email send is synchronous (awaited) before HTTP response.
+ * This adds ~250-1000ms typical to payment-verification latency. Fire-and-
+ * forget is unsafe on Vercel Node runtime (async work after res.json() may
+ * not drain reliably). V1 accepts the latency; revisit if production data
+ * shows verification-timeout pressure.
  */
 async function sendLetterSealedNotification({ sessionUser, sanitized, paymentId, amountPaise, requestId }) {
   // Guard 1: guest sender — no email available
@@ -105,16 +111,22 @@ async function sendLetterSealedNotification({ sessionUser, sanitized, paymentId,
   }
 
   // Guard 3: idempotency — already sent for this paymentId
-  // Stored at notifications/{paymentId}/letterSealedSentAt — separate from
-  // payments/{paymentId} because the existing multi-path write overwrites
-  // that object on retry, which would wipe a flag stored there.
+  // Stored at notifications/{paymentId} as { letterSealedSentAt, resendMessageId }
+  // — separate from payments/{paymentId} because the existing multi-path write
+  // overwrites that object on retry, which would wipe a flag stored there.
   try {
-    const sentSnapshot = await adminDb.ref(`notifications/${paymentId}/letterSealedSentAt`).once('value');
+    const sentSnapshot = await adminDb.ref(`notifications/${paymentId}`).once('value');
     if (sentSnapshot.exists()) {
+      const sentVal = sentSnapshot.val();
+      // Defensive: handle the brief deploy-transition window where an older
+      // instance might have written just a string. If sentVal is a string,
+      // fall through to it directly; otherwise pull the timestamp field.
+      const previouslyAt =
+        (sentVal && typeof sentVal === 'object' ? sentVal.letterSealedSentAt : null) ?? sentVal;
       console.log('[Verify] Email skipped — already sent for this payment (idempotency)', {
         requestId,
         paymentId,
-        previouslyAt: sentSnapshot.val(),
+        previouslyAt,
       });
       return;
     }
@@ -173,9 +185,14 @@ async function sendLetterSealedNotification({ sessionUser, sanitized, paymentId,
     resendMessageId: sendResult.id,
   });
 
-  // Mark sent for idempotency
+  // Mark sent for idempotency. Object shape carries the Resend message id
+  // alongside the timestamp so support can correlate inbox-side delivery
+  // events back to a payment without a separate log lookup.
   try {
-    await adminDb.ref(`notifications/${paymentId}/letterSealedSentAt`).set(new Date().toISOString());
+    await adminDb.ref(`notifications/${paymentId}`).set({
+      letterSealedSentAt: new Date().toISOString(),
+      resendMessageId: sendResult.id,
+    });
   } catch (markErr) {
     // Worst case: a retry could re-send. Log loudly. Don't fail the response.
     console.error('[Verify] Email idempotency-mark write failed (possible duplicate on retry)', {
@@ -379,17 +396,6 @@ export default async function handler(req, res) {
       // PR #18a — atomic-with-success: mark the user's ACTIVE draft COMPLETED.
       // No-op for guests; helper internally swallows errors.
       await markActiveDraftCompleted(senderUid);
-
-      // PR-46 — letter-sealed notification email. Founder path always skips
-      // (amount=0 → Guard 2). Call retained for code symmetry + future
-      // founder-email policy without re-touching this block.
-      await sendLetterSealedNotification({
-        sessionUser: senderSessionUser,
-        sanitized,
-        paymentId: founderId,
-        amountPaise: 0,
-        requestId,
-      });
 
       const senderSlug = slugify(sanitized.senderName || 'sender');
       const receiverSlug = slugify(sanitized.recipientName || 'receiver');
