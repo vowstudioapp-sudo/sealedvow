@@ -37,11 +37,11 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
                    <div className="w-8 h-8 rounded-full border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37]">
-                      <span className="font-serif-elegant italic font-bold">§</span>
+                      <span className="font-sans font-bold">§</span>
                    </div>
                    <div>
                        <h2 className="text-[10px] uppercase tracking-[0.3em] text-[#D4AF37] font-bold">Studio Protocol</h2>
-                       <h1 className="text-xl font-serif-elegant italic text-white">Terms of Engagement</h1>
+                       <h1 className="text-xl font-sans font-medium text-white">Terms of Engagement</h1>
                    </div>
                 </div>
                 <button onClick={onClose} className="text-[#666] hover:text-white transition-colors p-2">
@@ -53,7 +53,7 @@ export const TermsModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {/* Content */}
         <div className="p-8 md:p-12 max-h-[70vh] overflow-y-auto custom-scrollbar">
             
-            <p className="text-[#888] text-xs italic mb-10 border-l border-[#D4AF37]/30 pl-4">
+            <p className="text-[#888] text-xs mb-10 border-l border-[#D4AF37]/30 pl-4">
               "By entering the VOW Private Expression Studio, you agree to the following terms. These terms exist to protect your privacy, the integrity of the experience, and the lawful operation of the studio."
             </p>
 

@@ -43,7 +43,7 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
                    </div>
                    <div>
                        <h2 className="text-[10px] uppercase tracking-[0.3em] text-[#D4AF37] font-bold">VOW Protocol</h2>
-                       <h1 className="text-xl font-serif-elegant italic text-white">Privacy & Sovereignty</h1>
+                       <h1 className="text-xl font-sans font-medium text-white">Privacy & Sovereignty</h1>
                    </div>
                 </div>
                 <button onClick={onClose} className="text-[#666] hover:text-white transition-colors p-2">
@@ -61,13 +61,13 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
                    <span className="w-1 h-1 bg-[#D4AF37] rounded-full"></span>
                    The Custody Promise
                 </h3>
-                <p className="text-[#CCC] text-sm leading-relaxed font-serif-elegant italic opacity-80 border-l-2 border-[#D4AF37]/20 pl-4 mb-6">
+                <p className="text-[#CCC] text-sm leading-relaxed font-sans opacity-80 border-l-2 border-[#D4AF37]/20 pl-4 mb-6">
                    "We act as a courier, not a reader. Your message is sealed, delivered, and exists only for the intended recipient. We do not open the envelope. Privacy is not a feature here — it is the foundation."
                 </p>
                 
                 {/* Explicit Human Reassurance */}
                 <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded text-center">
-                    <p className="text-[#E5D0A1] text-xs font-serif-elegant italic">
+                    <p className="text-[#E5D0A1] text-xs font-sans">
                         "Your message is never reviewed by a human. It is delivered automatically and privately."
                     </p>
                 </div>
@@ -109,7 +109,7 @@ export const PrivacyModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <section>
                 <h3 className="text-white text-[9px] uppercase tracking-[0.2em] font-bold mb-3">How Writing Assistance Works</h3>
                 
-                <p className="text-[#AAA] text-xs leading-relaxed mb-6 font-serif-elegant italic">
+                <p className="text-[#AAA] text-xs leading-relaxed mb-6 font-sans">
                    VOW uses technology only to help you express what you already feel — then steps out of the way.
                 </p>
 

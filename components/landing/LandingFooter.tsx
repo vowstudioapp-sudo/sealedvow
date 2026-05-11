@@ -37,7 +37,8 @@ const LandingFooter: React.FC<Props> = ({ onShowPrivacy, onShowTerms, onShowHelp
                 How It Works
               </a>
             </li>
-            <li><a href="#">Contact</a></li>
+            {/* PR-40: duplicate "Contact" removed — Contact Us
+                already lives under the Need Help? column. */}
           </ul>
         </div>
         <div className="lp-footer__col">
@@ -54,14 +55,8 @@ const LandingFooter: React.FC<Props> = ({ onShowPrivacy, onShowTerms, onShowHelp
             <li><a href="#">FAQs</a></li>
           </ul>
         </div>
-        <div className="lp-footer__col">
-          <p className="lp-footer__col-heading">Stay in the loop</p>
-          <p className="lp-footer__subscribe-text">Thoughtful updates on new features and quiet moments.</p>
-          <div className="lp-footer__subscribe-form">
-            <input className="lp-footer__subscribe-input" type="email" placeholder="Enter email address" />
-            <button className="lp-footer__subscribe-btn">→</button>
-          </div>
-        </div>
+        {/* PR-40: "Stay in the loop" newsletter column removed —
+            the footer ends quietly, not with email capture. */}
       </div>
       <div className="lp-footer__bottom">
         <div className="lp-footer__socials">

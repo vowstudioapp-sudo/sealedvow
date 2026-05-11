@@ -1661,7 +1661,10 @@
 
 .lp-footer__columns {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 1.4fr;
+  /* PR-40: 4 → 3 columns after Stay-in-the-loop block removed.
+     Sealed Vow column retains slight emphasis (1.2fr); Policy +
+     Need Help equal-weight (1fr each). */
+  grid-template-columns: 1.2fr 1fr 1fr;
   gap: 48px;
   padding-bottom: 56px;
   border-bottom: 1px solid rgba(242,232,213,0.1);
@@ -1707,56 +1710,9 @@
   color: rgba(242,232,213,0.9);
 }
 
-.lp-footer__subscribe-text {
-  font-size: 12px;
-  font-style: normal;
-  color: rgba(207,198,178,0.72);
-  letter-spacing: 0.02em;
-  line-height: 1.6;
-  margin-bottom: 16px;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-.lp-footer__subscribe-form {
-  display: flex;
-  align-items: center;
-  border: 1px solid rgba(242,232,213,0.18);
-  border-radius: 6px;
-  overflow: hidden;
-  transition: border-color 0.25s;
-}
-.lp-footer__subscribe-form:focus-within {
-  border-color: rgba(242,232,213,0.42);
-}
-
-.lp-footer__subscribe-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  padding: 11px 14px;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  color: var(--lp-text-main);
-}
-.lp-footer__subscribe-input::placeholder {
-  color: rgba(242,232,213,0.52);
-}
-
-.lp-footer__subscribe-btn {
-  background: none;
-  border: none;
-  border-left: 1px solid rgba(242,232,213,0.14);
-  padding: 11px 14px;
-  color: rgba(242,232,213,0.62);
-  cursor: pointer;
-  font-size: 14px;
-  transition: color 0.2s;
-}
-.lp-footer__subscribe-btn:hover {
-  color: rgba(242,232,213,0.9);
-}
+/* PR-40: .lp-footer__subscribe-* rules removed alongside the
+   newsletter block they styled. The footer no longer asks for
+   email capture — it ends quietly. */
 
 .lp-footer__bottom {
   display: flex;
