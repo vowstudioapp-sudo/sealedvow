@@ -285,9 +285,12 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           SECTION 2 — PROBLEM
       ══════════════════════════════════════ */}
       <section className="lp-section">
-        {/* PR-37: Tier 1 editorial stillness — no entrance reveal */}
+        {/* PR-37: Tier 1 editorial stillness — no entrance reveal.
+            PR-38: subtitle added beneath the headline as quiet
+            editorial support, not marketing copy. */}
         <div>
           <p className="lp-s2__headline">Write them properly.</p>
+          <p className="lp-wtp__subtitle">Some feelings deserve more than a quick message.</p>
         </div>
       </section>
 
@@ -372,10 +375,11 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               </p>
             </div>
 
+            {/* PR-38: founder name removed — note reads as the
+                product's authored voice, not a personal signature wall. */}
             <div className="lp-founder__attribution">
               <span className="lp-founder__rule" aria-hidden="true"></span>
               <div className="lp-founder__attribution-text">
-                <span className="lp-founder__name">Ajmal Fahad</span>
                 <span className="lp-founder__role">Founder, Sealed Vow</span>
               </div>
             </div>

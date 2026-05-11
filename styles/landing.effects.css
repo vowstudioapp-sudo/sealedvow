@@ -862,6 +862,23 @@
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
 
+/* PR-38: WTP subtitle — quiet editorial support beneath the headline.
+   Upright (not italic) so it reads as a calm clarification beneath
+   the louder italic statement above it. Soft cream tone matches the
+   editorial-secondary register used by §3 close. */
+.lp-wtp__subtitle {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+  color: rgba(207, 198, 178, 0.7);
+  text-align: center;
+  max-width: 520px;
+  margin: 24px auto 0;
+}
+
 /* ══════════════════════════════════
    SLOW ON PURPOSE — editorial pause
    (PR-33: time/effort beat between §2 and §4)
