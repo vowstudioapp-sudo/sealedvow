@@ -1917,3 +1917,108 @@
   .lp-footer__columns { grid-template-columns: 1fr; }
   .lp-modal { padding: 48px 28px 40px; }
 }
+
+/* ═══════════════════════════════════════════════════
+   ABOUT PAGE — operational/editorial infrastructure
+   PR-31: Restrained sans-serif page, no commercial chrome.
+   Cormorant exempt only on inherited .lp-nav__wordmark.
+═══════════════════════════════════════════════════ */
+
+.lp-about {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--sv-bg-base);
+  color: var(--lp-text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+.lp-about--visible {
+  opacity: 1;
+}
+
+.lp-about__nav {
+  /* Inherit .lp-nav layout; About uses a wordmark-only nav. */
+  justify-content: flex-start;
+}
+
+.lp-about__main {
+  flex: 1 0 auto;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 128px 24px 96px;
+  box-sizing: border-box;
+}
+
+.lp-about__article {
+  width: 100%;
+  max-width: 640px;
+}
+
+.lp-about__title {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  color: var(--lp-accent);
+  margin: 0 0 16px;
+}
+
+.lp-about__eyebrow {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--lp-text-soft);
+  margin: 0;
+}
+
+.lp-about__sep {
+  border: 0;
+  height: 1px;
+  background: rgba(212, 175, 55, 0.18);
+  margin: 56px 0;
+}
+
+.lp-about__section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lp-about__h2 {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 500;
+  font-size: 19px;
+  line-height: 1.35;
+  color: var(--lp-accent);
+  margin: 0 0 8px;
+  letter-spacing: 0.005em;
+}
+
+.lp-about__p {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 400;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--lp-text-main);
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .lp-about__main {
+    padding: 104px 20px 72px;
+  }
+  .lp-about__title {
+    font-size: 28px;
+  }
+  .lp-about__sep {
+    margin: 48px 0;
+  }
+}

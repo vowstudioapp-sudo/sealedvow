@@ -340,7 +340,18 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
           <div className="lp-footer__col">
             <p className="lp-footer__col-heading">SEALED VOW</p>
             <ul>
-              <li><a href="#">About Us</a></li>
+              <li>
+                <a
+                  href="/about"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.history.pushState({}, '', '/about');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }}
+                >
+                  About Us
+                </a>
+              </li>
               <li><a href="#">How It Works</a></li>
               <li><a href="#">Contact</a></li>
             </ul>

@@ -57,6 +57,10 @@ const OccasionSelector = lazy(() =>
   import('./components/OccasionSelector.tsx').then(m => ({ default: m.OccasionSelector }))
 );
 
+const AboutPage = lazy(() =>
+  import('./components/AboutPage.tsx').then(m => ({ default: m.AboutPage }))
+);
+
 const EidPreparationForm = lazy(() =>
   import('./components/EidPreparationForm.tsx').then(m => ({ default: m.default }))
 );
@@ -1256,6 +1260,10 @@ const App: React.FC = () => {
 
   if (routeType === 'OCCASION_SELECTOR') {
     return <Suspense fallback={null}><OccasionSelector /></Suspense>;
+  }
+
+  if (routeType === 'ABOUT') {
+    return <Suspense fallback={null}><AboutPage /></Suspense>;
   }
 
   const handleEnterStudio = () => {
