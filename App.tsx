@@ -78,6 +78,21 @@ import { validateCoupleData } from './lib/coupleDataValidator.js';
 import { writeDraftFromExternal, peekDraft, writeStage, writeDraftId, clearPreparationDraft } from './hooks/usePreparationPersistence';
 import { useDraftStateObserver } from './hooks/useDraftStateObserver';
 import { saveDraft, type SaveDraftInput } from './utils/saveDraft';
+import { StaleRevisionModal } from './components/StaleRevisionModal';
+
+// PR-48 Phase 4 — Reconciliation authority is owned by App.tsx via this
+// single discriminated union. Only ONE reconciliation modal renders at a
+// time. DraftResumeModal and SignInPromptModal remain on their existing
+// independent state systems; this union covers only the Phase 4 modals.
+// Begin-New and Sign-in Case B cases are added in Commits 4 and 5.
+type ReconciliationState =
+  | { kind: 'none' }
+  | {
+      kind: 'stale_revision';
+      source: 'save';
+      currentRevision: number;
+      pendingSavePayload: SaveDraftInput;
+    };
 import type { DraftState, PersistenceStatus } from './types/draft';
 import { DRAFT_STATE_ORDER } from './types/draft';
 import { UI_STAGE_TO_DRAFT_STATE } from './hooks/draftStateLogic';
@@ -520,6 +535,15 @@ const App: React.FC = () => {
   const [lastSaveSuccessAt, setLastSaveSuccessAt] = useState<number | null>(null);
   const [lastSaveError, setLastSaveError] = useState<string | null>(null);
 
+  // PR-48 Phase 4: single reconciliation authority. Exactly one of the
+  // Phase 4 modals (StaleRevisionModal in this commit; BeginNewPromptModal
+  // and SignInReconciliationModal in later commits) renders at a time,
+  // gated by the kind discriminator. DraftResumeModal and SignInPromptModal
+  // are NOT part of this union (they keep their pre-Phase-4 state systems).
+  const [reconciliation, setReconciliation] = useState<ReconciliationState>({
+    kind: 'none',
+  });
+
   // Unmount guard for the in-flight save handler. App.tsx is the root and
   // rarely unmounts in production, but the pattern is correct for tests +
   // Strict Mode and protects against any future migration that remounts.
@@ -532,6 +556,103 @@ const App: React.FC = () => {
 
   const clearLastSaveError = () => {
     setLastSaveError(null);
+  };
+
+  // PR-48 Phase 4 (Commit 3) — StaleRevisionModal handlers.
+  //
+  // Reload Latest: fetch the cloud's current ACTIVE for this draftId from
+  // /api/drafts/list, replace local persistence with cloud data, update
+  // draftRecord to the fresh revision. The user explicitly accepts losing
+  // their local edits. lastSaveError is cleared because the user has
+  // resolved the conflict.
+  //
+  // Keep Local for Now: preserve local exactly as-is. Cloud unchanged. The
+  // lastSaveError stays visible — the conflict is unresolved but the user
+  // has opted to defer.
+  //
+  // Cancel: close modal only. Same net effect as Keep Local for Now, but
+  // framed as "I want to think about this," not "I'm choosing local."
+  const handleStaleRevisionReloadLatest = async () => {
+    if (reconciliation.kind !== 'stale_revision') return;
+    const targetDraftId = reconciliation.pendingSavePayload.draftId;
+    // Close modal optimistically; the fetch below either succeeds (we
+    // hydrate state) or fails (we surface error and the user retries).
+    setReconciliation({ kind: 'none' });
+
+    try {
+      const res = await fetch('/api/drafts/list', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!mountedRef.current) return;
+      if (!res.ok) {
+        setLastSaveError("Couldn't reload. Try again in a moment.");
+        return;
+      }
+      const json = (await res.json()) as {
+        ok?: boolean;
+        drafts?: Array<{
+          draftId?: string;
+          data?: CoupleData;
+          draftState?: DraftState;
+          persistenceStatus?: PersistenceStatus;
+          revision?: number;
+          updatedAt?: number;
+        }>;
+      };
+      if (!mountedRef.current) return;
+      // Find the cloud's current ACTIVE for the draftId we tried to save.
+      // If targetDraftId is undefined (CREATE attempt that stale-revisioned
+      // — unusual but possible if revision-CAS was added to creates),
+      // we just pick any ACTIVE.
+      const candidate = (json.drafts ?? []).find(
+        (d) =>
+          d.persistenceStatus === 'ACTIVE' &&
+          (targetDraftId ? d.draftId === targetDraftId : true),
+      );
+      if (!candidate || !candidate.draftId || typeof candidate.revision !== 'number') {
+        // Cloud's ACTIVE has moved on entirely (e.g., user discarded on
+        // another device). Clear our error and let draftRecord re-hydrate
+        // on the next /list cycle.
+        setLastSaveError(null);
+        return;
+      }
+      // Replace App.tsx data state with cloud's content; update draftRecord
+      // to the fresh revision so future saves CAS correctly.
+      if (candidate.data) {
+        setData(hydrateCoupleData(candidate.data));
+      }
+      setDraftRecord({
+        draftId: candidate.draftId,
+        seedDraftState: candidate.draftState ?? null,
+        revision: candidate.revision,
+      });
+      writeDraftId(candidate.draftId);
+      setLastSaveError(null);
+      setLastSaveSuccessAt(
+        typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now(),
+      );
+    } catch {
+      if (mountedRef.current) {
+        setLastSaveError("Couldn't reload. Try again in a moment.");
+      }
+    }
+  };
+
+  const handleStaleRevisionKeepLocalForNow = () => {
+    if (reconciliation.kind !== 'stale_revision') return;
+    setReconciliation({ kind: 'none' });
+    // Intentionally preserve lastSaveError so the user sees the unresolved
+    // conflict affordance and can retry later.
+  };
+
+  const handleStaleRevisionCancel = () => {
+    if (reconciliation.kind !== 'stale_revision') return;
+    setReconciliation({ kind: 'none' });
+    // Same net effect as Keep Local for Now in this commit; distinct label
+    // for UX clarity per the locked Phase 4 button copy.
   };
 
   const handleSaveAndContinueLater = () => {
@@ -619,15 +740,22 @@ const App: React.FC = () => {
         }
 
         case 'stale_revision':
-          // PR-48 Phase 4: placeholder for Commit 3's StaleRevisionModal
-          // wiring. Currently surfaces as a generic save error — the modal
-          // hookup lands in the next commit. console.warn aids triage if
-          // this branch fires in production before Commit 3 deploys.
-          console.warn(
-            `[PR-48] /save STALE_REVISION: server=${result.currentRevision}, client=${result.yourRevision}. ` +
-              `Modal wiring lands in Phase 4 Commit 3.`,
-          );
+          // PR-48 Phase 4 (Commit 3): route to StaleRevisionModal via the
+          // reconciliation authority. The user explicitly resolves: Reload
+          // Latest (replace local with cloud), Keep Local for Now (preserve
+          // local, no save), or Cancel (close modal only).
+          //
+          // Stash the original save input so a future Phase-4 retry (not
+          // shipped here) can replay if needed. lastSaveError remains set
+          // so the inline affordance shows the user there's an unresolved
+          // save attempt.
           setLastSaveError("Couldn't save just now. Your work is still here.");
+          setReconciliation({
+            kind: 'stale_revision',
+            source: 'save',
+            currentRevision: result.currentRevision,
+            pendingSavePayload: input,
+          });
           saveInFlightRef.current = false;
           return;
 
@@ -1703,6 +1831,16 @@ const App: React.FC = () => {
         onSignInSuccess={() => commitPendingAction()}
         variant={signInVariant}
       />
+      {/* PR-48 Phase 4 — single exhaustive reconciliation render switch. */}
+      {reconciliation.kind === 'stale_revision' && (
+        <StaleRevisionModal
+          isOpen={true}
+          currentRevision={reconciliation.currentRevision}
+          onReloadLatest={handleStaleRevisionReloadLatest}
+          onKeepLocalForNow={handleStaleRevisionKeepLocalForNow}
+          onCancel={handleStaleRevisionCancel}
+        />
+      )}
     </div>
   );
 };
