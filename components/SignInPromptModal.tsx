@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 // PR #18b — variant prop. 'payment' is the existing behavior (byte-identical
@@ -12,12 +12,21 @@ const PERSISTENCE_SUBTITLE =
 const PAYMENT_SUBTITLE =
   "Sign in to keep your letter, track when it's opened, and view replies.";
 
+const DELIVERY_EMAIL_LABEL =
+  "Optional — if you continue as guest, we'll send your share link here. No account is created.";
+
+const DELIVERY_EMAIL_PLACEHOLDER = 'your@email.com';
+
+function isValidEmailShape(value: string): boolean {
+  const t = value.trim();
+  if (!t) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  // Effectively unused under variant='persistence' (button hidden); callers
-  // may omit it on the persistence path.
-  onContinueAsGuest?: () => void;
+  onContinueAsGuest?: (guestEmail?: string) => void;
   onSignInSuccess: () => void;
   variant?: SignInPromptVariant;
 }
@@ -32,21 +41,30 @@ export const SignInPromptModal: React.FC<Props> = ({
   const { signInWithGoogle } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
+  const [deliveryEmail, setDeliveryEmail] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setDeliveryEmail('');
+      setSignInError(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const trimmedDelivery = deliveryEmail.trim();
+  const deliveryLooksInvalid =
+    trimmedDelivery.length > 0 && !isValidEmailShape(trimmedDelivery);
 
   const handleGoogle = async () => {
     setSignInError(null);
     setIsSigningIn(true);
     try {
       await signInWithGoogle();
-      // Session cookie is set by the time signInWithGoogle() resolves,
-      // so downstream API calls (create-order, verify-payment) will see it.
       onSignInSuccess();
     } catch (err) {
       const code = (err as { code?: string })?.code || '';
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-        // user-initiated cancel — stay silent, let them try again or pick guest
       } else if (code === 'auth/popup-blocked') {
         setSignInError('Popup was blocked. Please allow popups and try again.');
       } else {
@@ -97,8 +115,36 @@ export const SignInPromptModal: React.FC<Props> = ({
           </p>
         )}
 
+        {variant === 'payment' && (
+          <>
+            <p
+              className="lp-modal__sub"
+              style={{ marginBottom: 12, marginTop: 16, fontSize: 10, letterSpacing: '0.08em' }}
+            >
+              {DELIVERY_EMAIL_LABEL}
+            </p>
+            <input
+              className="lp-modal__input"
+              type="email"
+              name="delivery-email"
+              autoComplete="email"
+              placeholder={DELIVERY_EMAIL_PLACEHOLDER}
+              value={deliveryEmail}
+              onChange={(e) => { setDeliveryEmail(e.target.value); }}
+              style={
+                deliveryLooksInvalid
+                  ? { borderColor: 'rgba(232, 136, 136, 0.55)' }
+                  : undefined
+              }
+            />
+          </>
+        )}
+
         {variant === 'payment' && onContinueAsGuest && (
-          <button className="lp-btn-guest" onClick={onContinueAsGuest}>
+          <button
+            className="lp-btn-guest"
+            onClick={() => onContinueAsGuest(trimmedDelivery)}
+          >
             Continue as Guest
           </button>
         )}
