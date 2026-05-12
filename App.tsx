@@ -387,10 +387,25 @@ const App: React.FC = () => {
   });
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
+  const [guestEmail, setGuestEmail] = useState<string | null>(null);
+  const [emailDelivered, setEmailDelivered] = useState(false);
   const [, forceLocationUpdate] = useState(0);
 
   const previousStageRef = useRef<AppStage | null>(null);
+  const guestFlowCleanupPrevStageRef = useRef<AppStage>(AppStage.LANDING);
   const demoSeededRef = useRef(false);
+
+  useEffect(() => {
+    const prev = guestFlowCleanupPrevStageRef.current;
+    if (stage === AppStage.PREPARE) {
+      setGuestEmail(null);
+      setEmailDelivered(false);
+    } else if (prev === AppStage.SHARE && stage !== AppStage.SHARE) {
+      setGuestEmail(null);
+      setEmailDelivered(false);
+    }
+    guestFlowCleanupPrevStageRef.current = stage;
+  }, [stage]);
 
   // ── Sign-in prompt at Preview → Payment transition ──
   // PR #18b — `serverSessionReady` is the deterministic gate for
@@ -453,8 +468,14 @@ const App: React.FC = () => {
     setShowSignInPrompt(true);
   };
 
-  const commitPendingAction = () => {
+  const commitPendingAction = (guestCapturedEmail?: string) => {
     setShowSignInPrompt(false);
+    if (guestCapturedEmail === undefined) {
+      setGuestEmail(null);
+    } else {
+      const t = guestCapturedEmail.trim();
+      setGuestEmail(t.length > 0 ? t : null);
+    }
     const action = pendingActionRef.current;
     pendingActionRef.current = null;
     pendingCancelRef.current = null;
@@ -1107,10 +1128,17 @@ const App: React.FC = () => {
             <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
               <PaymentStage
                 data={data}
-                onPaymentComplete={(result: { replyEnabled: boolean; sessionKey: string; shareSlug: string }) => {
+                guestEmail={guestEmail ?? undefined}
+                onPaymentComplete={(result: {
+                  replyEnabled: boolean;
+                  sessionKey: string;
+                  shareSlug: string;
+                  emailDelivered?: boolean;
+                }) => {
                   updateData({ replyEnabled: result.replyEnabled, sealedAt: new Date().toISOString() });
                   setSessionKey(result.sessionKey);
                   setShareSlug(result.shareSlug);
+                  setEmailDelivered(result.emailDelivered === true);
                   safeSetStage(AppStage.SHARE);
                 }}
                 onBack={() => {
@@ -1131,6 +1159,7 @@ const App: React.FC = () => {
                 data={data}
                 sessionKey={sessionKey}
                 shareSlug={shareSlug}
+                emailDelivered={emailDelivered}
                 onPreview={() => {
                   // Eid renders <EidExperience/> for any non-PAYMENT/non-SHARE
                   // stage, so the value here is a "cycle off SHARE" token. Use
@@ -1558,10 +1587,17 @@ const App: React.FC = () => {
             <div className="animate-fade-in flex items-center justify-center min-h-screen px-4">
               <PaymentStage
                 data={data}
-                onPaymentComplete={(result: { replyEnabled: boolean; sessionKey: string; shareSlug: string }) => {
+                guestEmail={guestEmail ?? undefined}
+                onPaymentComplete={(result: {
+                  replyEnabled: boolean;
+                  sessionKey: string;
+                  shareSlug: string;
+                  emailDelivered?: boolean;
+                }) => {
                   updateData({ replyEnabled: result.replyEnabled, sealedAt: new Date().toISOString() });
                   setSessionKey(result.sessionKey);
                   setShareSlug(result.shareSlug);
+                  setEmailDelivered(result.emailDelivered === true);
                   // PR #16: letter is finalized — drop the refresh-resilience
                   // draft so a fresh visit to /letter/create starts at PREPARE.
                   clearPreparationDraft();
@@ -1581,6 +1617,7 @@ const App: React.FC = () => {
                 data={data}
                 sessionKey={sessionKey}
                 shareSlug={shareSlug}
+                emailDelivered={emailDelivered}
                 onPreview={() => {
                    // Post-share re-preview: routes into the canonical receiver
                    // experience (no banner / no theme dots, since
@@ -1656,8 +1693,8 @@ const App: React.FC = () => {
       <SignInPromptModal
         isOpen={showSignInPrompt}
         onClose={cancelPendingAction}
-        onContinueAsGuest={commitPendingAction}
-        onSignInSuccess={commitPendingAction}
+        onContinueAsGuest={(email) => commitPendingAction(email)}
+        onSignInSuccess={() => commitPendingAction()}
         variant={signInVariant}
       />
     </div>

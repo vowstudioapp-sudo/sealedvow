@@ -22,6 +22,27 @@ import { sendLetterSealedEmail } from '../lib/email/sendEmail.js';
 
 const MIN_PRICE_PAISE = 24900;  // ₹249 — single price floor
 
+function getPublicSiteOrigin() {
+  const explicit = process.env.PUBLIC_SITE_URL || process.env.VITE_PUBLIC_SITE_URL;
+  if (typeof explicit === 'string' && explicit.trim().length > 0) {
+    return explicit.replace(/\/$/, '');
+  }
+  const vercel = process.env.VERCEL_URL;
+  if (typeof vercel === 'string' && vercel.trim().length > 0) {
+    return `https://${vercel.replace(/\/$/, '')}`;
+  }
+  return 'https://www.sealedvow.com';
+}
+
+function normalizeRecipientEmail(raw) {
+  if (raw == null) return null;
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim();
+  if (!t) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return null;
+  return t;
+}
+
 // PR #18a: atomic-with-success draft completion. Called from BOTH the founder
 // branch and the Razorpay branch AFTER the existing payment-success multi-path
 // write resolves. Internal try/catch swallows errors — payment success must
@@ -65,142 +86,148 @@ async function markActiveDraftCompleted(senderUid) {
 }
 
 /**
- * PR-46 — Send the "Your letter has been sealed" email to the sender.
+ * PR-46 + PR-46.5 — Seal confirmation email (share link + optional receipt).
  *
  * Mirrors markActiveDraftCompleted's discipline:
  *   - Non-critical-path side effect
- *   - Never throws; never bubbles
- *   - Logs success/failure/skip-reason with requestId for correlation
- *   - Caller awaits but never gates HTTP response on result
+ *   - Never throws; returns { delivered: boolean }
+ *   - Caller awaits but never gates HTTP success on email outcome
  *
- * Skip conditions (each logged):
- *   - No authenticated sender (guest payment) → no email source
- *   - amount <= 0 (founder path) → no receipt to send
- *   - Already-sent guard via notifications/{paymentId}/letterSealedSentAt
+ * Effective To: sessionUser.email ?? normalized guest recipientEmail (transport
+ * only — not an identity primitive; see PR-46.5 doctrine).
  *
- * Idempotency note: best-effort single-check-then-set. Concurrent duplicate
- * invocations could theoretically result in two emails (small race window
- * between read and post-send write). Acceptable for V1; full transactional
- * idempotency is deferrable to PR-46.X if duplicate-email events are observed.
- *
- * Latency note: email send is synchronous (awaited) before HTTP response.
- * This adds ~250-1000ms typical to payment-verification latency. Fire-and-
- * forget is unsafe on Vercel Node runtime (async work after res.json() may
- * not drain reliably). V1 accepts the latency; revisit if production data
- * shows verification-timeout pressure.
+ * Receipt block: only when paid (amountPaise > 0) AND session had auth email.
  */
-async function sendLetterSealedNotification({ sessionUser, sanitized, paymentId, amountPaise, requestId }) {
-  // Guard 1: guest sender — no email available
-  if (!sessionUser || !sessionUser.email) {
-    console.log('[Verify] Email skipped — no authenticated sender email', {
-      requestId,
-      paymentId,
-      senderUid: sessionUser?.uid || null,
-    });
-    return;
-  }
-
-  // Guard 2: founder path — amount == 0, no receipt to send
-  if (!amountPaise || amountPaise <= 0) {
-    console.log('[Verify] Email skipped — non-paid path (founder access)', {
-      requestId,
-      paymentId,
-      senderUid: sessionUser.uid,
-    });
-    return;
-  }
-
-  // Guard 3: idempotency — already sent for this paymentId
-  // Stored at notifications/{paymentId} as { letterSealedSentAt, resendMessageId }
-  // — separate from payments/{paymentId} because the existing multi-path write
-  // overwrites that object on retry, which would wipe a flag stored there.
+async function sendLetterSealedNotification({
+  sessionUser,
+  sanitized,
+  paymentId,
+  amountPaise,
+  recipientEmail: recipientEmailRaw,
+  shareUrl,
+  requestId,
+}) {
   try {
-    const sentSnapshot = await adminDb.ref(`notifications/${paymentId}`).once('value');
-    if (sentSnapshot.exists()) {
-      const sentVal = sentSnapshot.val();
-      // Defensive: handle the brief deploy-transition window where an older
-      // instance might have written just a string. If sentVal is a string,
-      // fall through to it directly; otherwise pull the timestamp field.
-      const previouslyAt =
-        (sentVal && typeof sentVal === 'object' ? sentVal.letterSealedSentAt : null) ?? sentVal;
-      console.log('[Verify] Email skipped — already sent for this payment (idempotency)', {
+    const authEmail =
+      sessionUser &&
+      typeof sessionUser.email === 'string' &&
+      sessionUser.email.trim().length > 0
+        ? sessionUser.email.trim()
+        : null;
+    const guestEmail = normalizeRecipientEmail(recipientEmailRaw);
+    const effectiveEmail = authEmail || guestEmail;
+
+    if (!effectiveEmail) {
+      console.log('[Verify] Email skipped — no email source (auth or guest-provided)', {
         requestId,
         paymentId,
-        previouslyAt,
+        senderUid: sessionUser?.uid || null,
       });
-      return;
+      return { delivered: false };
     }
-  } catch (idempotencyReadErr) {
-    // RTDB read failure: skip send conservatively to avoid possible duplicate.
-    console.error('[Verify] Email idempotency check failed — skipping send', {
+
+    try {
+      const sentSnapshot = await adminDb.ref(`notifications/${paymentId}`).once('value');
+      if (sentSnapshot.exists()) {
+        const sentVal = sentSnapshot.val();
+        const previouslyAt =
+          (sentVal && typeof sentVal === 'object' ? sentVal.letterSealedSentAt : null) ?? sentVal;
+        console.log('[Verify] Email skipped — already sent for this payment (idempotency)', {
+          requestId,
+          paymentId,
+          previouslyAt,
+        });
+        return { delivered: true };
+      }
+    } catch (idempotencyReadErr) {
+      console.error('[Verify] Email idempotency check failed — skipping send', {
+        requestId,
+        paymentId,
+        error: idempotencyReadErr.message,
+      });
+      return { delivered: false };
+    }
+
+    const includeReceipt =
+      Number(amountPaise) > 0 &&
+      Boolean(
+        sessionUser &&
+          typeof sessionUser.email === 'string' &&
+          sessionUser.email.trim().length > 0,
+      );
+
+    const formattedDate = new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    });
+
+    const receipt =
+      includeReceipt
+        ? {
+            formattedAmount: `₹${(Number(amountPaise) / 100).toFixed(2)}`,
+            paymentId,
+            formattedDate,
+          }
+        : undefined;
+
+    let sendResult;
+    try {
+      sendResult = await sendLetterSealedEmail({
+        to: effectiveEmail,
+        senderName: sanitized.senderName || 'there',
+        shareUrl,
+        receipt,
+      });
+    } catch (sendErr) {
+      console.error('[Verify] Email send threw (unexpected)', {
+        requestId,
+        paymentId,
+        error: sendErr.message,
+      });
+      return { delivered: false };
+    }
+
+    if (!sendResult || sendResult.ok !== true) {
+      console.error('[Verify] Email send failed', {
+        requestId,
+        paymentId,
+        error: sendResult?.error || 'unknown',
+      });
+      return { delivered: false };
+    }
+
+    console.log('[Verify] Email sent', {
       requestId,
       paymentId,
-      error: idempotencyReadErr.message,
-    });
-    return;
-  }
-
-  // Format inputs for the locked template
-  const formattedAmount = `₹${(amountPaise / 100).toFixed(2)}`;
-  const formattedDate = new Date().toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'Asia/Kolkata',
-  });
-  // formattedDate example: "11 May 2026" (en-GB locale, IST)
-
-  // Send
-  let sendResult;
-  try {
-    sendResult = await sendLetterSealedEmail({
-      to: sessionUser.email,
-      senderName: sanitized.senderName || 'there',
-      formattedAmount,
-      paymentId,
-      formattedDate,
-    });
-  } catch (sendErr) {
-    // sendLetterSealedEmail is documented never-throws; belt-and-suspenders.
-    console.error('[Verify] Email send threw (unexpected)', {
-      requestId,
-      paymentId,
-      error: sendErr.message,
-    });
-    return;
-  }
-
-  if (!sendResult || sendResult.ok !== true) {
-    console.error('[Verify] Email send failed', {
-      requestId,
-      paymentId,
-      error: sendResult?.error || 'unknown',
-    });
-    return;
-  }
-
-  console.log('[Verify] Email sent', {
-    requestId,
-    paymentId,
-    resendMessageId: sendResult.id,
-  });
-
-  // Mark sent for idempotency. Object shape carries the Resend message id
-  // alongside the timestamp so support can correlate inbox-side delivery
-  // events back to a payment without a separate log lookup.
-  try {
-    await adminDb.ref(`notifications/${paymentId}`).set({
-      letterSealedSentAt: new Date().toISOString(),
       resendMessageId: sendResult.id,
     });
-  } catch (markErr) {
-    // Worst case: a retry could re-send. Log loudly. Don't fail the response.
-    console.error('[Verify] Email idempotency-mark write failed (possible duplicate on retry)', {
+
+    try {
+      await adminDb.ref(`notifications/${paymentId}`).set({
+        letterSealedSentAt: new Date().toISOString(),
+        resendMessageId: sendResult.id,
+        // PR-46.5: delivery destination only — not an identity primitive (doctrine).
+        recipientEmail: effectiveEmail,
+      });
+    } catch (markErr) {
+      console.error('[Verify] Email idempotency-mark write failed (possible duplicate on retry)', {
+        requestId,
+        paymentId,
+        resendMessageId: sendResult.id,
+        error: markErr.message,
+      });
+    }
+
+    return { delivered: true };
+  } catch (err) {
+    console.error('[Verify] sendLetterSealedNotification unexpected', {
       requestId,
       paymentId,
-      resendMessageId: sendResult.id,
-      error: markErr.message,
+      error: err?.message || err,
     });
+    return { delivered: false };
   }
 }
 
@@ -293,7 +320,10 @@ export default async function handler(req, res) {
     coupleData,
     paymentMode,
     founderToken,
+    recipientEmail: recipientEmailRaw,
   } = req.body || {};
+
+  const transportRecipientEmail = normalizeRecipientEmail(recipientEmailRaw);
 
   // ════════════════════════════════════════════════════════════
   // PATH A: FOUNDER ACCESS
@@ -400,6 +430,17 @@ export default async function handler(req, res) {
       const senderSlug = slugify(sanitized.senderName || 'sender');
       const receiverSlug = slugify(sanitized.recipientName || 'receiver');
       const shareSlug = `${senderSlug}--${receiverSlug}--${sessionKey}`;
+      const shareUrl = `${getPublicSiteOrigin()}/${shareSlug}`;
+
+      const emailResult = await sendLetterSealedNotification({
+        sessionUser: senderSessionUser,
+        sanitized,
+        paymentId: founderId,
+        amountPaise: 0,
+        recipientEmail: transportRecipientEmail,
+        shareUrl,
+        requestId,
+      });
 
       console.log('[Verify] ✓ FOUNDER', { requestId, sessionKey, paymentId: founderId });
 
@@ -409,6 +450,7 @@ export default async function handler(req, res) {
         shareSlug,
         replyEnabled,
         paymentId: founderId,
+        emailDelivered: emailResult.delivered,
       });
     } catch (error) {
       // Best effort rollback
@@ -521,6 +563,16 @@ export default async function handler(req, res) {
         if (final && final.sessionKey) {
           const s = slugify(coupleData.senderName || 'sender');
           const r = slugify(coupleData.recipientName || 'receiver');
+          let emailDelivered = false;
+          try {
+            const nSnap = await adminDb.ref(`notifications/${razorpay_payment_id}`).once('value');
+            const nv = nSnap.val();
+            if (nv && typeof nv === 'object' && nv.resendMessageId) {
+              emailDelivered = true;
+            }
+          } catch {
+            emailDelivered = false;
+          }
           return res.status(200).json({
             verified: true,
             replay: true,
@@ -528,6 +580,7 @@ export default async function handler(req, res) {
             shareSlug: `${s}--${r}--${final.sessionKey}`,
             replyEnabled: final.replyEnabled || false,
             paymentId: razorpay_payment_id,
+            emailDelivered,
           });
         }
 
@@ -688,21 +741,20 @@ export default async function handler(req, res) {
     // multi-path write succeeds so it never fires on payment failure.
     await markActiveDraftCompleted(senderUid);
 
-    // PR-46 — letter-sealed notification email. Authenticated paying senders
-    // only (guests + founder path skip via internal guards). Non-critical
-    // path: helper never throws and never gates this HTTP response.
-    await sendLetterSealedNotification({
+    const senderSlug = slugify(sanitized.senderName || 'sender');
+    const receiverSlug = slugify(sanitized.recipientName || 'receiver');
+    const shareSlug = `${senderSlug}--${receiverSlug}--${sessionKey}`;
+    const shareUrl = `${getPublicSiteOrigin()}/${shareSlug}`;
+
+    const emailResult = await sendLetterSealedNotification({
       sessionUser: senderSessionUser,
       sanitized,
       paymentId: razorpay_payment_id,
       amountPaise: orderAmount,
+      recipientEmail: transportRecipientEmail,
+      shareUrl,
       requestId,
     });
-
-    // 7. RETURN SHARE URL
-    const senderSlug = slugify(sanitized.senderName || 'sender');
-    const receiverSlug = slugify(sanitized.recipientName || 'receiver');
-    const shareSlug = `${senderSlug}--${receiverSlug}--${sessionKey}`;
 
     console.log('[Verify] ✓', { requestId, sessionKey, paymentId: razorpay_payment_id });
 
@@ -712,6 +764,7 @@ export default async function handler(req, res) {
       shareSlug,
       replyEnabled,
       paymentId: razorpay_payment_id,
+      emailDelivered: emailResult.delivered,
     });
 
   } catch (error) {

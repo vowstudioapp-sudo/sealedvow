@@ -11,11 +11,12 @@ interface Props {
   data: CoupleData;
   sessionKey: string;   // NEW: from server via payment flow
   shareSlug: string;    // NEW: from server via payment flow
+  emailDelivered?: boolean;
   onPreview: () => void;
   onEdit: () => void;
 }
 
-export const SharePackage: React.FC<Props> = ({ data, sessionKey, shareSlug, onPreview, onEdit }) => {
+export const SharePackage: React.FC<Props> = ({ data, sessionKey, shareSlug, emailDelivered, onPreview, onEdit }) => {
   const [copied, setCopied] = useState(false);
   const [masterCopied, setMasterCopied] = useState(false);
 
@@ -98,6 +99,11 @@ export const SharePackage: React.FC<Props> = ({ data, sessionKey, shareSlug, onP
           >
             <span>Deliver Key</span>
           </button>
+          {emailDelivered ? (
+            <p className="mt-3 text-[9px] text-luxury-stone/75 tracking-[0.06em] text-center font-serif-elegant italic">
+              We also sent your share link to your email.
+            </p>
+          ) : null}
         </div>
 
         {/* MASTER KEY (For Remote/Sync) */}

@@ -5,10 +5,12 @@ interface PaymentResult {
   replyEnabled: boolean;
   sessionKey: string;
   shareSlug: string;
+  emailDelivered?: boolean;
 }
 
 interface Props {
   data: CoupleData;
+  guestEmail?: string;
   onPaymentComplete: (result: PaymentResult) => void;
   onBack: () => void;
 }
@@ -43,7 +45,7 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack }) => {
+export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentComplete, onBack }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
@@ -95,6 +97,9 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
           paymentMode: 'founder',
           founderToken: orderData.founderToken,
           coupleData: data,
+          ...(guestEmail && guestEmail.trim()
+            ? { recipientEmail: guestEmail.trim() }
+            : {}),
         }),
       });
 
@@ -105,6 +110,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
           replyEnabled: result.replyEnabled,
           sessionKey: result.sessionKey,
           shareSlug: result.shareSlug,
+          emailDelivered: result.emailDelivered === true,
         });
       } else {
         setFounderError(result.error || 'Session creation failed.');
@@ -183,7 +189,12 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
         name: 'Sealed Vow',
         description: PRODUCT_NAME,
         order_id: orderId,
-        prefill: { name: data.senderName || '' },
+        prefill: {
+          name: data.senderName || '',
+          ...(guestEmail && guestEmail.trim()
+            ? { email: guestEmail.trim() }
+            : {}),
+        },
         theme: { color: '#722F37' },
         handler: async (response: any) => {
           try {
@@ -199,6 +210,9 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
                 razorpay_signature: response.razorpay_signature,
                 coupleData: data,
                 ...(requestId ? { requestId } : {}),
+                ...(guestEmail && guestEmail.trim()
+                  ? { recipientEmail: guestEmail.trim() }
+                  : {}),
               }),
             });
 
@@ -214,6 +228,7 @@ export const PaymentStage: React.FC<Props> = ({ data, onPaymentComplete, onBack 
                 replyEnabled: result.replyEnabled,
                 sessionKey: result.sessionKey,
                 shareSlug: result.shareSlug,
+                emailDelivered: result.emailDelivered === true,
               });
               resolve();
             } else {

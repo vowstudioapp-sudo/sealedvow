@@ -20,7 +20,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const [showTerms,   setShowTerms]   = useState(false);
   const [showHelp,    setShowHelp]    = useState(false);
   const [showLogin,   setShowLogin]   = useState(false);
-  const [emailInput,  setEmailInput]  = useState('');
   const [pastHero,    setPastHero]    = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
@@ -113,11 +112,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     // draft exists) instead of silently restoring it.
     markIntentionalEntry();
     window.location.href = "/create";
-  };
-
-  const handleSendLoginLink = () => {
-    if (!emailInput || !emailInput.includes('@')) return;
-    console.log('Send magic link to:', emailInput);
   };
 
   return (
@@ -526,9 +520,6 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
             </p>
           )}
           <button className="lp-btn-guest" onClick={() => { setShowLogin(false); onEnter(); }}>Continue as Guest</button>
-          <div className="lp-modal__or"><span>or</span></div>
-          <input className="lp-modal__input" type="email" placeholder="your@email.com" value={emailInput} onChange={e => setEmailInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendLoginLink()} />
-          <button className="lp-btn-email-send" onClick={handleSendLoginLink}>Send login link</button>
           <p className="lp-modal__guest-note">Guest letters are not saved after the session ends.</p>
         </div>
       </div>
