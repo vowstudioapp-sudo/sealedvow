@@ -91,8 +91,6 @@ const THEME_BG_COLORS: Record<Theme, string> = Object.fromEntries(
 const STUDIO_BG_COLOR = THEME_SYSTEM.obsidian.boardSurface;
 
 
-const STORAGE_KEY = 'vday_data';
-
 const hydrateCoupleData = (value: CoupleData): CoupleData => ({
   ...value,
   theme: value.theme ?? 'obsidian',
@@ -145,44 +143,13 @@ const isStageValid = (
   return typeof data?.finalLetter === 'string' && data.finalLetter.length > 0;
 };
 
-const readPersistedCoupleData = (): CoupleData | null => {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return null;
-    const parsed = JSON.parse(saved);
-    const result = validateCoupleData(parsed);
-    if (!result.success) {
-      console.warn('[Persistence] Discarding invalid CoupleData from storage');
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return hydrateCoupleData(result.data);
-  } catch (e) {
-    console.error('[Persistence] Failed to read CoupleData from storage', e);
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
-};
-
-// H6: optional onQuotaError callback. Mobile Safari's ~5-10 MB cap (and iOS's
-// memory-pressure-driven storage clears) can throw QuotaExceededError on
-// setItem. Without a user-visible signal the draft is silently lost on next
-// page load. Caller passes a setter to surface a banner.
-const writePersistedCoupleData = (value: CoupleData, onQuotaError?: () => void): void => {
-  const hydrated = hydrateCoupleData(value);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(hydrated));
-  } catch (e) {
-    console.error('[Persistence] Failed to write CoupleData to storage', e);
-    const isQuotaError = e instanceof DOMException && (
-      e.name === 'QuotaExceededError' ||
-      e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
-      e.code === 22 ||
-      e.code === 1014
-    );
-    if (isQuotaError && onQuotaError) onQuotaError();
-  }
-};
+// PR-47.1 (Option F): readPersistedCoupleData / writePersistedCoupleData
+// removed alongside the `vday_data` STORAGE_KEY. Refined-state recovery
+// fidelity now lives entirely in vday_data_draft via the extended
+// selectiveHydrate allowlist in hooks/usePreparationPersistence.ts. The
+// Refine handoff writes the enriched payload through writeDraftFromExternal
+// (see RefineStage.onSave below). See docs/diagnostics/2026-05-12-mount-
+// authority-replay.md §8.1.
 
 // Type for Eid form data (matches EidPreparationForm output)
 type EidFormData = {
@@ -291,10 +258,12 @@ const App: React.FC = () => {
     }
   }
 
-  // H6: surfaces when localStorage.setItem throws QuotaExceededError so the
-  // user can save their work before refreshing. Dismissable; sticky for the
-  // rest of the session because the underlying quota likely persists.
-  const [storageError, setStorageError] = useState(false);
+  // PR-47.1 (Option F): the H6 storage-quota banner was sourced exclusively
+  // from writePersistedCoupleData's onQuotaError callback. With that writer
+  // removed, the banner has no caller. vday_data_draft writes already swallow
+  // quota errors with console.warn (see hooks/usePreparationPersistence.ts);
+  // restoring symmetric, user-visible quota signaling across both writers is
+  // queued as a Phase 1 stabilization item.
 
   const {
     state: linkState,
@@ -343,16 +312,15 @@ const App: React.FC = () => {
     return initialDraft.stage;
   });
   const [data, setData] = useState<CoupleData | null>(() => {
-    // Mount-only canonical creator-state restore. This runs exactly once and
-    // must not be duplicated in any effect with stage/linkState in its deps —
-    // doing so re-reads persistence on every transition and stomps fresh
-    // in-memory state during active composition. PREPARE is owned by
-    // PreparationForm's local state; app-level data is null there.
-    // See docs/diagnostics/state-authority-hydration-conflict.md.
+    // Mount-only canonical creator-state restore. Single local authority is
+    // vday_data_draft, read via peekDraft() into `initialDraft`. PR-47.1
+    // (Option F) collapsed the prior dual-authority setup — there is no
+    // second bucket to consult and therefore no cross-letter contamination
+    // possible at mount. PREPARE is owned by PreparationForm's local state;
+    // app-level data is null there. See
+    // docs/diagnostics/2026-05-12-mount-authority-replay.md.
     if (getRouteType() !== 'LETTER_CREATE') return null;
     if (!initialDraft.stage || initialDraft.stage === AppStage.PREPARE) return null;
-    const persistedRefined = readPersistedCoupleData();
-    if (persistedRefined) return persistedRefined;
     if (!initialDraft.data) return null;
     if (!isStageValid(initialDraft.stage, initialDraft.data)) return null;
     return hydrateCoupleData(initialDraft.data as CoupleData);
@@ -1406,19 +1374,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen relative overflow-x-hidden transition-colors duration-1000" style={{ backgroundColor: '#0C0A09' }}>
-      {/* H6: storage-quota banner — sticky, dismissable, single-instance per session. */}
-      {storageError && (
-        <div className="fixed top-0 inset-x-0 z-[100] bg-amber-900/95 text-amber-100 text-[10px] md:text-xs uppercase tracking-widest px-4 py-3 text-center shadow-lg">
-          Browser storage is full. Save your letter to avoid losing it on refresh.
-          <button
-            onClick={() => setStorageError(false)}
-            className="ml-3 underline font-bold"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
       {!isEidiRoute(routeType) && isBooting && !isReceiverLink && bootScreen}
 
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/paper.png")' }}></div>
@@ -1474,7 +1429,12 @@ const App: React.FC = () => {
                 // (PERSONAL_INTRO → QUESTION → MAIN_EXPERIENCE) — the same
                 // sequence the receiver gets, with preview chrome on top.
                 safeSetStage(AppStage.PERSONAL_INTRO);
-                writePersistedCoupleData(updated, () => setStorageError(true));
+                // PR-47.1 (Option F): merge enrichedData + finalLetter into
+                // the single surviving authority (vday_data_draft). The
+                // extended selectiveHydrate allowlist preserves refined-state
+                // fidelity (myth, sacredLocation, video, audio, aiImageUrl)
+                // on refresh.
+                writeDraftFromExternal({ ...enrichedData, finalLetter });
               }}
               onBack={() => safeSetStage(AppStage.PREPARE)}
               onUpdateLetter={(letter) => {
