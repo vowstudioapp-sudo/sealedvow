@@ -412,12 +412,26 @@ const App: React.FC = () => {
   // activation may fire one /transition with stale state in the brief
   // window before hydration completes (silent 409 if backward, accepted if
   // forward; not user-visible either way).
+  // PR-48 Phase 2 (D1): `revision` is the monotonic content-revision counter
+  // returned by the server. It is populated by /api/drafts/list hydration
+  // and by /api/drafts/save success responses. It is required for every
+  // UPDATE call (per contract §6); CREATE calls (no draftId) ignore it.
+  //
+  // The localStorage hint does NOT carry revision in Phase 2. If the user
+  // clicks save in the narrow pre-hydration window (lazy init populated
+  // draftId from hint, /list response not yet arrived), the save sends no
+  // draftId — falling through to a CREATE attempt that the server may
+  // reject as ACTIVE_DRAFT_EXISTS. The explicit-reconciliation rule from
+  // doctrine §6.5 forbids chronological inference; the client must not
+  // guess at a revision it has not been told.
   const [draftRecord, setDraftRecord] = useState<{
     draftId: string | null;
     seedDraftState: DraftState | null;
+    revision: number | null;
   }>(() => ({
     draftId: peekDraft().draftId,
     seedDraftState: null,
+    revision: null,
   }));
 
   // PR #18b — variant + onCancel are additive. Existing payment call sites
@@ -547,12 +561,21 @@ const App: React.FC = () => {
         step?: 1 | 2 | 3;
         draftState: DraftState;
         persistenceStatus: PersistenceStatus;
+        expectedRevision?: number;
       } = {
         data: data ?? {},
         draftState: draftStateToSend,
         persistenceStatus: 'ACTIVE',
       };
-      if (draftRecord.draftId) payload.draftId = draftRecord.draftId;
+      // PR-48 Phase 2 (D4): UPDATE requires both draftId and expectedRevision.
+      // Pair them. If either is missing, omit both and fall through to a
+      // CREATE attempt (server will reject with ACTIVE_DRAFT_EXISTS if a
+      // cloud ACTIVE already exists — explicit reconciliation, never
+      // chronological inference, per doctrine §6.5).
+      if (draftRecord.draftId && typeof draftRecord.revision === 'number') {
+        payload.draftId = draftRecord.draftId;
+        payload.expectedRevision = draftRecord.revision;
+      }
       if (step !== undefined) payload.step = step;
 
       try {
@@ -575,7 +598,12 @@ const App: React.FC = () => {
           return;
         }
 
-        const json = (await res.json()) as { ok?: boolean; draftId?: string; updatedAt?: number };
+        const json = (await res.json()) as {
+          ok?: boolean;
+          draftId?: string;
+          updatedAt?: number;
+          revision?: number;
+        };
 
         if (!mountedRef.current) {
           saveInFlightRef.current = false;
@@ -599,12 +627,18 @@ const App: React.FC = () => {
           return;
         }
 
-        // Success — update draftRecord atomically (single setter, both
+        // Success — update draftRecord atomically (single setter, all
         // fields together) so the observer's activation seeding sees the
         // matching values in the same render. seedDraftState carries the
         // state we just told the server about; the observer will treat
         // the next /transition for the same state as a noop (same_state).
-        setDraftRecord({ draftId: json.draftId, seedDraftState: draftStateToSend });
+        // PR-48 Phase 2 (D1): also capture revision from the response so
+        // subsequent UPDATE saves can echo it back as expectedRevision.
+        setDraftRecord({
+          draftId: json.draftId,
+          seedDraftState: draftStateToSend,
+          revision: typeof json.revision === 'number' ? json.revision : null,
+        });
 
         // PR #21 — mirror the just-confirmed draftId to localStorage as the
         // optimistic hint. On the next page reload, the lazy initializer for
@@ -666,7 +700,7 @@ const App: React.FC = () => {
     // user's stale draftId (cloud-wins reconciliation corrects it, but
     // starting clean is preferable).
     if (!capturedUid) {
-      setDraftRecord({ draftId: null, seedDraftState: null });
+      setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
       setLastSaveSuccessAt(null);
       setLastSaveError(null);
       writeDraftId(null);
@@ -713,7 +747,7 @@ const App: React.FC = () => {
           // localStorage hint is stale (cloud was the source of truth and
           // it now disagrees). Clear the hint and any draftRecord that may
           // have been optimistically populated by the lazy initializer.
-          setDraftRecord({ draftId: null, seedDraftState: null });
+          setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
           writeDraftId(null);
           return;
         }
@@ -731,12 +765,19 @@ const App: React.FC = () => {
           draftId?: string;
           draftState?: DraftState;
           updatedAt?: number;
+          revision?: number;
         };
         if (!oldest?.draftId || !oldest?.draftState) return;
 
+        // PR-48 Phase 2 (D1): capture cloud revision so the next save can
+        // echo it back as expectedRevision. Pre-Phase-2 drafts without a
+        // revision field hydrate as null; first save against them falls
+        // through to CREATE-attempt path and the server's transaction
+        // detects the existing ACTIVE.
         setDraftRecord({
           draftId: oldest.draftId,
           seedDraftState: oldest.draftState,
+          revision: typeof oldest.revision === 'number' ? oldest.revision : null,
         });
         // PR #21 — cloud-wins reconciliation. Mirror the cloud's draftId
         // into the localStorage hint. If the prior hint matched, this is a
