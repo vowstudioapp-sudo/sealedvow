@@ -81,6 +81,7 @@ import { saveDraft, type SaveDraftInput } from './utils/saveDraft';
 import { pauseDraft, discardDraft } from './utils/lifecycleDraft';
 import { StaleRevisionModal } from './components/StaleRevisionModal';
 import { BeginNewPromptModal } from './components/BeginNewPromptModal';
+import { SignInReconciliationModal } from './components/SignInReconciliationModal';
 import { getDraftMetadata } from './hooks/usePreparationPersistence';
 
 // PR-48 Phase 4 — Reconciliation authority is owned by App.tsx via this
@@ -88,6 +89,21 @@ import { getDraftMetadata } from './hooks/usePreparationPersistence';
 // time. DraftResumeModal and SignInPromptModal remain on their existing
 // independent state systems; this union covers only the Phase 4 modals.
 // Begin-New and Sign-in Case B cases are added in Commits 4 and 5.
+interface CloudDraftSnapshot {
+  draftId: string;
+  data: CoupleData;
+  draftState: DraftState;
+  revision: number;
+  updatedAt: number | null;
+}
+
+interface LocalDraftSnapshot {
+  recipientName: string;
+  wordCount: number;
+  photoCount: number;
+  savedAt: string;
+}
+
 type ReconciliationState =
   | { kind: 'none' }
   | {
@@ -100,7 +116,30 @@ type ReconciliationState =
       kind: 'begin_new';
       source: 'begin_new_button';
       hasCloudActive: boolean;
+    }
+  | {
+      kind: 'sign_in_case_b';
+      source: 'sign_in';
+      cloudDraft: CloudDraftSnapshot;
+      localMetadata: LocalDraftSnapshot;
     };
+
+// PR-48 Phase 4 (Commit 5) — hydration resolution state machine.
+// Sign-in pending actions (via commitPendingAction) are gated on this
+// becoming 'resolved'. Transitions:
+//   'idle'                  — initial; or post-sign-out.
+//   'hydrating'             — /api/drafts/list in-flight.
+//   'needs_reconciliation'  — Case B detected; modal open; user must choose.
+//   'resolved'              — Case A silent hydration done, Case C silent
+//                              local-authority confirmed, or Case B resolved
+//                              by user choice.
+// Guests never enter this machine — commitPendingAction short-circuits on
+// !authUser per the integration rule.
+type HydrationResolutionState =
+  | 'idle'
+  | 'hydrating'
+  | 'needs_reconciliation'
+  | 'resolved';
 import type { DraftState, PersistenceStatus } from './types/draft';
 import { DRAFT_STATE_ORDER } from './types/draft';
 import { UI_STAGE_TO_DRAFT_STATE } from './hooks/draftStateLogic';
@@ -463,6 +502,16 @@ const App: React.FC = () => {
   // preserving byte-identical UX. Persistence callers pass 'persistence' to
   // switch the modal copy/Guest-button visibility, and pass onCancel to be
   // notified when the user dismisses without signing in.
+  // PR-48 Phase 4 (Commit 5) — Hydration gating layer integrated into the
+  // existing pendingAction system. commitPendingAction below defers
+  // signed-in pending actions until this state becomes 'resolved'. The
+  // /list hydration effect drives all transitions. Guests bypass this gate.
+  // Declared here (rather than alongside other state hooks below) so it
+  // is in scope for commitPendingAction's closure reference and for the
+  // watcher useEffect that releases deferred actions.
+  const [hydrationResolutionState, setHydrationResolutionState] =
+    useState<HydrationResolutionState>('idle');
+
   const runOrPromptSignIn = (
     action: () => void,
     variant: 'payment' | 'persistence' = 'payment',
@@ -486,11 +535,53 @@ const App: React.FC = () => {
       const t = guestCapturedEmail.trim();
       setGuestEmail(t.length > 0 ? t : null);
     }
+
+    // PR-48 Phase 4 (Commit 5) — hydration gating.
+    //
+    // Guest path (no authUser): preserve pre-Phase-4 behavior. Run the
+    // action immediately. No cloud state to reconcile. PR-46.5 guest email
+    // continuity is unaffected — guestCapturedEmail handling above is
+    // identical to the prior commit.
+    //
+    // Signed-in path: hold the action until /list hydration resolves.
+    // The action stays in pendingActionRef; the effect below watches
+    // hydrationResolutionState and fires the action when it becomes
+    // 'resolved' (Case A silent, Case C silent, or Case B post-user-choice).
+    //
+    // The hydrating effect is triggered by the same authUser?.uid change
+    // that leads to commitPendingAction being called — so by the time this
+    // function runs, hydration is already starting (state will be 'idle'
+    // or 'hydrating'). We don't need to kick it off here.
+    if (!authUser) {
+      const action = pendingActionRef.current;
+      pendingActionRef.current = null;
+      pendingCancelRef.current = null;
+      if (action) action();
+      return;
+    }
+
+    if (hydrationResolutionState === 'resolved') {
+      const action = pendingActionRef.current;
+      pendingActionRef.current = null;
+      pendingCancelRef.current = null;
+      if (action) action();
+      return;
+    }
+    // Else: leave action in pendingActionRef. The effect watching
+    // hydrationResolutionState below releases it once 'resolved'.
+  };
+
+  // PR-48 Phase 4 (Commit 5) — release deferred pending action when
+  // hydration resolution completes. This fires for all three resolution
+  // paths (silent Case A, silent Case C, user-resolved Case B).
+  useEffect(() => {
+    if (hydrationResolutionState !== 'resolved') return;
     const action = pendingActionRef.current;
+    if (!action) return;
     pendingActionRef.current = null;
     pendingCancelRef.current = null;
-    if (action) action();
-  };
+    action();
+  }, [hydrationResolutionState]);
 
   const cancelPendingAction = () => {
     const onCancel = pendingCancelRef.current;
@@ -831,6 +922,142 @@ const App: React.FC = () => {
     setReconciliation({ kind: 'none' });
   };
 
+  // PR-48 Phase 4 (Commit 5) — Sign-in Case B handlers.
+  //
+  // Continue Dashboard Draft: discard local, hydrate from cloud ACTIVE,
+  // update draftRecord to cloud's identity. Operationally convergent
+  // with Discard Local Draft (both clear local and trust cloud); distinct
+  // label per locked Phase 4 spec.
+  //
+  // Save Local Draft as New: two-step server orchestration —
+  //   1. pauseDraft(existing cloud ACTIVE, expectedRevision)
+  //   2. saveDraft({...local data, no draftId})  → creates new ACTIVE
+  // Then clear local + set draftRecord to the new ACTIVE.
+  //
+  // Discard Local Draft: same outcome as Continue Dashboard Draft.
+  //
+  // All three paths transition hydrationResolutionState → 'resolved',
+  // which releases any deferred pending action via the effect above.
+
+  const caseBInFlightRef = useRef(false);
+
+  const applyCloudActiveToState = (cloud: CloudDraftSnapshot) => {
+    clearPreparationDraft();
+    writeDraftId(cloud.draftId);
+    // Replace App.tsx in-memory data with cloud's. PreparationForm will
+    // remount cleanly via key bump; the App-level data flows to downstream
+    // stages (REFINE/PERSONAL_INTRO/MAIN_EXPERIENCE) that read it directly.
+    setData(hydrateCoupleData(cloud.data));
+    setDraftRecord({
+      draftId: cloud.draftId,
+      seedDraftState: cloud.draftState,
+      revision: cloud.revision,
+    });
+    setLastSaveError(null);
+    if (typeof cloud.updatedAt === 'number') {
+      setLastSaveSuccessAt(cloud.updatedAt);
+    }
+    setPrepFormResetKey((k) => k + 1);
+  };
+
+  const handleSignInContinueDashboardDraft = () => {
+    if (reconciliation.kind !== 'sign_in_case_b') return;
+    applyCloudActiveToState(reconciliation.cloudDraft);
+    setReconciliation({ kind: 'none' });
+    setHydrationResolutionState('resolved');
+  };
+
+  const handleSignInDiscardLocalDraft = () => {
+    if (reconciliation.kind !== 'sign_in_case_b') return;
+    applyCloudActiveToState(reconciliation.cloudDraft);
+    setReconciliation({ kind: 'none' });
+    setHydrationResolutionState('resolved');
+  };
+
+  const handleSignInSaveLocalDraftAsNew = async () => {
+    if (reconciliation.kind !== 'sign_in_case_b') return;
+    if (caseBInFlightRef.current) return;
+    caseBInFlightRef.current = true;
+
+    const cloudDraft = reconciliation.cloudDraft;
+
+    // Step 1: pause the existing cloud ACTIVE.
+    const pauseResult = await pauseDraft({
+      draftId: cloudDraft.draftId,
+      expectedRevision: cloudDraft.revision,
+    });
+    if (!mountedRef.current) {
+      caseBInFlightRef.current = false;
+      return;
+    }
+    if (pauseResult.kind !== 'ok') {
+      // Pause failed. Leave reconciliation modal open so the user can
+      // retry or pick a different option. Surface inline error.
+      caseBInFlightRef.current = false;
+      setLastSaveError("Couldn't set aside the dashboard draft. Try again.");
+      return;
+    }
+
+    // Step 2: create new ACTIVE from local. Local data is in App.tsx's
+    // `data` state (which was populated from PreparationForm or seeded
+    // from peekDraft on mount). draftStateToSend is the same monotonic
+    // computation used by the save flow; for a Case B fresh user, this
+    // is typically 'IN_PROGRESS' since the local working copy hasn't
+    // been refined yet.
+    const candidate = UI_STAGE_TO_DRAFT_STATE[stage] ?? 'IN_PROGRESS';
+    const seed = draftRecord.seedDraftState;
+    const draftStateToSend: DraftState =
+      seed !== null && DRAFT_STATE_ORDER[seed] > DRAFT_STATE_ORDER[candidate]
+        ? seed
+        : candidate;
+    const localStep = peekDraft().step;
+    const step = stage === AppStage.PREPARE ? (localStep ?? undefined) : undefined;
+
+    const saveInput: SaveDraftInput = {
+      data: data ?? {},
+      draftState: draftStateToSend,
+    };
+    if (step !== undefined) saveInput.step = step;
+    // Intentionally no draftId / no expectedRevision — CREATE path.
+
+    const saveResult = await saveDraft(saveInput);
+    if (!mountedRef.current) {
+      caseBInFlightRef.current = false;
+      return;
+    }
+    if (saveResult.kind !== 'ok') {
+      // Save failed AFTER pause succeeded. Cloud now has zero ACTIVE
+      // (the donor was demoted) + one PAUSED (the donor). Local is
+      // intact. Surface the error; the user can retry — the next
+      // attempt's pauseDraft will hit ILLEGAL_STATUS_TRANSITION
+      // (already PAUSED) which we handle by skipping straight to save.
+      // For Phase 4 simplicity, surface the error and leave the modal
+      // open. Phase 5+ can refine the retry path.
+      caseBInFlightRef.current = false;
+      setLastSaveError("Couldn't save your local draft as new. Try again.");
+      return;
+    }
+
+    // Both steps succeeded. Reset everything; the new ACTIVE's draft is
+    // now the cloud authority. Local working copy was the source; we now
+    // clear it because the user's intent was "save AS NEW" — i.e., a new
+    // cloud draft, not necessarily that local stays editable.
+    clearPreparationDraft();
+    writeDraftId(saveResult.draftId);
+    setData(null);
+    setDraftRecord({
+      draftId: saveResult.draftId,
+      seedDraftState: draftStateToSend,
+      revision: saveResult.revision,
+    });
+    setLastSaveError(null);
+    setLastSaveSuccessAt(Date.now());
+    setPrepFormResetKey((k) => k + 1);
+    setReconciliation({ kind: 'none' });
+    setHydrationResolutionState('resolved');
+    caseBInFlightRef.current = false;
+  };
+
   const handleSaveAndContinueLater = () => {
     // Concurrency guard — prevent overlapping saves from rapid re-clicks.
     if (saveInFlightRef.current) return;
@@ -1004,6 +1231,9 @@ const App: React.FC = () => {
       setLastSaveSuccessAt(null);
       setLastSaveError(null);
       writeDraftId(null);
+      // PR-48 Phase 4 (Commit 5) — sign-out resets the hydration gate.
+      // Next sign-in re-enters the state machine from 'idle'.
+      setHydrationResolutionState('idle');
       return;
     }
 
@@ -1024,6 +1254,9 @@ const App: React.FC = () => {
     // initial-hint state correctly.
 
     let cancelled = false;
+    // PR-48 Phase 4 (Commit 5) — gate begins. Hydration in-flight; any
+    // signed-in pending action is held until this resolves below.
+    setHydrationResolutionState('hydrating');
     fetch('/api/drafts/list', {
       method: 'POST',
       credentials: 'include',
@@ -1049,6 +1282,10 @@ const App: React.FC = () => {
           // have been optimistically populated by the lazy initializer.
           setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
           writeDraftId(null);
+          // PR-48 Phase 4 (Commit 5) — Case C: no cloud ACTIVE + local
+          // remains authoritative (local content stays untouched). Silent
+          // resolution per locked spec — no modal, no auto-save.
+          setHydrationResolutionState('resolved');
           return;
         }
 
@@ -1063,12 +1300,56 @@ const App: React.FC = () => {
         );
         const oldest = activeDrafts[0] as {
           draftId?: string;
+          data?: CoupleData;
           draftState?: DraftState;
           updatedAt?: number;
           revision?: number;
         };
-        if (!oldest?.draftId || !oldest?.draftState) return;
+        if (!oldest?.draftId || !oldest?.draftState) {
+          // Malformed cloud response. Treat as 'resolved' to unblock any
+          // deferred pending action — draftRecord remains in its current
+          // state.
+          setHydrationResolutionState('resolved');
+          return;
+        }
 
+        // PR-48 Phase 4 (Commit 5) — Case A vs B split.
+        // Case A: cloud ACTIVE + no meaningful local. Silent hydration.
+        // Case B: cloud ACTIVE + meaningful local. Surface modal; defer.
+        const localMeta = getDraftMetadata();
+        const localHasMeaningfulContent =
+          !!localMeta && localMeta.hasMeaningfulContent;
+
+        if (localHasMeaningfulContent && oldest.data) {
+          // Case B — explicit reconciliation required. Do NOT touch
+          // draftRecord yet; the user's choice in the modal determines
+          // which side wins.
+          const cloudRevision =
+            typeof oldest.revision === 'number' ? oldest.revision : 1;
+          const cloudUpdatedAt =
+            typeof oldest.updatedAt === 'number' ? oldest.updatedAt : null;
+          setReconciliation({
+            kind: 'sign_in_case_b',
+            source: 'sign_in',
+            cloudDraft: {
+              draftId: oldest.draftId,
+              data: oldest.data,
+              draftState: oldest.draftState,
+              revision: cloudRevision,
+              updatedAt: cloudUpdatedAt,
+            },
+            localMetadata: {
+              recipientName: localMeta?.recipientName ?? '',
+              wordCount: localMeta?.wordCount ?? 0,
+              photoCount: localMeta?.photoCount ?? 0,
+              savedAt: localMeta?.savedAt ?? '',
+            },
+          });
+          setHydrationResolutionState('needs_reconciliation');
+          return;
+        }
+
+        // Case A — silent hydration (existing behavior).
         // PR-48 Phase 2 (D1): capture cloud revision so the next save can
         // echo it back as expectedRevision. Pre-Phase-2 drafts without a
         // revision field hydrate as null; first save against them falls
@@ -1090,10 +1371,17 @@ const App: React.FC = () => {
         if (typeof oldest.updatedAt === 'number') {
           setLastSaveSuccessAt(oldest.updatedAt);
         }
+        setHydrationResolutionState('resolved');
       })
       .catch(() => {
         // Silent: background hydration must never surface a UI error.
         // draftRecord stays cleared; observer remains dormant.
+        // PR-48 Phase 4 (Commit 5) — also unblock any deferred pending
+        // action. The user can retry; the next /list fetch will re-enter
+        // the gate.
+        if (!cancelled) {
+          setHydrationResolutionState('resolved');
+        }
       });
 
     return () => {
@@ -2028,6 +2316,25 @@ const App: React.FC = () => {
           onSaveAndStartNew={handleBeginNewSaveAndStartNew}
           onDiscardAndStartNew={handleBeginNewDiscardAndStartNew}
           onCancel={handleBeginNewCancel}
+        />
+      )}
+      {reconciliation.kind === 'sign_in_case_b' && (
+        <SignInReconciliationModal
+          isOpen={true}
+          cloudDraft={{
+            recipientName: reconciliation.cloudDraft.data.recipientName,
+            draftState: reconciliation.cloudDraft.draftState,
+            updatedAt: reconciliation.cloudDraft.updatedAt,
+          }}
+          localMetadata={{
+            recipientName: reconciliation.localMetadata.recipientName,
+            wordCount: reconciliation.localMetadata.wordCount,
+            photoCount: reconciliation.localMetadata.photoCount,
+            savedAt: reconciliation.localMetadata.savedAt,
+          }}
+          onContinueDashboardDraft={handleSignInContinueDashboardDraft}
+          onSaveLocalDraftAsNew={handleSignInSaveLocalDraftAsNew}
+          onDiscardLocalDraft={handleSignInDiscardLocalDraft}
         />
       )}
     </div>
