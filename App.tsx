@@ -808,11 +808,18 @@ const App: React.FC = () => {
   // pass-through prevents a duplicate /transition write on the activation
   // tick — without it, the observer would always fire for the current
   // UIStage on first activation because lastPersistedDraftStateRef starts null.
+  // PR-48 Phase 3: currentRevision is the observer's CAS token. It is
+  // seeded at the just-activated edge from draftRecord.revision (which is
+  // populated by /save success or /list hydration). If null at observer-
+  // fire time, the hook skips the fire (the next milestone after revision
+  // hydrates will fire correctly). Subsequent fires advance the observer's
+  // internal ref from each /transition response's `revision` field.
   useDraftStateObserver({
     uiStage: stage,
     draftId: draftRecord.draftId,
     enabled: !!authUser && !!draftRecord.draftId,
     seedDraftState: draftRecord.seedDraftState ?? undefined,
+    currentRevision: draftRecord.revision,
   });
 
   useEffect(() => {

@@ -44,6 +44,14 @@ interface UseDraftStateObserverArgs {
   // Seed value applied to lastPersistedDraftStateRef on the render where the
   // observer transitions inactive → active. See "Activation seeding" above.
   seedDraftState?: DraftState;
+  // PR-48 Phase 3: seed value applied to lastPersistedRevisionRef on the
+  // same just-activated edge. The observer sends expectedRevision on every
+  // /api/drafts/transition call (per doctrine §6 and contract §6).
+  // If null at fire time (no revision known yet — e.g., post-mount before
+  // /list hydration completes), the fire is skipped because the server
+  // requires expectedRevision; the next genuine UIStage milestone after
+  // hydration fires correctly.
+  currentRevision?: number | null;
 }
 
 export function useDraftStateObserver({
@@ -51,8 +59,11 @@ export function useDraftStateObserver({
   draftId,
   enabled,
   seedDraftState,
+  currentRevision,
 }: UseDraftStateObserverArgs): void {
   const lastPersistedDraftStateRef = useRef<DraftState | null>(null);
+  // PR-48 Phase 3: revision tracker, symmetric to lastPersistedDraftStateRef.
+  const lastPersistedRevisionRef = useRef<number | null>(null);
   const pendingRequestIdRef = useRef(0);
   const previouslyActiveRef = useRef(false);
 
@@ -66,12 +77,16 @@ export function useDraftStateObserver({
       return;
     }
 
-    // Just-activated edge — seed the persisted-state ref before the monotonic
-    // check runs, so a /save-then-activate or /list-hydrate-then-activate
-    // does not produce a redundant /transition for the current UIStage.
+    // Just-activated edge — seed the persisted-state refs before the
+    // monotonic check runs, so a /save-then-activate or /list-hydrate-then-
+    // activate does not produce a redundant /transition for the current
+    // UIStage.
     if (!previouslyActiveRef.current) {
       if (seedDraftState !== undefined) {
         lastPersistedDraftStateRef.current = seedDraftState;
+      }
+      if (currentRevision !== undefined) {
+        lastPersistedRevisionRef.current = currentRevision;
       }
       previouslyActiveRef.current = true;
     }
@@ -79,10 +94,18 @@ export function useDraftStateObserver({
     const decision = decideTransition(uiStage, lastPersistedDraftStateRef.current);
     if (decision.kind !== 'write') return;
 
+    // PR-48 Phase 3: skip the fire if we don't yet know our revision.
+    // /api/drafts/transition requires expectedRevision; sending without
+    // it would 400. The next genuine UIStage milestone after hydration
+    // fires correctly once draftRecord.revision becomes non-null.
+    if (lastPersistedRevisionRef.current === null) return;
+
     const candidate = decision.candidate;
+    const candidateExpectedRevision = lastPersistedRevisionRef.current;
 
     // Race protection (1) — capture previous state BEFORE optimistic update.
     const previousDraftState = lastPersistedDraftStateRef.current;
+    const previousRevision = lastPersistedRevisionRef.current;
     // Race protection (2) — pre-increment, capture into local const.
     const requestId = ++pendingRequestIdRef.current;
 
@@ -95,20 +118,51 @@ export function useDraftStateObserver({
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ draftId, draftState: candidate }),
+      body: JSON.stringify({
+        draftId,
+        draftState: candidate,
+        expectedRevision: candidateExpectedRevision,
+      }),
     })
-      .then((r) => r.json())
-      .then((json) => {
-        // Race protection (3) — rollback only if no newer request has fired.
-        if (!json?.ok && requestId === pendingRequestIdRef.current) {
-          lastPersistedDraftStateRef.current = previousDraftState;
+      .then((r) =>
+        r.json().then((body) => ({ status: r.status, ok: r.ok, body })),
+      )
+      .then(({ ok, body }) => {
+        // Race protection (3) — only act if no newer request has fired.
+        if (requestId !== pendingRequestIdRef.current) return;
+
+        if (ok && body?.ok) {
+          // Success path: capture server's revision so subsequent fires
+          // use the fresh value. Server returns the (possibly unchanged)
+          // revision in both committed and same-state-no-op responses.
+          if (typeof body.revision === 'number') {
+            lastPersistedRevisionRef.current = body.revision;
+          }
+          return;
         }
+
+        // STALE_REVISION recovery (per Stage 1 item #7 / Stage 2 plan):
+        // capture currentRevision from response and DO NOT retry. The
+        // next genuine UIStage milestone fires correctly with the fresh
+        // revision. lastPersistedDraftStateRef rolls back; the milestone
+        // is effectively re-attempted at the next render cycle.
+        if (body?.error === 'STALE_REVISION' && typeof body.currentRevision === 'number') {
+          lastPersistedRevisionRef.current = body.currentRevision;
+          lastPersistedDraftStateRef.current = previousDraftState;
+          return;
+        }
+
+        // Generic failure — roll back both refs together so the activation
+        // edge can re-seed cleanly if the observer is re-activated.
+        lastPersistedDraftStateRef.current = previousDraftState;
+        lastPersistedRevisionRef.current = previousRevision;
       })
       .catch(() => {
-        // Same staleness guard applies to network failure.
+        // Network failure — same staleness guard, roll both refs.
         if (requestId === pendingRequestIdRef.current) {
           lastPersistedDraftStateRef.current = previousDraftState;
+          lastPersistedRevisionRef.current = previousRevision;
         }
       });
-  }, [uiStage, draftId, enabled, seedDraftState]);
+  }, [uiStage, draftId, enabled, seedDraftState, currentRevision]);
 }
