@@ -144,17 +144,17 @@ export default async function handler(req, res) {
         abortReason = null;
 
         if (current === null) {
-          // Defense-in-depth: either the path was deleted between
-          // pre-fetch and transaction (extremely rare concurrent action),
-          // or — despite the pre-fetch — the Admin SDK still passed null
-          // on this first call. Aborting here is correct: there's no
-          // safe value to write without observing the stored revision.
-          // If runtime verification ever shows this firing in non-race
-          // conditions, the recourse is to return preSnap.val() to force
-          // a server compare-and-set retry — but that path is not needed
-          // in the happy case and adds complexity, so we abort instead.
-          abortReason = { http: 404, body: { error: 'DRAFT_NOT_FOUND' } };
-          return; // abort
+          // Firebase Admin SDK may invoke transaction callback with null
+          // on first call even when data exists. Returning the pre-fetched
+          // value forces compare-and-set retry semantics so Firebase
+          // re-invokes the callback with actual server state. The next
+          // invocation will deliver `current` as the real stored draft,
+          // and the revision validation below runs against authoritative
+          // data. Returning preSnap.val() does NOT commit stale data — it
+          // tells Firebase "this is what I observed"; the server detects
+          // the mismatch against its real state (which may differ if a
+          // concurrent writer changed the draft) and retries the callback.
+          return preSnap.val();
         }
 
         // Graceful retro-migration: pre-Phase-2 drafts without a revision
