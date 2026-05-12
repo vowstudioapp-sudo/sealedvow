@@ -32,6 +32,12 @@ const MAX_SHORT_STRING = 500;
 const MAX_URL_STRING = 2_000;
 const MAX_LONG_STRING = 10_000;
 
+// PR-48 Phase 2 (D5) — server-enforced cap on non-ABANDONED drafts per user.
+// Doctrine §6.5: Count(ACTIVE) + Count(PAUSED) ≤ 3. ABANDONED is unbounded.
+// Enforced inside the atomic transaction in /api/drafts/save.js so concurrent
+// creates cannot both pass a stale pre-transaction count check.
+export const MAX_DRAFTS = 3;
+
 // Long-form CoupleData fields that legitimately exceed 500 chars. Cap matches
 // the existing MAX_TEXT_LENGTH in lib/coupleDataValidator.js (full validator
 // at payment time stays the canonical gate).
