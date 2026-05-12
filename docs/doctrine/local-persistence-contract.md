@@ -82,6 +82,59 @@ The rule applies at three layers:
 
 Any future change that introduces a *new* read of local persistence into a non-mount surface (effect, callback, render path) must justify itself against this rule. The default answer is no.
 
+## §6.5 Cloud draft authority (PR-48)
+
+> PR-48 is not multi-draft editing. It is single-active emotional composition with resumable preserved states.
+
+PR-48 introduces an authenticated user-facing dashboard of saved drafts with cross-device synchronization. The following invariants extend the local persistence doctrine without rescinding any prior section.
+
+**Canonical invariants:**
+
+1. At most ONE cloud ACTIVE draft per user globally, server-enforced.
+2. Local autosave (`vday_data_draft`) NEVER independently creates cloud drafts.
+3. Cloud draft CONTENT changes only at intentional user boundaries, never at session or identity events. Metadata such as revision counters, heartbeat timestamps, and session identifiers may update outside explicit saves.
+4. During live editing, in-memory local composition remains sovereign.
+5. Every conflict UX surface ends with exactly one explicit surviving composition authority. No ambiguous parallel states.
+
+**Authority resolution principle:**
+
+> Local autosave may contain unsaved work newer than cloud ACTIVE. This does NOT make local authoritative until the user explicitly chooses a reconciliation path. Authority is explicitly resolved, never chronologically inferred.
+
+**Continue Locally clause:**
+
+> "Continue Locally" reconciliation does NOT reserve cloud ACTIVE ownership. The first subsequent Save Draft attempt must still pass cap and revision validation against current server state at that moment.
+
+**Authority by boundary:**
+
+| Boundary | Authority |
+|---|---|
+| Live editing | Local in-memory composition |
+| Save Draft click | Cloud snapshot overwrite |
+| Resume Draft | Cloud seeds local, then local sovereign again |
+| Begin New | Cloud ACTIVE → PAUSED transition |
+| Dashboard selection | Cloud ACTIVE transition |
+
+**State machine:**
+
+`PersistenceStatus` enum: ACTIVE / PAUSED / ABANDONED.
+Per user: Count(ACTIVE) + Count(PAUSED) ≤ 3. ABANDONED unbounded.
+
+**Atomic transition rule:**
+
+> Resume operations (PAUSED → ACTIVE for one draft while the previous ACTIVE → PAUSED for another) MUST execute as single server transactions. Validation occurs INSIDE the transaction boundary, not before. Cloud ACTIVE creation is serialized per-user. At ACTIVE creation time, server MUST re-query authoritative state inside the transaction before commit.
+
+**Revision/epoch rule:**
+
+> Every cloud draft carries a monotonic `revision` counter incremented on every content-mutating event (Save, Resume, Begin New, Delete, ACTIVE reclaim). Every mutating client request must include `expectedRevision`. Server rejects stale requests deterministically with STALE_REVISION error.
+
+**Heartbeat metadata rule:**
+
+> Active editing sessions update three metadata fields on the cloud ACTIVE draft: sessionId (unique per browser session), deviceLabel (human-readable, not required unique), lastSeenAt (server timestamp). Heartbeat is informational only — used for UX messaging like "Active 2 minutes ago on MacBook Air." Heartbeat updates do NOT increment revision and do NOT mutate state. Missed heartbeats MUST NEVER trigger automatic state transitions.
+
+**Guest behavior:** Unchanged from §6 and prior sections. Guests have local persistence only, no cloud drafts, no dashboard.
+
+**Reconciliation flows:** See [docs/contracts/active-paused-state-machine.md](../contracts/active-paused-state-machine.md) for full state machine specification, all three reconciliation cases, and conflict UX flows.
+
 ## 7. What the contract does *not* cover
 
 - **Cloud-draft persistence** ([`api/drafts/save`](../../api/drafts/save.js), [`api/drafts/list`](../../api/drafts/list.js), [`api/drafts/transition`](../../api/drafts/transition.js)). The cloud-draft system is the authoritative cross-device draft store for signed-in users. Its relationship to local persistence is currently: cloud is the per-user, per-letter authority; local `vday_data_draft` is the per-tab crash-recovery buffer. Promoting cloud to *also* be the mount-time creator-state authority (Diagnostic-2 §8.6 Option A — cloud-canonical) is a future direction; this doctrine does not require it.
