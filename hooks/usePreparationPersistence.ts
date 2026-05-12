@@ -2,8 +2,10 @@ import { useEffect, useRef } from 'react';
 import type { CoupleData, AppStage } from '../types';
 
 const STORAGE_KEY = 'vday_data_draft';
-// Separate key from App.tsx 'vday_data' (post-finalize). This avoids
-// collision between mid-form drafts and post-refine state.
+// PR-47.1 (Option F): single local persistence authority for creator-state
+// recovery. The historical sibling `vday_data` (post-Refine snapshot) was
+// removed; refined-state fidelity now lives entirely in this bucket via the
+// extended selectiveHydrate allowlist below.
 const CURRENT_SCHEMA_VERSION = 2;
 // v1 drafts (pre-stage) are still readable; missing `stage` reads as undefined
 // and the App-level validity guard falls back to the route default. The next
@@ -27,7 +29,10 @@ interface StoredDraft {
   savedAt: string;
 }
 
-// Text-only, no media. Safe to restore as-is.
+// Text-only, no media. Safe to restore as-is. PR-47.1 additions: `myth`
+// (RefineStage AI narrative), `giftNote` (authored content), and the four
+// editor-only video config fields — all previously only survived recovery
+// via the now-deleted vday_data bucket.
 const TEXT_SAFE_FIELDS: (keyof CoupleData)[] = [
   'recipientName',
   'senderName',
@@ -39,6 +44,7 @@ const TEXT_SAFE_FIELDS: (keyof CoupleData)[] = [
   'writingMode',
   'finalLetter',
   'senderRawThoughts',
+  'myth',
   'musicType',
   'musicUrl',
   'revealMethod',
@@ -48,7 +54,12 @@ const TEXT_SAFE_FIELDS: (keyof CoupleData)[] = [
   'hasGift',
   'giftType',
   'giftTitle',
+  'giftNote',
   'giftLink',
+  'videoSource',
+  'videoAspectRatio',
+  'videoResolution',
+  'videoStyle',
 ];
 
 // Restore wholesale. Coupons are text data; sessionId preserves continuity.
@@ -57,12 +68,18 @@ const STRUCTURED_TEXT_FIELDS: (keyof CoupleData)[] = [
   'sessionId',
 ];
 
-// Media fields safe to restore. Storage URLs are stable across sessions
-// in this product. audio/video remain excluded as a conservative measure
-// pending separate validation; aiImageUrl is server-regenerable.
+// Media + validated-structured fields safe to restore. Storage URLs are
+// stable across sessions in this product. PR-47.1 (Option F) promoted
+// audio/video/aiImageUrl/sacredLocation into this allowlist when vday_data
+// was deleted — refined-state fidelity now lives entirely in vday_data_draft,
+// gated by defensive validators in selectiveHydrate below.
 const MEDIA_FIELDS_RESTORED: (keyof CoupleData)[] = [
   'memoryBoard',
   'userImageUrl',
+  'audio',
+  'video',
+  'aiImageUrl',
+  'sacredLocation',
 ];
 
 function selectiveHydrate(stored: Partial<CoupleData>): Partial<CoupleData> {
@@ -91,6 +108,83 @@ function selectiveHydrate(stored: Partial<CoupleData>): Partial<CoupleData> {
       if (field === 'userImageUrl' && typeof stored.userImageUrl === 'string') {
         if (stored.userImageUrl.length > 0) {
           safe.userImageUrl = stored.userImageUrl;
+        }
+        continue;
+      }
+
+      // PR-47.1 (Option F): aiImageUrl — drop empty strings. Restoring
+      // locally avoids a regen round-trip on refresh.
+      if (field === 'aiImageUrl' && typeof stored.aiImageUrl === 'string') {
+        if (stored.aiImageUrl.length > 0) {
+          safe.aiImageUrl = stored.aiImageUrl;
+        }
+        continue;
+      }
+
+      // PR-47.1 (Option F): audio — require non-empty url and recognized
+      // source. Drops malformed objects without crashing the renderer.
+      if (field === 'audio' && stored.audio && typeof stored.audio === 'object') {
+        const a = stored.audio as { url?: unknown; source?: unknown; duration?: unknown };
+        if (
+          typeof a.url === 'string' &&
+          a.url.length > 0 &&
+          (a.source === 'user' || a.source === 'ai')
+        ) {
+          safe.audio = {
+            url: a.url,
+            source: a.source,
+            ...(typeof a.duration === 'number' ? { duration: a.duration } : {}),
+          };
+        }
+        continue;
+      }
+
+      // PR-47.1 (Option F): video — same shape as audio.
+      if (field === 'video' && stored.video && typeof stored.video === 'object') {
+        const v = stored.video as { url?: unknown; source?: unknown; duration?: unknown };
+        if (
+          typeof v.url === 'string' &&
+          v.url.length > 0 &&
+          (v.source === 'user' || v.source === 'ai')
+        ) {
+          safe.video = {
+            url: v.url,
+            source: v.source,
+            ...(typeof v.duration === 'number' ? { duration: v.duration } : {}),
+          };
+        }
+        continue;
+      }
+
+      // PR-47.1 (Option F): sacredLocation — require placeName. Optional
+      // fields (description, googleMapsUri, latLng) are restored only when
+      // shape-valid; consumed by MainExperience.tsx for receiver preview.
+      if (
+        field === 'sacredLocation' &&
+        stored.sacredLocation &&
+        typeof stored.sacredLocation === 'object'
+      ) {
+        const s = stored.sacredLocation as {
+          placeName?: unknown;
+          description?: unknown;
+          googleMapsUri?: unknown;
+          latLng?: unknown;
+        };
+        if (typeof s.placeName === 'string' && s.placeName.length > 0) {
+          const rawLatLng = s.latLng as { lat?: unknown; lng?: unknown } | undefined;
+          const safeLatLng =
+            rawLatLng &&
+            typeof rawLatLng === 'object' &&
+            typeof rawLatLng.lat === 'number' &&
+            typeof rawLatLng.lng === 'number'
+              ? { lat: rawLatLng.lat, lng: rawLatLng.lng }
+              : undefined;
+          safe.sacredLocation = {
+            placeName: s.placeName,
+            ...(typeof s.description === 'string' ? { description: s.description } : {}),
+            ...(typeof s.googleMapsUri === 'string' ? { googleMapsUri: s.googleMapsUri } : {}),
+            ...(safeLatLng ? { latLng: safeLatLng } : {}),
+          };
         }
         continue;
       }
