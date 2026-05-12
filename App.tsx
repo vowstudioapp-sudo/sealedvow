@@ -78,7 +78,10 @@ import { validateCoupleData } from './lib/coupleDataValidator.js';
 import { writeDraftFromExternal, peekDraft, writeStage, writeDraftId, clearPreparationDraft } from './hooks/usePreparationPersistence';
 import { useDraftStateObserver } from './hooks/useDraftStateObserver';
 import { saveDraft, type SaveDraftInput } from './utils/saveDraft';
+import { pauseDraft, discardDraft } from './utils/lifecycleDraft';
 import { StaleRevisionModal } from './components/StaleRevisionModal';
+import { BeginNewPromptModal } from './components/BeginNewPromptModal';
+import { getDraftMetadata } from './hooks/usePreparationPersistence';
 
 // PR-48 Phase 4 — Reconciliation authority is owned by App.tsx via this
 // single discriminated union. Only ONE reconciliation modal renders at a
@@ -92,6 +95,11 @@ type ReconciliationState =
       source: 'save';
       currentRevision: number;
       pendingSavePayload: SaveDraftInput;
+    }
+  | {
+      kind: 'begin_new';
+      source: 'begin_new_button';
+      hasCloudActive: boolean;
     };
 import type { DraftState, PersistenceStatus } from './types/draft';
 import { DRAFT_STATE_ORDER } from './types/draft';
@@ -653,6 +661,174 @@ const App: React.FC = () => {
     setReconciliation({ kind: 'none' });
     // Same net effect as Keep Local for Now in this commit; distinct label
     // for UX clarity per the locked Phase 4 button copy.
+  };
+
+  // PR-48 Phase 4 (Commit 4) — Begin New cloud-aware orchestration.
+  //
+  // PreparationForm's resume modal "Begin again" button now delegates to
+  // App.tsx via the onBeginAgainRequest callback (props change in this
+  // commit). App.tsx inspects local meaningfulness + cloud-ACTIVE presence
+  // and either:
+  //   * Short-circuits (clear local immediately) if both are empty —
+  //     preserves the pre-Phase-4 fast path for trivial Begin Again.
+  //   * Opens BeginNewPromptModal otherwise — the user explicitly resolves.
+  //
+  // prepFormResetKey is the React-key mechanism for force-remounting
+  // PreparationForm. Each "clear local + reset state" path bumps it,
+  // which causes React to discard the existing PreparationForm instance
+  // and mount a fresh one — picking up the (now-cleared) localStorage.
+  // This avoids coupling App.tsx to PreparationForm's internal reset
+  // hook (resetPreparationState is hook-internal).
+  const [prepFormResetKey, setPrepFormResetKey] = useState(0);
+
+  const beginNewInFlightRef = useRef(false);
+
+  const handleBeginAgainRequest = () => {
+    if (beginNewInFlightRef.current) return;
+    if (reconciliation.kind !== 'none') return;
+
+    const localMeta = getDraftMetadata();
+    const localHasMeaningfulContent =
+      !!localMeta && localMeta.hasMeaningfulContent;
+    const hasCloudActive = !!draftRecord.draftId;
+
+    if (!localHasMeaningfulContent && !hasCloudActive) {
+      // Fast path: nothing to reconcile. Clear local + bump key.
+      // Preserves pre-Phase-4 trivial-Begin-Again behavior.
+      clearPreparationDraft();
+      writeDraftId(null);
+      setData(null);
+      setLastSaveError(null);
+      setLastSaveSuccessAt(null);
+      setPrepFormResetKey((k) => k + 1);
+      return;
+    }
+
+    setReconciliation({
+      kind: 'begin_new',
+      source: 'begin_new_button',
+      hasCloudActive,
+    });
+  };
+
+  const finalizeBeginNewLocalReset = () => {
+    clearPreparationDraft();
+    writeDraftId(null);
+    setData(null);
+    setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
+    setLastSaveError(null);
+    setLastSaveSuccessAt(null);
+    setReconciliation({ kind: 'none' });
+    setPrepFormResetKey((k) => k + 1);
+    beginNewInFlightRef.current = false;
+  };
+
+  const handleBeginNewSaveAndStartNew = async () => {
+    if (reconciliation.kind !== 'begin_new') return;
+    if (beginNewInFlightRef.current) return;
+    beginNewInFlightRef.current = true;
+
+    // Step 1: save current composition to cloud. This either UPDATEs the
+    // existing cloud ACTIVE (if draftRecord.draftId present) or CREATEs
+    // a new ACTIVE (if not). draftStateToSend mirrors the save flow's
+    // monotonic computation.
+    const candidate = UI_STAGE_TO_DRAFT_STATE[stage] ?? 'IN_PROGRESS';
+    const seed = draftRecord.seedDraftState;
+    const draftStateToSend: DraftState =
+      seed !== null && DRAFT_STATE_ORDER[seed] > DRAFT_STATE_ORDER[candidate]
+        ? seed
+        : candidate;
+    const localStep = peekDraft().step;
+    const step = stage === AppStage.PREPARE ? (localStep ?? undefined) : undefined;
+
+    const saveInput: SaveDraftInput = {
+      data: data ?? {},
+      draftState: draftStateToSend,
+    };
+    if (draftRecord.draftId && typeof draftRecord.revision === 'number') {
+      saveInput.draftId = draftRecord.draftId;
+      saveInput.expectedRevision = draftRecord.revision;
+    }
+    if (step !== undefined) saveInput.step = step;
+
+    const saveResult = await saveDraft(saveInput);
+    if (!mountedRef.current) {
+      beginNewInFlightRef.current = false;
+      return;
+    }
+    if (saveResult.kind !== 'ok') {
+      // Save failed. Abort the multi-step. Local untouched, cloud may
+      // have advanced revision but no demotion happened. Surface error.
+      beginNewInFlightRef.current = false;
+      setReconciliation({ kind: 'none' });
+      setLastSaveError("Couldn't save just now. Your work is still here.");
+      return;
+    }
+
+    // Step 2: pause the just-saved ACTIVE. The revision is the one we
+    // just got back from save.
+    const pauseResult = await pauseDraft({
+      draftId: saveResult.draftId,
+      expectedRevision: saveResult.revision,
+    });
+    if (!mountedRef.current) {
+      beginNewInFlightRef.current = false;
+      return;
+    }
+    if (pauseResult.kind !== 'ok') {
+      // Pause failed. The cloud has an updated-content ACTIVE; local
+      // is still intact. User can retry; the next save would be a same-
+      // content UPDATE (revision bumped) and the next pause may succeed.
+      // Update draftRecord to reflect the successful save before bailing.
+      setDraftRecord({
+        draftId: saveResult.draftId,
+        seedDraftState: draftStateToSend,
+        revision: saveResult.revision,
+      });
+      writeDraftId(saveResult.draftId);
+      setLastSaveSuccessAt(Date.now());
+      beginNewInFlightRef.current = false;
+      setReconciliation({ kind: 'none' });
+      setLastSaveError("Couldn't finish starting a new draft. Try again.");
+      return;
+    }
+
+    // Step 3-5: clear local + reset draftRecord + remount PreparationForm.
+    finalizeBeginNewLocalReset();
+  };
+
+  const handleBeginNewDiscardAndStartNew = async () => {
+    if (reconciliation.kind !== 'begin_new') return;
+    if (beginNewInFlightRef.current) return;
+    beginNewInFlightRef.current = true;
+
+    // If cloud has an ACTIVE, transition it to ABANDONED first.
+    // If not, just clear local.
+    if (draftRecord.draftId && typeof draftRecord.revision === 'number') {
+      const discardResult = await discardDraft({
+        draftId: draftRecord.draftId,
+        expectedRevision: draftRecord.revision,
+      });
+      if (!mountedRef.current) {
+        beginNewInFlightRef.current = false;
+        return;
+      }
+      if (discardResult.kind !== 'ok') {
+        // Discard failed. Don't risk clearing local if cloud state is
+        // uncertain. Surface error; user can retry.
+        beginNewInFlightRef.current = false;
+        setReconciliation({ kind: 'none' });
+        setLastSaveError("Couldn't discard the cloud draft. Try again.");
+        return;
+      }
+    }
+
+    finalizeBeginNewLocalReset();
+  };
+
+  const handleBeginNewCancel = () => {
+    if (reconciliation.kind !== 'begin_new') return;
+    setReconciliation({ kind: 'none' });
   };
 
   const handleSaveAndContinueLater = () => {
@@ -1585,7 +1761,11 @@ const App: React.FC = () => {
 
           {stage === AppStage.PREPARE && (
             <div className="animate-fade-in py-12 px-4">
-               <PreparationForm onComplete={(d) => { setData(hydrateCoupleData(d)); safeSetStage(AppStage.REFINE); }} />
+               <PreparationForm
+                 key={prepFormResetKey}
+                 onComplete={(d) => { setData(hydrateCoupleData(d)); safeSetStage(AppStage.REFINE); }}
+                 onBeginAgainRequest={handleBeginAgainRequest}
+               />
             </div>
           )}
 
@@ -1839,6 +2019,15 @@ const App: React.FC = () => {
           onReloadLatest={handleStaleRevisionReloadLatest}
           onKeepLocalForNow={handleStaleRevisionKeepLocalForNow}
           onCancel={handleStaleRevisionCancel}
+        />
+      )}
+      {reconciliation.kind === 'begin_new' && (
+        <BeginNewPromptModal
+          isOpen={true}
+          hasCloudActive={reconciliation.hasCloudActive}
+          onSaveAndStartNew={handleBeginNewSaveAndStartNew}
+          onDiscardAndStartNew={handleBeginNewDiscardAndStartNew}
+          onCancel={handleBeginNewCancel}
         />
       )}
     </div>

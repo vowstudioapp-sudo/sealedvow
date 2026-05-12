@@ -20,6 +20,16 @@ const SILENT_RESTORE_WINDOW_MINUTES = 10;
 
 interface Props {
   onComplete: (data: CoupleData) => void;
+  // PR-48 Phase 4 — optional cloud-aware Begin Again hook. When provided,
+  // the resume modal's "Begin again" button delegates to the parent which
+  // orchestrates cloud-side action (pause/discard) before clearing local.
+  // The parent uses a remount key to force a clean PreparationForm instance
+  // after clearing local; this component therefore does NOT call
+  // clearPreparationDraft / resetPreparationState in that path.
+  //
+  // When omitted (legacy callers), the local-only fallback is preserved:
+  // clearPreparationDraft + resetPreparationState run inline.
+  onBeginAgainRequest?: () => void;
 }
 
 // CORE OCCASIONS — V1: Anniversary + Unsaid only.
@@ -72,7 +82,7 @@ const ENABLE_VIDEO = false;
 // normally — the redirect is gated on draft absence (see shouldRedirectAway).
 const REMOVED_OCCASIONS = new Set<string>(['birthday', 'apology', 'thank-you']);
 
-export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
+export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainRequest }) => {
   const [error, setError] = useState<string | null>(null);
   
   // Read any saved draft once on mount, BEFORE state hook init.
@@ -166,17 +176,30 @@ export const PreparationForm: React.FC<Props> = ({ onComplete }) => {
   };
 
   const handleBeginAgain = () => {
-    // Order matters:
+    // PR-48 Phase 4: if the parent (App.tsx) provided onBeginAgainRequest,
+    // delegate the cloud-aware Begin New orchestration to it. The parent
+    // will open BeginNewPromptModal (or short-circuit on trivial Begin
+    // Again), perform any required cloud-side action (pause/discard),
+    // clear local, and force-remount this component via a key change.
+    // We close the resume modal so the user sees the parent's reconciliation
+    // modal layer cleanly.
+    setShowModal(false);
+    if (onBeginAgainRequest) {
+      onBeginAgainRequest();
+      return;
+    }
+
+    // Legacy local-only fallback. Preserves pre-Phase-4 behavior for any
+    // future caller that doesn't wire onBeginAgainRequest. Order matters:
     // 1. Clear localStorage FIRST so persistence's auto-save can't pick
     //    up reset state and re-write stale fields.
     // 2. Reset in-memory state.
     // 3. Mark hydration complete so the gated effect doesn't re-apply
     //    the stale hydratedData (still in scope from peekDraft).
-    // 4. Close modal.
+    // 4. Close modal (already done above).
     clearPreparationDraft();
     resetPreparationState();
     hasHydratedRef.current = true;
-    setShowModal(false);
     setHydrationDeferred(false);
   };
 
