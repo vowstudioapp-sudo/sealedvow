@@ -141,3 +141,30 @@ export function validateDraftWrite({ data, step, draftState, persistenceStatus }
 
   return { ok: true };
 }
+
+// ============================================================================
+// PR-48 Phase 2 (D1) — expectedRevision request-shape validator.
+//
+// Every mutating request against an existing draft MUST include
+// `expectedRevision: number` matching the stored draft's current revision.
+// Per docs/contracts/active-paused-state-machine.md §6:
+//   * UPDATE without expectedRevision  → 400 MISSING_EXPECTED_REVISION
+//   * UPDATE with non-integer / < 1    → 400 INVALID_EXPECTED_REVISION_FORMAT
+//   * UPDATE with stale value          → 409 STALE_REVISION (handled in
+//                                         /api/drafts/save.js inside the
+//                                         atomic transaction, not here)
+//
+// This helper checks request shape only. Comparison against stored value
+// happens inside the transaction boundary at the call site.
+// ============================================================================
+export function validateExpectedRevision(value, { required }) {
+  if (value === undefined || value === null) {
+    return required
+      ? { ok: false, reason: 'MISSING_EXPECTED_REVISION' }
+      : { ok: true };
+  }
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    return { ok: false, reason: 'INVALID_EXPECTED_REVISION_FORMAT' };
+  }
+  return { ok: true };
+}

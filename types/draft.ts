@@ -56,6 +56,13 @@ export interface DraftDocument {
   step?: 1 | 2 | 3;
   draftState: DraftState;
   persistenceStatus: PersistenceStatus;
+  // PR-48 Phase 2 (D1): monotonic content-revision counter. Incremented by
+  // the server on every content-mutating event (save, transition, delete,
+  // ACTIVE reclaim). Never incremented by heartbeat or metadata-only writes.
+  // Every mutating client request must echo back the last-known value as
+  // `expectedRevision`; mismatch returns STALE_REVISION or INVALID_REVISION.
+  // See docs/contracts/active-paused-state-machine.md §6.
+  revision: number;
   createdAt: number;
   updatedAt: number;
 }
