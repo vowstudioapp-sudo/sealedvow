@@ -343,13 +343,17 @@ const App: React.FC = () => {
     return initialDraft.stage;
   });
   const [data, setData] = useState<CoupleData | null>(() => {
-    // Hydrate data only when a valid post-PREPARE stage was restored — that
-    // way RefineStage / PersonalIntro / etc. have something to render on the
-    // very first paint instead of flashing blank until the resolver effect runs.
-    // PREPARE-form data continues to flow through PreparationForm's own peek.
+    // Mount-only canonical creator-state restore. This runs exactly once and
+    // must not be duplicated in any effect with stage/linkState in its deps —
+    // doing so re-reads persistence on every transition and stomps fresh
+    // in-memory state during active composition. PREPARE is owned by
+    // PreparationForm's local state; app-level data is null there.
+    // See docs/diagnostics/state-authority-hydration-conflict.md.
     if (getRouteType() !== 'LETTER_CREATE') return null;
-    if (!initialDraft.data || !initialDraft.stage) return null;
-    if (initialDraft.stage === AppStage.PREPARE) return null;
+    if (!initialDraft.stage || initialDraft.stage === AppStage.PREPARE) return null;
+    const persistedRefined = readPersistedCoupleData();
+    if (persistedRefined) return persistedRefined;
+    if (!initialDraft.data) return null;
     if (!isStageValid(initialDraft.stage, initialDraft.data)) return null;
     return hydrateCoupleData(initialDraft.data as CoupleData);
   });
@@ -938,14 +942,12 @@ const App: React.FC = () => {
       setData(hydrateCoupleData(sharedData));
       setIsBooting(false);
       setIsFadingOut(false);
-    } else if (linkState === LoaderState.NO_LINK) {
-      const persisted = readPersistedCoupleData();
-      if (persisted) {
-        setData(persisted);
-      }
     } else if (linkState === LoaderState.ERROR) {
       console.error('Link loading error:', linkError);
     }
+    // NO_LINK creator flow intentionally does not restore data here.
+    // Persistence is passive during composition; mount-time restore lives in
+    // the `data` useState initializer above. See diagnostic §13 option 5.
 
     if (linkState !== LoaderState.IDLE) {
       let nextStage = resolveStage({
