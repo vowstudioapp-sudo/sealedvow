@@ -77,6 +77,7 @@ import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
 import { writeDraftFromExternal, peekDraft, writeStage, writeDraftId, clearPreparationDraft } from './hooks/usePreparationPersistence';
 import { useDraftStateObserver } from './hooks/useDraftStateObserver';
+import { saveDraft, type SaveDraftInput } from './utils/saveDraft';
 import type { DraftState, PersistenceStatus } from './types/draft';
 import { DRAFT_STATE_ORDER } from './types/draft';
 import { UI_STAGE_TO_DRAFT_STATE } from './hooks/draftStateLogic';
@@ -555,110 +556,105 @@ const App: React.FC = () => {
       const localStep = peekDraft().step;
       const step = stage === AppStage.PREPARE ? (localStep ?? undefined) : undefined;
 
-      const payload: {
-        draftId?: string;
-        data: Partial<CoupleData> | CoupleData | Record<string, never>;
-        step?: 1 | 2 | 3;
-        draftState: DraftState;
-        persistenceStatus: PersistenceStatus;
-        expectedRevision?: number;
-      } = {
+      // PR-48 Phase 4: migrated from inline fetch to canonical saveDraft
+      // helper. The pairing rule for draftId + expectedRevision is preserved
+      // (per Phase 2 doctrine: only send draftId when revision is known).
+      const input: SaveDraftInput = {
         data: data ?? {},
         draftState: draftStateToSend,
-        persistenceStatus: 'ACTIVE',
       };
-      // PR-48 Phase 2 (D4): UPDATE requires both draftId and expectedRevision.
-      // Pair them. If either is missing, omit both and fall through to a
-      // CREATE attempt (server will reject with ACTIVE_DRAFT_EXISTS if a
-      // cloud ACTIVE already exists — explicit reconciliation, never
-      // chronological inference, per doctrine §6.5).
       if (draftRecord.draftId && typeof draftRecord.revision === 'number') {
-        payload.draftId = draftRecord.draftId;
-        payload.expectedRevision = draftRecord.revision;
+        input.draftId = draftRecord.draftId;
+        input.expectedRevision = draftRecord.revision;
       }
-      if (step !== undefined) payload.step = step;
+      if (step !== undefined) input.step = step;
 
-      try {
-        const res = await fetch('/api/drafts/save', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+      const result = await saveDraft(input);
 
-        // Mount guard — abort silently if the component unmounted mid-flight.
-        if (!mountedRef.current) {
+      // Mount guard — abort silently if the component unmounted mid-flight.
+      if (!mountedRef.current) {
+        saveInFlightRef.current = false;
+        return;
+      }
+
+      switch (result.kind) {
+        case 'ok': {
+          // DraftId identity invariant (Decision #14). If we already have a
+          // draftId and the server returned a different one, refuse the swap.
+          if (draftRecord.draftId && result.draftId !== draftRecord.draftId) {
+            console.warn(
+              `[18b] /save returned draftId=${result.draftId} but currentDraftId=${draftRecord.draftId}; refusing identity swap.`,
+            );
+            setLastSaveError("Couldn't save just now. Your work is still here.");
+            saveInFlightRef.current = false;
+            return;
+          }
+
+          // Success — update draftRecord atomically (single setter, all
+          // fields together) so the observer's activation seeding sees the
+          // matching values in the same render. seedDraftState carries the
+          // state we just told the server about; the observer will treat
+          // the next /transition for the same state as a noop (same_state).
+          // PR-48 Phase 2 (D1): also capture revision from the response so
+          // subsequent UPDATE saves can echo it back as expectedRevision.
+          setDraftRecord({
+            draftId: result.draftId,
+            seedDraftState: draftStateToSend,
+            revision: result.revision,
+          });
+
+          // PR #21 — mirror the just-confirmed draftId to localStorage as the
+          // optimistic hint. On the next page reload, the lazy initializer for
+          // draftRecord will read this and avoid the post-mount race window.
+          writeDraftId(result.draftId);
+
+          // PR #18b CP3.5 — set the settled-state anchor. No auto-dismiss
+          // timer; the affordance now renders the receipt as long as the
+          // session holds it. Re-saves refresh the timestamp; sign-out clears.
+          setLastSaveError(null);
+          setLastSaveSuccessAt(Date.now());
+
           saveInFlightRef.current = false;
           return;
         }
 
-        if (!res.ok) {
-          setLastSaveError("Couldn't save just now. Your work is still here.");
-          saveInFlightRef.current = false;
-          return;
-        }
-
-        const json = (await res.json()) as {
-          ok?: boolean;
-          draftId?: string;
-          updatedAt?: number;
-          revision?: number;
-        };
-
-        if (!mountedRef.current) {
-          saveInFlightRef.current = false;
-          return;
-        }
-
-        if (!json?.ok || !json?.draftId) {
-          setLastSaveError("Couldn't save just now. Your work is still here.");
-          saveInFlightRef.current = false;
-          return;
-        }
-
-        // DraftId identity invariant (Decision #14). If we already have a
-        // draftId and the server returned a different one, refuse the swap.
-        if (draftRecord.draftId && json.draftId !== draftRecord.draftId) {
+        case 'stale_revision':
+          // PR-48 Phase 4: placeholder for Commit 3's StaleRevisionModal
+          // wiring. Currently surfaces as a generic save error — the modal
+          // hookup lands in the next commit. console.warn aids triage if
+          // this branch fires in production before Commit 3 deploys.
           console.warn(
-            `[18b] /save returned draftId=${json.draftId} but currentDraftId=${draftRecord.draftId}; refusing identity swap.`,
+            `[PR-48] /save STALE_REVISION: server=${result.currentRevision}, client=${result.yourRevision}. ` +
+              `Modal wiring lands in Phase 4 Commit 3.`,
           );
           setLastSaveError("Couldn't save just now. Your work is still here.");
           saveInFlightRef.current = false;
           return;
-        }
 
-        // Success — update draftRecord atomically (single setter, all
-        // fields together) so the observer's activation seeding sees the
-        // matching values in the same render. seedDraftState carries the
-        // state we just told the server about; the observer will treat
-        // the next /transition for the same state as a noop (same_state).
-        // PR-48 Phase 2 (D1): also capture revision from the response so
-        // subsequent UPDATE saves can echo it back as expectedRevision.
-        setDraftRecord({
-          draftId: json.draftId,
-          seedDraftState: draftStateToSend,
-          revision: typeof json.revision === 'number' ? json.revision : null,
-        });
-
-        // PR #21 — mirror the just-confirmed draftId to localStorage as the
-        // optimistic hint. On the next page reload, the lazy initializer for
-        // draftRecord will read this and avoid the post-mount race window.
-        writeDraftId(json.draftId);
-
-        // PR #18b CP3.5 — set the settled-state anchor. No auto-dismiss
-        // timer; the affordance now renders the receipt as long as the
-        // session holds it. Re-saves refresh the timestamp; sign-out clears.
-        setLastSaveError(null);
-        setLastSaveSuccessAt(Date.now());
-
-        saveInFlightRef.current = false;
-      } catch {
-        if (mountedRef.current) {
+        case 'cap_exceeded':
+          // PR-48 Phase 4: cap-exceeded UX is a Phase 5 dashboard concern.
+          // Surface a generic error toast for now.
           setLastSaveError("Couldn't save just now. Your work is still here.");
-        }
-        // Do NOT clear draftRecord. Do NOT auto-retry. User retries by
-        // clicking the action again.
-        saveInFlightRef.current = false;
+          saveInFlightRef.current = false;
+          return;
+
+        case 'active_draft_exists':
+          // Server enforces single-ACTIVE invariant. This branch fires when
+          // the client tried to CREATE while a cloud ACTIVE already exists
+          // (e.g., post-sign-in race before hydration completed).
+          setLastSaveError("Couldn't save just now. Your work is still here.");
+          saveInFlightRef.current = false;
+          return;
+
+        case 'unauthorized':
+        case 'rate_limited':
+        case 'bad_request':
+        case 'network_error':
+        case 'unknown_error':
+        default:
+          setLastSaveError("Couldn't save just now. Your work is still here.");
+          saveInFlightRef.current = false;
+          return;
       }
     };
 
