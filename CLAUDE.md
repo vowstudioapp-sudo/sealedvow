@@ -13,6 +13,8 @@ There is no test runner, linter, or formatter configured. `tsc` runs as part of 
 
 Required env vars (in `.env.local`): `GEMINI_API_KEY`, `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_APP_ID`, plus server-side `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_DB_URL`, `FIREBASE_STORAGE_BUCKET`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, and Razorpay/OpenAI keys as referenced in the relevant `api/*.js` handlers.
 
+**Seal-confirmation email (Vercel / server):** set `PUBLIC_SITE_URL` to the canonical public origin (production: `https://www.sealedvow.com`) so share links in email are not `*.vercel.app` deployment URLs. If unset, `getPublicSiteOrigin()` in `api/verify-payment.js` falls back to `https://${VERCEL_URL}` (preview/dev), then `https://www.sealedvow.com`. Optional alias: `VITE_PUBLIC_SITE_URL` (also read server-side).
+
 Dev preview shortcuts (DEV-only) — append to any URL: `?preview=intro|envelope|letter|receiver`, optional `&theme=obsidian|velvet|crimson|midnight|evergreen|pearl`. `App.tsx` seeds mock `CoupleData` and jumps straight to that stage.
 
 ## Architecture

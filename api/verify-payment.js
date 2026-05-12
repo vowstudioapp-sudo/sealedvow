@@ -22,6 +22,10 @@ import { sendLetterSealedEmail } from '../lib/email/sendEmail.js';
 
 const MIN_PRICE_PAISE = 24900;  // ₹249 — single price floor
 
+// Canonical share-link origin for seal-confirmation email. Production should set
+// PUBLIC_SITE_URL=https://www.sealedvow.com (see CLAUDE.md) so customers never
+// see deployment-specific hosts. VERCEL_URL fallback remains for preview/dev safety
+// when the explicit vars are unset (resolution order unchanged).
 function getPublicSiteOrigin() {
   const explicit = process.env.PUBLIC_SITE_URL || process.env.VITE_PUBLIC_SITE_URL;
   if (typeof explicit === 'string' && explicit.trim().length > 0) {
