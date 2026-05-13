@@ -35,3 +35,18 @@ export function setActiveMode(mode: ActiveMode): void {
     // treat absent mode as "show ModeSelectionModal at next Create click".
   }
 }
+
+// PR-49 lifecycle-authoritative invalidation. Called from useAuth's
+// onAuthStateChanged listener on every authenticated → null transition
+// (including cross-tab signout propagation via Firebase's IndexedDB
+// persistence). Ensures the invariant: mode === 'authenticated' AND
+// user === null MUST NOT survive after auth resolution stabilizes.
+export function clearActiveMode(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // sessionStorage may be unavailable (private mode, quota errors).
+    // Clearing failure is non-fatal.
+  }
+}

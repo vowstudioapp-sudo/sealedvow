@@ -37,6 +37,7 @@ import {
   signInWithGoogle as fbSignInWithGoogle,
   signOut as fbSignOut,
 } from '../services/firebase';
+import { clearActiveMode } from '../utils/activeMode';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -48,8 +49,31 @@ export function useAuth() {
   // completion) does NOT optimistically flip serverSessionReady true.
   const signInInFlightRef = useRef(false);
 
+  // PR-49 — Tracks the previous user across listener fires so we can
+  // distinguish cold-start initial null (no transition) from real
+  // authenticated → null transitions (auth-end). Refs survive React
+  // StrictMode's dev double-mount intact; the initial null value
+  // correctly classifies the first cold-start fire as a non-event.
+  const prevUserRef = useRef<User | null>(null);
+
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
+      const wasSignedIn = prevUserRef.current !== null;
+      prevUserRef.current = u;
+
+      // PR-49 lifecycle-authoritative mode invalidation:
+      // if Firebase auth transitions from authenticated → null,
+      // clear the persistence mode so no tab can retain the invalid state:
+      // mode === 'authenticated' AND user === null.
+      //
+      // This listener is the single authoritative auth-end event,
+      // including cross-tab signout propagation (Firebase's default
+      // browserLocalPersistence emits onAuthStateChanged(null) in every
+      // tab when one tab signs out).
+      if (!u && wasSignedIn) {
+        clearActiveMode();
+      }
+
       setUser(u);
       setLoading(false);
       if (!u) {
