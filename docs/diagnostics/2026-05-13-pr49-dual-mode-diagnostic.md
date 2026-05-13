@@ -349,6 +349,83 @@ Surviving variants: `ok`, `unauthorized`, `rate_limited`, `bad_request`, `networ
 
 `docs/doctrine/local-persistence-contract.md §6.5` — currently describes the multi-draft state machine with ACTIVE/PAUSED ≤ 3 invariant (lines 85–136). Under dual-mode it rewrites to describe guest-mode-only local persistence per proposal §9.
 
+### 3.11 `draftState` ontology — survives as business state (Gap Closure 1)
+
+Cross-voice review surfaced that the diagnostic analyzed `persistenceStatus` thoroughly but did not formally resolve whether `draftState` (`IN_PROGRESS` / `GENERATED` / `REFINED` / `PREVIEWED` / `READY_FOR_PAYMENT` / `COMPLETED`) is a business state or a persistence-lifecycle state.
+
+**Verdict: `draftState` survives under dual-mode as BUSINESS state, not persistence-lifecycle state.**
+
+- `draftState` describes the user's progress through the ceremonial flow (which UI stage they are in).
+- Values map to ceremony milestones:
+  - `IN_PROGRESS` — user is in the form (PREPARE).
+  - `GENERATED` — AI draft created (REFINE entry).
+  - `REFINED` — refine-stage edits committed.
+  - `PREVIEWED` — preview message seen (MAIN_EXPERIENCE).
+  - `READY_FOR_PAYMENT` — at payment screen.
+  - `COMPLETED` — paid + sealed; ceremony complete; sender cannot edit.
+- Under dual-mode, all values survive for BOTH guest and authenticated paths.
+- The semantics of `COMPLETED` get clarified: "letter has been sealed; ceremony complete; sender cannot edit." For authenticated users, this removes the letter from the Drafts tab and surfaces it in Sent. For guests, this just means the receiver URL is live (no dashboard impact).
+- `markActiveDraftCompleted` in [`api/verify-payment.js:55`](../../api/verify-payment.js:55) rewrites to drop the `persistenceStatus === 'ACTIVE'` filter (which retires with the state machine) but keeps the `draftState: 'COMPLETED'` write semantic. See §7.8 / §7.9.
+
+**Consumer inventory** — `git grep -n "draftState" -- '*.ts' '*.tsx' '*.js' ':!docs/'` returns **50 consumer lines across 9 files**:
+
+| File | Role under dual-mode |
+|---|---|
+| [`types/draft.ts`](../../types/draft.ts) | Type definition (`DraftState` union + `DRAFT_STATE_ORDER` + `isDraftState`). Survives unchanged. |
+| [`App.tsx`](../../App.tsx) | Save handlers compute `draftStateToSend` via `UI_STAGE_TO_DRAFT_STATE` + monotonicity seed; consumers are in the authenticated save path. Survives. |
+| [`hooks/draftStateLogic.ts`](../../hooks/draftStateLogic.ts) | `UI_STAGE_TO_DRAFT_STATE` map. Survives (already kept by Commit 1 / L6). |
+| [`api/drafts/save.js`](../../api/drafts/save.js) | Writes `draftState` on save. Survives. |
+| [`api/drafts/transition.js`](../../api/drafts/transition.js) | Orphan endpoint (zero callers); transition logic retires with PR-48 cleanup per §3.3, but if retained, its `draftState` write semantic survives. |
+| [`api/lib/draftValidation.js`](../../api/lib/draftValidation.js) | Validates `draftState` against the enum. The validation branch survives; only the `persistenceStatus` branch retires. |
+| [`api/verify-payment.js`](../../api/verify-payment.js) | Writes `draftState: 'COMPLETED'` via `markActiveDraftCompleted`. The COMPLETED write semantic survives; the ACTIVE filter retires. |
+| [`utils/saveDraft.ts`](../../utils/saveDraft.ts) | Passes `draftState` in save payload. Survives. |
+| [`components/SignInReconciliationModal.tsx`](../../components/SignInReconciliationModal.tsx) | Display-only — shows the cloud draft's `draftState` in the modal. **Entire file retires per §3.1**, so this consumer goes away with the file, not with `draftState` itself. |
+
+**Conclusion:** every `draftState` consumer has a continued purpose under dual-mode (or retires with its surrounding file for unrelated reasons). The type survives. The COMPLETED semantic survives. The enum stays in `types/draft.ts:16–22`.
+
+### 3.12 `draftId` semantics — mode-specific, no continuity across modes (Gap Closure 2)
+
+Cross-voice review surfaced that the diagnostic did not formalize `draftId` semantics under dual-mode. Resolve:
+
+**Authenticated mode:** `draftId` is the Firebase RTDB push key (e.g., `-NXY...abc`). Always cloud-assigned at first save. Every save thereafter uses the same `draftId`. Each authenticated user has at most one active `draftId` at a time per invariant I7.
+
+**Guest mode:** **No `draftId` concept.** Local storage uses the fixed key `vday_data_draft` (no UID namespacing, no migration — per FL-1 strict no upgrade). There is at most one local draft per browser session. No ID is generated client-side.
+
+**Post-payment:**
+- Authenticated: the cloud `draftId` either survives as the sealed letter's identifier or a new sealed-letter ID is minted (preserve existing flow).
+- Guest: anonymous letter record keyed by `paymentId` (per FL-3). No connection to any draft-side `draftId`.
+
+**Forbidden:** No code path may treat a guest draft as having an `id` or `draftId`. Guest persistence is positional (the one fixed local storage key), not identity-based. Any abstraction that gives guest drafts an ID is a reconciliation ghost (see §8).
+
+**Consumer inventory** — `git grep -n "draftId" -- '*.ts' '*.tsx' '*.js' ':!docs/'` returns **130 consumer lines across 10 files**.
+
+**Cross-mode contamination risk** — the most load-bearing finding here:
+
+[`hooks/usePreparationPersistence.ts`](../../hooks/usePreparationPersistence.ts) — the **guest-side** local persistence hook — currently carries a `draftId` field throughout:
+
+- `:28` — `draftId?: string` field on `StoredDraft` interface.
+- `:204` — `draftId: string | null` field on the exported `DraftPeek` type.
+- `:235–238` — `readDraft()` parses `draftId` from the persisted blob.
+- `:259, :314, :351, :473` — every read-merge write (`writeDraft`, `writeStage`, `writeDraftId`, `writeDraftFromExternal`) preserves the `draftId` field through localStorage round-trips.
+- `:323–358` — the entire `writeDraftId` exported helper exists to write the cloud draftId hint into the guest-side localStorage bucket.
+
+Per [PR-#21 comment at `:23`](../../hooks/usePreparationPersistence.ts:23): "optimistic draftId hint. Persisted by App.tsx after a successful /api/drafts/save and at hydration completion."
+
+**This is a cross-mode contamination by today's standards.** The guest-side hook should not know what a cloud `draftId` is. Under dual-mode:
+
+- The `StoredDraft.draftId` field retires from the schema.
+- The `DraftPeek.draftId` field retires from the exported type.
+- The `writeDraftId` helper retires entirely.
+- All read-merge sites drop the `draftId` preservation logic.
+- All App.tsx call sites of `writeDraftId` (App.tsx:730, :789, :806, etc.) retire — they exist to mirror cloud-draftId into local, which is forbidden under FL-1 / I4.
+
+**Consumers that assume draft-id continuity across modes (these need rewriting):**
+
+- [`App.tsx:494`](../../App.tsx:494) — `draftRecord` lazy-initializer reads `peekDraft().draftId`. Under dual-mode, draftRecord only exists in authenticated mode and is hydrated from `GET /api/draft` (or equivalent), not from local. The `peekDraft().draftId` read retires.
+- All `writeDraftId(...)` call sites in App.tsx (the optimistic hint mirror) — retire.
+
+The remaining `draftId` consumers (in `api/drafts/*.js`, `types/draft.ts:53`, `utils/saveDraft.ts`, `utils/lifecycleDraft.ts`) are server-side or authenticated-path-only and survive under dual-mode (with `pause.js`/`resume.js`/`discard.js` retiring entirely per §3.2, taking their `draftId` references with them).
+
 ---
 
 ## Section 4 — Code that gets modified under dual-mode
@@ -558,9 +635,37 @@ See §3.8 above. The helper survives with a narrower error surface (drops `stale
 
 **Function:** PR-49 implementation roadmap mirroring the discipline of PR-48.A's strategy doc but with the smaller dual-mode surface. **This is the next deliverable after this diagnostic.**
 
+### 5.9 Mode-state mechanism: sessionStorage with hard write-once semantics (Gap Closure 3 — resolves FL-2)
+
+Per FL-2 (founder-locked), mode state lives in `sessionStorage`. This subsection specifies the enforcement contract.
+
+**Storage:** `sessionStorage.setItem('vday_mode', 'guest' | 'authenticated')`.
+
+**Write site (exactly one):** ModeSelectionModal's "user chose this mode" handler. No other code path may write `vday_mode`.
+
+**Read site (many):** anywhere persistence routing happens — `App.tsx` hydration effect, save handlers, Begin Again flow, Resume flow, PreparationForm's mount-time mode resolution.
+
+**Enforcement rules:**
+
+1. **Hydration reads mode FIRST.** The hydration effect's first action is to read `sessionStorage.getItem('vday_mode')`. The branching tree:
+   - `mode === 'authenticated'` AND `user` signed in → load cloud draft via `GET /api/draft`.
+   - `mode === 'authenticated'` AND `user` NOT signed in → re-prompt sign-in (the cloud draft is unreachable without auth, but mode is already locked; no fallback to guest).
+   - `mode === 'guest'` → ignore `user` auth state entirely; load from local storage only.
+   - `mode === undefined` → user has not entered the create flow yet; show ModeSelectionModal at the entry-point gate.
+
+2. **Auth state changes after mode is set DO NOT change persistence path.** A guest who signs in mid-flow (via UserMenu or any other surface) stays in guest mode for the current draft. The auth state can change; the persistence authority cannot.
+
+3. **Forbidden pattern:** no code path may infer mode from `user` alone. Any condition of the form `user ? 'authenticated' : 'guest'` outside the initial ModeSelectionModal handler is a doctrine violation.
+
+4. **Refresh behavior:** on refresh, mode survives in sessionStorage. Authenticated users get re-routed through their cloud draft (if still signed in) or sign-in re-prompt (if session expired). Guests resume from local storage.
+
+5. **Tab close:** sessionStorage is cleared. A new tab requires a new mode decision at the entry-point gate. This matches the "session lifetime" semantics in invariant I1.
+
+**Prerequisites:** none. `sessionStorage` is a browser primitive; no new dependencies. The mechanism is intentionally minimal — single write site, no React context, no external store, no provider plumbing. Read sites use the `sessionStorage.getItem('vday_mode')` call directly or via a thin `getActiveMode()` helper that performs no other logic.
+
 ---
 
-## Section 6 — Dependency verification (8 questions)
+## Section 6 — Dependency verification (9 questions)
 
 ### Q1. Transactional email infrastructure
 
@@ -696,6 +801,28 @@ Both consumers retire/rewrite. Endpoint becomes orphan candidate.
 - PaymentStage's founder-code UI at `:55, :81, :98, :357` survives.
 - **Verify during implementation:** PaymentStage's founder-code UI is currently in the PaymentStage component itself, which under dual-mode receives a `mode` prop. Confirm that the UI is rendered identically in both modes — there's no reason to gate founder codes by mode.
 
+### Q9. Guest payment recovery guarantees (Gap Closure 4)
+
+**Question:** What happens if a guest's payment succeeds but the seal completion fails before the receiver URL is delivered?
+
+**Resolution:** the existing Razorpay webhook + retry mechanism handles this. Specifically:
+
+1. Razorpay payment record is created server-side at payment time, including the guest's email captured at the PaymentStage email field.
+2. If `verify-payment.js` succeeds but downstream operations fail (RTDB write, email send), the Razorpay webhook fires and the [reconcile-payments cron](../../api/admin/reconcile-payments.js) (scheduled daily per `vercel.json`) detects the orphan and eventually completes the seal.
+3. Guest receives the receiver URL via email once the seal completes.
+4. If email delivery fails (Resend bounce, invalid email), the Razorpay payment ID is the fallback identifier — guest can contact support and the letter can be recovered server-side from `anonymousLetters/{paymentId}` (per FL-3).
+
+**Explicit guarantees for guests:**
+
+- Once payment succeeds at Razorpay's end, the letter WILL be sealed (eventual consistency via webhook retry + daily reconciliation cron).
+- The receiver URL WILL be delivered to the email captured at payment, OR be retrievable via Razorpay payment ID through support.
+
+**Explicit non-guarantees for guests:**
+
+- If the tab crashes between payment success and the receiver URL appearing on-screen, the guest must wait for the email. Refreshing or retrying creates duplicate payment attempts (which Razorpay deduplicates, but the UX is confusing).
+- Guests do NOT get an in-app "view my paid letter" surface (no dashboard). The email is the only delivery channel.
+- If the guest loses both the email AND the Razorpay payment ID, the letter is unrecoverable. **This is intentional — anonymous purchases are anonymous.**
+
 ---
 
 ## Section 7 — Risks and unknowns
@@ -740,14 +867,47 @@ Confirmed in §6.Q8. No risk.
 
 **Risk:** minor — the gating modal sits on the critical entry path, so a code-split delay could feel sluggish. Recommend including ModeSelectionModal in the landing-page bundle (not lazy) since it's small and on the critical interaction.
 
-### 7.6 Proposal items requiring founder lock before PR-49 code starts
+### 7.6 Founder-lock resolutions (post cross-voice review)
 
-Surfacing for explicit decision:
+Founder-locks resolved during cross-voice review pass. The four items previously surfaced as open decisions are now locked. Receiver URL TTL is deferred (not blocking PR-49).
 
-1. **§6.Q3 anonymous-letter record schema.** This diagnostic finds that `shared/{sessionKey}` already supports the anonymous case (`senderUid` conditional). The proposal suggested a separate `anonymousLetters/{paymentId}` collection. Recommend founder picks: keep existing `shared/` shape with `senderUid` optional vs. add explicit `mode` discriminator field vs. split into separate collection. The codebase strongly supports option 1.
-2. **§6.Q9 receiver URL longevity.** Proposal raised TTL question for anonymous letters. Current schema has no TTL on `shared/*`. Recommend founder picks: no TTL (URLs permanent) vs. TTL with explicit expiry semantics.
-3. **§5.2 mode-state mechanism.** First explicit cross-component shared state in the codebase. React Context vs prop drilling vs external store. No existing prior art.
-4. **§7.1 Eidi participation.** Whether Eidi gets dual-mode treatment or is out-of-scope.
+**FL-1 — Guest-to-authenticated upgrade policy: STRICT NO. [RESOLVED]**
+
+- No mid-flow upgrade (guest stays guest for that draft).
+- No post-payment claim (anonymous letters stay anonymous forever).
+- No retroactive account attachment.
+- Proposal anti-pattern A4 ("Migration of guest state to cloud account on later sign-in") becomes binding doctrine.
+- **Zero migration code in PR-49.** Any future engineer who proposes "let's claim the guest letter on sign-in" is violating doctrine.
+
+**FL-2 — Mode-state mechanism: `sessionStorage`. [RESOLVED]**
+
+- Mode stored at exactly one location: `sessionStorage.setItem('vday_mode', 'guest' | 'authenticated')` written by ModeSelectionModal's handler.
+- Read-only thereafter for the session.
+- Survives refresh within the same tab.
+- Auto-cleans on tab close (matches "session lifetime" invariant I1).
+- Resists I3 violation: hydration effect reads mode FIRST, then acts; auth state changes do NOT change persistence path.
+- **Forbidden pattern:** any code path that infers mode from `user` auth state.
+- Full enforcement contract at §5.9.
+
+**FL-3 — Anonymous letter record schema: separate `anonymousLetters/` collection. [RESOLVED]**
+
+- New RTDB collection `anonymousLetters/{paymentId}` with letter content + receiver URL slug.
+- Keyed by Razorpay payment ID (the guest's only stable identifier).
+- Lives apart from authenticated `shared/` records.
+- Receiver flow looks up letters from BOTH `shared/` and `anonymousLetters/` via slug-to-record mapping.
+- `MyLettersModal` requires no filtering changes (only reads `shared/` keyed to the user).
+- `verify-payment.js` branches on mode at payment time and writes to the appropriate collection.
+
+**FL-4 — Eidi participation: OUT OF SCOPE for PR-49. [RESOLVED]**
+
+- PR-49 does NOT touch any Eidi code (`pages/eidi/`, Eidi-specific routing, Eidi receiver flow).
+- Eidi mid-flow sign-in prompt at [`App.tsx:1667`](../../App.tsx:1667) stays untouched.
+- [`config/features.ts`](../../config/features.ts) Eidi gating stays as-is.
+- When Eidi is re-enabled for Eid 2027, dual-mode alignment becomes a separate follow-up PR.
+
+**Deferred (not blocking PR-49):**
+
+- **Receiver URL longevity / TTL.** Originally raised as a founder-lock item. Founder deferred — anonymous and authenticated letters keep current TTL semantics (no expiry on `shared/*`; same default for `anonymousLetters/*`). Revisit if real-world abuse or storage cost demands it.
 
 ### 7.7 Items that look wrong in the proposal when checked against code
 
@@ -772,6 +932,76 @@ Same surface as §7.8 — flagged separately because it's the load-bearing serve
 ### 7.10 The proposal's "no autosave-to-cloud" rule (A2) and the current authenticated UX
 
 Proposal §2.3 says authenticated users use "Save and Continue" — no debounced autosave. Current code has no debounced autosave-to-cloud either (the autosave hook only writes localStorage). **A2 is not currently violated by any active autosave-to-cloud path.** Flagging only because future engineers might read "no autosave to cloud" and try to add one — the doctrine doc PR-49 produces should call this out explicitly.
+
+### 7.11 Doctrine: accepted unsaved-loss in authenticated mode (Gap Closure 5)
+
+**Authenticated mode has no autosave by design. Loss between explicit Save and Continue clicks is accepted behavior.**
+
+This trade-off is deliberate. Reintroducing autosave to mitigate the loss is forbidden because:
+
+1. **Autosave creates reconciliation pressure** — the autosave snapshot may diverge from explicit-save state. The moment you have two stored representations of the same draft, you have a reconciliation problem, no matter how much the autosave is labeled "just a backup."
+2. **Autosave reintroduces the "two sources of truth" problem** that dual-mode is designed to eliminate.
+3. **Future engineers will see "but the user lost work" as justification for autosave.** This doctrine exists to prevent that. The justification is real; the response is wrong.
+
+**Future-proofing language for the strategy doc and the doctrine doc:**
+
+> In authenticated mode, the user is responsible for explicit Save and Continue clicks. Work between saves is in-memory only. If the tab crashes, the network fails, or the user closes the tab without saving, the in-memory work is lost. **This is the design.** Do not "fix" this by adding autosave. The trade-off was made to keep the architecture free of reconciliation, which has higher cost than occasional unsaved-loss.
+
+**UX mitigations that are PERMITTED** (because they do not introduce a second storage authority):
+
+- Inline "unsaved changes" indicators that flip on local mutation, flip off on successful Save and Continue. Read-only signal, no storage.
+- A "before-unload" browser dialog when there are unsaved changes (`window.onbeforeunload`). User-confronted, no storage.
+- Disabling step-advance navigation while a save is in flight, so the user cannot accidentally lose pending work by clicking forward before the save resolves.
+
+**UX mitigations that are FORBIDDEN** (because they introduce a second storage authority):
+
+- A local backup of the in-memory state "just in case the user crashes." This is autosave by another name.
+- A periodic ping to the server that captures partial state. This is autosave to cloud by another name.
+- A `sessionStorage` mirror of the form state for refresh recovery. This is autosave to a third storage authority, even worse.
+
+Update the proposal accordingly when it gets its patch round (separate work item).
+
+---
+
+## Section 8 — Reconciliation-Ghost Anti-Patterns (forbidden under dual-mode)
+
+Cross-voice review surfaced that the danger to PR-49's architectural integrity is NOT reintroducing the literal reconciliation modal — it's reintroducing reconciliation under a different abstraction. PR-49 succeeds only if guest and authenticated paths are brutally simple and barely know each other exists. The following patterns are forbidden:
+
+**Forbidden — Generic persistence managers.** Any class, hook, or helper that abstracts over both local and cloud persistence behind a unified interface (e.g., `usePersistence()` that returns the right backend based on mode). This is a reconciliation ghost. **Instead:** separate hooks (`useGuestPersistence`, `useAuthenticatedPersistence`) that don't share code.
+
+**Forbidden — Mode-aware smart dispatchers.** Any save handler that takes mode as a parameter and routes internally. **Instead:** completely separate save flows for each mode, called from completely separate code paths.
+
+**Forbidden — Universal save handlers.** A single `handleSave()` that handles both modes via internal branching. **Instead:** `handleGuestContinue()` and `handleAuthenticatedSaveAndContinue()` as independent functions.
+
+**Forbidden — Dual-purpose draft models.** A single `Draft` type or `DraftRecord` interface that covers both guest and authenticated drafts via optional fields. **Instead:** separate types — `LocalDraft` (guest-only) and `CloudDraft` (authenticated-only) — with no inheritance or shared shape.
+
+**Forbidden — Compatibility APIs.** Helpers that convert between local and cloud draft representations. Even one-way (guest → cloud) is forbidden per FL-1 strict no upgrade.
+
+**Forbidden — Transitional flags.** Configuration flags that temporarily allow X during migration. Examples: `ALLOW_GUEST_TO_AUTH_MIGRATION`, `ENABLE_LEGACY_RECONCILIATION`, etc. Any such flag is a reconciliation ghost.
+
+**Forbidden — Optional reconciliation hooks.** Any code path that reads both local and cloud state in the same flow, even if it doesn't compare or merge them. The mere co-presence is the smell.
+
+**Forbidden — `mode` parameter on shared utilities.** If a utility takes `mode` as a parameter, it's a smart dispatcher. Split the utility instead.
+
+**The test:** If a code reviewer sees a function/module/abstraction and cannot tell whether it's guest-only or authenticated-only without reading the implementation, it's probably a reconciliation ghost.
+
+---
+
+## Cross-Voice Review Delta
+
+**Date:** 13 May 2026
+**Reviewers:** Claude (drafter) + ChatGPT (cross-reviewer) + Founder (decision authority)
+
+**Summary of what changed in this patch round:**
+
+1. **Five gap closures integrated** — §3.11 (`draftState` ontology), §3.12 (`draftId` semantics), §5.9 (mode-state mechanism enforcement), §6.Q9 (guest payment recovery), §7.11 (accepted unsaved-loss doctrine).
+2. **Four founder-locks resolved** — FL-1 (no guest-to-auth upgrade), FL-2 (sessionStorage mode), FL-3 (separate `anonymousLetters/` collection), FL-4 (Eidi out of scope). See updated §7.6.
+3. **New §8 Reconciliation-Ghost Anti-Patterns** section added.
+4. **Receiver URL TTL deferred** from the founder-lock list (not blocking PR-49).
+
+**Diagnostic quality rating:** ~8.7/10 per ChatGPT cross-voice review, with the five gaps now closed.
+
+**Recommendation:** diagnostic is implementation-grade. The PR-49 strategy doc can now be drafted with all founder-locks resolved and ChatGPT-surfaced gaps addressed.
 
 ---
 
