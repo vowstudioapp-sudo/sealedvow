@@ -3,10 +3,12 @@ import { PrivacyModal } from './PrivacyModal';
 import { TermsModal } from './TermsModal';
 import { HelpModal } from './HelpModal';
 import { MyLettersModal } from './MyLettersModal';
+import { ModeSelectionModal } from './ModeSelectionModal';
 import { UserMenu } from './UserMenu';
 import { AtmosphericShell } from './AtmosphericShell';
 import { useAuth } from '../hooks/useAuth';
 import { markIntentionalEntry } from '../utils/intentionalEntry';
+import { setActiveMode } from '../utils/activeMode';
 
 interface Props {
   onEnter: () => void;
@@ -24,6 +26,10 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [showMyLetters, setShowMyLetters] = useState(false);
+  // PR-49 Phase A — Mode entry primitive (dormant). Modal fires only when
+  // a signed-out user clicks "Create Your Letter"; signed-in users skip
+  // the gate per strategy §5.6.
+  const [showModeSelection, setShowModeSelection] = useState(false);
 
   const { user, signInWithGoogle, signOut } = useAuth();
 
@@ -106,12 +112,47 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     return () => { document.body.style.overflow = ''; };
   }, [showLogin]);
 
-  const handleEnter = () => {
+  const proceedToCreate = () => {
     // PR #11 — flags this navigation as a fresh-letter intent so
     // PreparationForm shows the resume modal (if a meaningful saved
     // draft exists) instead of silently restoring it.
     markIntentionalEntry();
     window.location.href = "/create";
+  };
+
+  const handleEnter = () => {
+    // PR-49 Phase A — gate the Create flow on mode selection.
+    // Signed-in users skip the gate per strategy §5.6 (auto-authenticated).
+    // Signed-out users see ModeSelectionModal; the chosen mode is written
+    // to sessionStorage by the modal, then handleModeChosen below resumes
+    // the navigation.
+    //
+    // The mode write is currently DORMANT — no persistence-routing code
+    // consumes it yet. Phase C wires the consumers in App.tsx hydration,
+    // save handlers, Begin Again, and PreparationForm.
+    if (user) {
+      setActiveMode('authenticated');
+      proceedToCreate();
+      return;
+    }
+    setShowModeSelection(true);
+  };
+
+  const handleModeChosen = () => {
+    setShowModeSelection(false);
+    proceedToCreate();
+  };
+
+  const handleModeSelectionSignIn = async () => {
+    // ModeSelectionModal's onSignIn contract is Promise<User | null>.
+    // useAuth.signInWithGoogle returns Promise<User> and throws on
+    // cancellation / failure; coerce thrown errors to null returns so the
+    // modal can interpret null as "stay open, user may retry or pick Guest".
+    try {
+      return await signInWithGoogle();
+    } catch {
+      return null;
+    }
   };
 
   return (
@@ -125,6 +166,11 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         isOpen={showMyLetters}
         onClose={() => setShowMyLetters(false)}
         onCreateNew={handleEnter}
+      />
+      <ModeSelectionModal
+        isOpen={showModeSelection}
+        onChosen={handleModeChosen}
+        onSignIn={handleModeSelectionSignIn}
       />
 
       {/* ══════════════════════════════════════
