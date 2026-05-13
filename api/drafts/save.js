@@ -33,7 +33,6 @@
 //
 // Atomic-transaction rejections (409):
 //   { error: 'ACTIVE_DRAFT_EXISTS', existingDraftId }
-//   { error: 'CAP_EXCEEDED', current, limit }
 //   { error: 'STALE_REVISION', currentRevision, yourRevision }
 //   { error: 'INVALID_REVISION', currentRevision, yourRevision }
 //
@@ -44,9 +43,8 @@
 //   404 DRAFT_NOT_FOUND (UPDATE path with unknown draftId)
 //   500 TRANSACTION_FAILED / WRITE_FAILED
 //
-// Cap rule: Count(ACTIVE) + Count(PAUSED) ≤ MAX_DRAFTS. ABANDONED unbounded.
 // Single-ACTIVE rule: at most one draft per user with status === 'ACTIVE'.
-// Both enforced inside the transaction (re-queried at commit time).
+// Enforced inside the transaction (re-queried at commit time).
 // ============================================================================
 
 import admin from 'firebase-admin';
@@ -55,7 +53,6 @@ import { getSessionUser } from '../lib/auth.js';
 import {
   validateDraftWrite,
   validateExpectedRevision,
-  MAX_DRAFTS,
 } from '../lib/draftValidation.js';
 
 export default async function handler(req, res) {
@@ -229,20 +226,6 @@ export default async function handler(req, res) {
         const drafts = currentDrafts || {};
 
         const allDrafts = Object.values(drafts).filter(Boolean);
-        const nonAbandonedCount = allDrafts.filter(
-          (d) => d.persistenceStatus !== 'ABANDONED',
-        ).length;
-        if (nonAbandonedCount >= MAX_DRAFTS) {
-          abortReason = {
-            http: 409,
-            body: {
-              error: 'CAP_EXCEEDED',
-              current: nonAbandonedCount,
-              limit: MAX_DRAFTS,
-            },
-          };
-          return;
-        }
         if (finalPersistenceStatus === 'ACTIVE') {
           const existingActive = allDrafts.find(
             (d) => d.persistenceStatus === 'ACTIVE',

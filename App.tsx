@@ -76,7 +76,6 @@ import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
 import { writeDraftFromExternal, peekDraft, writeStage, writeDraftId, clearPreparationDraft } from './hooks/usePreparationPersistence';
-import { useDraftStateObserver } from './hooks/useDraftStateObserver';
 import { saveDraft, type SaveDraftInput } from './utils/saveDraft';
 import { pauseDraft, discardDraft } from './utils/lifecycleDraft';
 import { StaleRevisionModal } from './components/StaleRevisionModal';
@@ -929,17 +928,10 @@ const App: React.FC = () => {
   // with Discard Local Draft (both clear local and trust cloud); distinct
   // label per locked Phase 4 spec.
   //
-  // Save Local Draft as New: two-step server orchestration —
-  //   1. pauseDraft(existing cloud ACTIVE, expectedRevision)
-  //   2. saveDraft({...local data, no draftId})  → creates new ACTIVE
-  // Then clear local + set draftRecord to the new ACTIVE.
-  //
   // Discard Local Draft: same outcome as Continue Dashboard Draft.
   //
-  // All three paths transition hydrationResolutionState → 'resolved',
+  // Both paths transition hydrationResolutionState → 'resolved',
   // which releases any deferred pending action via the effect above.
-
-  const caseBInFlightRef = useRef(false);
 
   const applyCloudActiveToState = (cloud: CloudDraftSnapshot) => {
     clearPreparationDraft();
@@ -972,90 +964,6 @@ const App: React.FC = () => {
     applyCloudActiveToState(reconciliation.cloudDraft);
     setReconciliation({ kind: 'none' });
     setHydrationResolutionState('resolved');
-  };
-
-  const handleSignInSaveLocalDraftAsNew = async () => {
-    if (reconciliation.kind !== 'sign_in_case_b') return;
-    if (caseBInFlightRef.current) return;
-    caseBInFlightRef.current = true;
-
-    const cloudDraft = reconciliation.cloudDraft;
-
-    // Step 1: pause the existing cloud ACTIVE.
-    const pauseResult = await pauseDraft({
-      draftId: cloudDraft.draftId,
-      expectedRevision: cloudDraft.revision,
-    });
-    if (!mountedRef.current) {
-      caseBInFlightRef.current = false;
-      return;
-    }
-    if (pauseResult.kind !== 'ok') {
-      // Pause failed. Leave reconciliation modal open so the user can
-      // retry or pick a different option. Surface inline error.
-      caseBInFlightRef.current = false;
-      setLastSaveError("Couldn't set aside the dashboard draft. Try again.");
-      return;
-    }
-
-    // Step 2: create new ACTIVE from local. Local data is in App.tsx's
-    // `data` state (which was populated from PreparationForm or seeded
-    // from peekDraft on mount). draftStateToSend is the same monotonic
-    // computation used by the save flow; for a Case B fresh user, this
-    // is typically 'IN_PROGRESS' since the local working copy hasn't
-    // been refined yet.
-    const candidate = UI_STAGE_TO_DRAFT_STATE[stage] ?? 'IN_PROGRESS';
-    const seed = draftRecord.seedDraftState;
-    const draftStateToSend: DraftState =
-      seed !== null && DRAFT_STATE_ORDER[seed] > DRAFT_STATE_ORDER[candidate]
-        ? seed
-        : candidate;
-    const localStep = peekDraft().step;
-    const step = stage === AppStage.PREPARE ? (localStep ?? undefined) : undefined;
-
-    const saveInput: SaveDraftInput = {
-      data: data ?? {},
-      draftState: draftStateToSend,
-    };
-    if (step !== undefined) saveInput.step = step;
-    // Intentionally no draftId / no expectedRevision — CREATE path.
-
-    const saveResult = await saveDraft(saveInput);
-    if (!mountedRef.current) {
-      caseBInFlightRef.current = false;
-      return;
-    }
-    if (saveResult.kind !== 'ok') {
-      // Save failed AFTER pause succeeded. Cloud now has zero ACTIVE
-      // (the donor was demoted) + one PAUSED (the donor). Local is
-      // intact. Surface the error; the user can retry — the next
-      // attempt's pauseDraft will hit ILLEGAL_STATUS_TRANSITION
-      // (already PAUSED) which we handle by skipping straight to save.
-      // For Phase 4 simplicity, surface the error and leave the modal
-      // open. Phase 5+ can refine the retry path.
-      caseBInFlightRef.current = false;
-      setLastSaveError("Couldn't save your local draft as new. Try again.");
-      return;
-    }
-
-    // Both steps succeeded. Reset everything; the new ACTIVE's draft is
-    // now the cloud authority. Local working copy was the source; we now
-    // clear it because the user's intent was "save AS NEW" — i.e., a new
-    // cloud draft, not necessarily that local stays editable.
-    clearPreparationDraft();
-    writeDraftId(saveResult.draftId);
-    setData(null);
-    setDraftRecord({
-      draftId: saveResult.draftId,
-      seedDraftState: draftStateToSend,
-      revision: saveResult.revision,
-    });
-    setLastSaveError(null);
-    setLastSaveSuccessAt(Date.now());
-    setPrepFormResetKey((k) => k + 1);
-    setReconciliation({ kind: 'none' });
-    setHydrationResolutionState('resolved');
-    caseBInFlightRef.current = false;
   };
 
   const handleSaveAndContinueLater = () => {
@@ -1159,13 +1067,6 @@ const App: React.FC = () => {
             currentRevision: result.currentRevision,
             pendingSavePayload: input,
           });
-          saveInFlightRef.current = false;
-          return;
-
-        case 'cap_exceeded':
-          // PR-48 Phase 4: cap-exceeded UX is a Phase 5 dashboard concern.
-          // Surface a generic error toast for now.
-          setLastSaveError("Couldn't save just now. Your work is still here.");
           saveInFlightRef.current = false;
           return;
 
@@ -1388,27 +1289,6 @@ const App: React.FC = () => {
       cancelled = true;
     };
   }, [authUser?.uid, authLoading, serverSessionReady]);
-
-  // PR #18b — Observer is LIVE. Activates when the user is signed in AND a
-  // draftRecord has been hydrated (or just-saved in CP2). The hook's early
-  // return on `!enabled || !draftId` keeps the anonymous case (and the brief
-  // window during /list hydration) at zero work per render. The seedDraftState
-  // pass-through prevents a duplicate /transition write on the activation
-  // tick — without it, the observer would always fire for the current
-  // UIStage on first activation because lastPersistedDraftStateRef starts null.
-  // PR-48 Phase 3: currentRevision is the observer's CAS token. It is
-  // seeded at the just-activated edge from draftRecord.revision (which is
-  // populated by /save success or /list hydration). If null at observer-
-  // fire time, the hook skips the fire (the next milestone after revision
-  // hydrates will fire correctly). Subsequent fires advance the observer's
-  // internal ref from each /transition response's `revision` field.
-  useDraftStateObserver({
-    uiStage: stage,
-    draftId: draftRecord.draftId,
-    enabled: !!authUser && !!draftRecord.draftId,
-    seedDraftState: draftRecord.seedDraftState ?? undefined,
-    currentRevision: draftRecord.revision,
-  });
 
   useEffect(() => {
     const onPopState = () => {
@@ -2333,7 +2213,6 @@ const App: React.FC = () => {
             savedAt: reconciliation.localMetadata.savedAt,
           }}
           onContinueDashboardDraft={handleSignInContinueDashboardDraft}
-          onSaveLocalDraftAsNew={handleSignInSaveLocalDraftAsNew}
           onDiscardLocalDraft={handleSignInDiscardLocalDraft}
         />
       )}

@@ -41,7 +41,6 @@ interface Props {
   cloudDraft: CloudDraftDisplayMetadata;
   localMetadata: LocalDraftDisplayMetadata;
   onContinueDashboardDraft: () => void;
-  onSaveLocalDraftAsNew: () => void;
   onDiscardLocalDraft: () => void;
 }
 
@@ -59,7 +58,6 @@ export const SignInReconciliationModal: React.FC<Props> = ({
   cloudDraft,
   localMetadata,
   onContinueDashboardDraft,
-  onSaveLocalDraftAsNew,
   onDiscardLocalDraft,
 }) => {
   if (!isOpen) return null;
@@ -149,13 +147,6 @@ export const SignInReconciliationModal: React.FC<Props> = ({
             className="lp-modal__primary"
           >
             Continue Dashboard Draft
-          </button>
-          <button
-            type="button"
-            onClick={onSaveLocalDraftAsNew}
-            className="lp-modal__secondary"
-          >
-            Save Local Draft as New
           </button>
           <button
             type="button"

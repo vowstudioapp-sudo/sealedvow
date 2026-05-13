@@ -35,7 +35,6 @@ export type SaveDraftResult =
       currentRevision: number;
       yourRevision: number;
     }
-  | { kind: 'cap_exceeded'; current: number; limit: number }
   | { kind: 'active_draft_exists'; existingDraftId: string }
   | { kind: 'unauthorized' }
   | { kind: 'rate_limited' }
@@ -79,8 +78,6 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
     error?: string;
     currentRevision?: number;
     yourRevision?: number;
-    current?: number;
-    limit?: number;
     existingDraftId?: string;
   } | null = null;
   try {
@@ -115,13 +112,6 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
         typeof body.currentRevision === 'number' ? body.currentRevision : 0,
       yourRevision:
         typeof body.yourRevision === 'number' ? body.yourRevision : 0,
-    };
-  }
-  if (res.status === 409 && body?.error === 'CAP_EXCEEDED') {
-    return {
-      kind: 'cap_exceeded',
-      current: typeof body.current === 'number' ? body.current : 0,
-      limit: typeof body.limit === 'number' ? body.limit : 3,
     };
   }
   if (res.status === 409 && body?.error === 'ACTIVE_DRAFT_EXISTS') {
