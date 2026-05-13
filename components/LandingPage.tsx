@@ -531,6 +531,14 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               setIsSigningIn(true);
               try {
                 await signInWithGoogle();
+                // PR-49 Phase A bypass fix: this completion path navigates via
+                // onEnter() (App.tsx:handleEnterStudio → window.location.href),
+                // bypassing handleEnter / proceedToCreate. Restore both writes
+                // that proceedToCreate does before navigation so the showLogin
+                // path lands the same sessionStorage state as the Phase A CTAs.
+                // See docs/diagnostics/2026-05-13-pr49-phase-a-test6-null.md.
+                setActiveMode('authenticated');
+                markIntentionalEntry();
                 setShowLogin(false);
                 onEnter();
               } catch (err) {
@@ -565,7 +573,7 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               {signInError}
             </p>
           )}
-          <button className="lp-btn-guest" onClick={() => { setShowLogin(false); onEnter(); }}>Continue as Guest</button>
+          <button className="lp-btn-guest" onClick={() => { setActiveMode('guest'); markIntentionalEntry(); setShowLogin(false); onEnter(); }}>Continue as Guest</button>
           <p className="lp-modal__guest-note">Guest letters are not saved after the session ends.</p>
         </div>
       </div>
