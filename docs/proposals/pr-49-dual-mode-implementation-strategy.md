@@ -300,7 +300,6 @@ Organized by phase. All file:line anchors cite current HEAD (`66719d8`); line nu
 - `App.tsx:137` — `type HydrationResolutionState` (diagnostic §3.5).
 - `App.tsx:450-457` — `showSignInPrompt` state, `pendingActionRef`, `pendingCancelRef` (diagnostic §3.5).
 - `App.tsx:511-512` — `hydrationResolutionState` state (diagnostic §3.5).
-- `App.tsx:514-528` — `runOrPromptSignIn` function (diagnostic §1.5).
 - `App.tsx:528-571` — `commitPendingAction` function (diagnostic §3.5).
 - `App.tsx:576-584` — deferred-action watcher useEffect (diagnostic §3.5).
 - `App.tsx:587-592` — `cancelPendingAction` function.
@@ -314,8 +313,15 @@ Organized by phase. All file:line anchors cite current HEAD (`66719d8`); line nu
 - `App.tsx:1078-1083` — switch case `'active_draft_exists'` (diagnostic §1.7).
 - `App.tsx:1218-1252` — Case A/B split in hydration effect (diagnostic §1.1, §1.3, §3.5).
 - `App.tsx:2175-2218` — render switch for `SignInPromptModal`, `BeginNewPromptModal`, `StaleRevisionModal`, `SignInReconciliationModal` (diagnostic §3.5).
-- `App.tsx:1093` — `runOrPromptSignIn(action, 'persistence', ...)` call site in save flow.
-- `App.tsx:2057` — `runOrPromptSignIn(() => safeSetStage(AppStage.PAYMENT))` call site in MainExperience `onPayment`. **NOTE:** the Eidi flow's call at `App.tsx:1667` is OUT OF SCOPE per FL-4 — that call site stays.
+**`runOrPromptSignIn` — bounded FL-4 exemption.** This is the only PR-49 deletion target that is preserved by founder exemption. All other reconciliation-surface targets are deleted fully.
+
+*Preserved per FL-4 (bounded exemption):*
+- `App.tsx:514-528` — `runOrPromptSignIn` function definition SURVIVES. Required by the Eidi call site at `App.tsx:1667` (FL-4 untouched). Cleanup deferred to the 2027 Eidi dual-mode alignment PR.
+- `App.tsx:1667` — Eidi call site `runOrPromptSignIn(...)` SURVIVES per FL-4.
+
+*Deleted by PR-49:*
+- `App.tsx:1093` — `runOrPromptSignIn(action, 'persistence', ...)` call site in the save flow.
+- `App.tsx:2057` — `runOrPromptSignIn(() => safeSetStage(AppStage.PAYMENT))` call site in MainExperience `onPayment`.
 
 **Cross-mode contamination in `usePreparationPersistence.ts` (Focus 1):**
 - `:23-28` — `draftId` field on `StoredDraft` interface (cross-mode contamination per diagnostic §3.12).
@@ -389,7 +395,8 @@ Per diagnostic §4. Organized by phase.
 
 **`App.tsx` save handler (rewrite of `handleSaveAndContinueLater`):**
 - Current: `App.tsx:969-1100` wraps the save in `runOrPromptSignIn`, switches on multiple result kinds.
-- New: NOT a "Save and Continue Later" floating affordance. Becomes the authenticated-mode step-advance handler. Each step button click in authenticated mode calls a new handler that saves to cloud, awaits success, then advances. On error: inline error, no advance. No modal. Guest mode has no save handler — `next()` from `usePreparationState` advances directly; autosave debounce writes localStorage.
+- New: NOT a "Save and Continue Later" floating affordance. Becomes the authenticated-mode step-advance handler. Each step button click in authenticated mode calls a new handler that saves to cloud, awaits success, then advances. On error: inline error, no advance. No modal. The new authenticated-mode save handler does NOT wrap in `runOrPromptSignIn` because mid-flow sign-in prompts are forbidden under I3. Guest mode has no save handler — `next()` from `usePreparationState` advances directly; autosave debounce writes localStorage.
+- This rewrite eliminates the function's NON-Eidi callers (the `App.tsx:1093` save-flow call site and the `App.tsx:2057` Vow-payment call site), not the function itself. The `runOrPromptSignIn` function definition survives per the FL-4 bounded exemption in §7.1; its only surviving caller is the Eidi flow at `App.tsx:1667`, which is out of PR-49 scope.
 - Per diagnostic §4.2.
 
 **`App.tsx` Begin Again handlers (rewrite):**
@@ -656,9 +663,9 @@ Five phases. Each ends in a compilable, runnable state. Each phase has explicit 
 **Smoke tests required:** the full §13 checklist runs after Phase C. Critical subsets:
 1. **Guest E2E:** open landing as guest, choose guest, type a letter, navigate through all stages, pay with email field, verify receiver URL email arrives.
 2. **Authenticated E2E:** sign in, choose authenticated (auto), type a letter, click "Save and Continue" at each step, refresh mid-flow, verify cloud draft resumes, pay, verify letter appears in Sent dashboard.
-3. **No reconciliation surfaces:** grep confirms zero matches for `SignInReconciliationModal`, `StaleRevisionModal`, `BeginNewPromptModal`, `SignInPromptModal`, `runOrPromptSignIn`, `ReconciliationState`, `HydrationResolutionState`, `applyCloudActiveToState`, `handleStaleRevisionReloadLatest`, etc.
+3. **No reconciliation surfaces:** grep confirms zero matches for `SignInReconciliationModal`, `StaleRevisionModal`, `BeginNewPromptModal`, `SignInPromptModal`, `ReconciliationState`, `HydrationResolutionState`, `applyCloudActiveToState`, `handleStaleRevisionReloadLatest`, etc.
 4. **Cross-mode contamination removed:** grep confirms zero matches for `writeDraftId` and `draftId` in `hooks/usePreparationPersistence.ts`.
-5. **Mid-flow sign-in prompts gone:** grep confirms zero matches for `runOrPromptSignIn` call sites in App.tsx EXCEPT the Eidi flow's call at `App.tsx:1667` (FL-4 untouched).
+5. **Mid-flow sign-in prompts gone:** the two non-Eidi `runOrPromptSignIn` call sites (`App.tsx:1093` save, `App.tsx:2057` Vow payment) are deleted. The `runOrPromptSignIn` function definition at `App.tsx:514-528` and the Eidi call site at `App.tsx:1667` SURVIVE per the FL-4 bounded exemption documented in §7.1. Verify via the grep expectation in the §13 Phase C checklist: exactly 2 matches in runtime/app code.
 6. **`npm run build` passes.**
 
 **Exit criteria:**
@@ -676,7 +683,7 @@ Treating a bucket as a deploy boundary is a doctrine violation. The "each phase 
 **C1 — Persistence routing rewrite**
 - App.tsx hydration effect rewrite (mode-aware dispatch reading `getActiveMode()` first).
 - App.tsx Begin Again rewrite (two separate handlers: `handleGuestBeginAgain`, `handleAuthenticatedBeginAgain`).
-- Removal of `runOrPromptSignIn` flow + `pendingActionRef` + `commitPendingAction` + the deferred-action watcher effect.
+- Removal of the `runOrPromptSignIn`-based deferred-action flow: the two non-Eidi call sites (`App.tsx:1093` save, `App.tsx:2057` Vow payment) are deleted along with `pendingActionRef`, `commitPendingAction`, and the deferred-action watcher effect. The `runOrPromptSignIn` function definition itself SURVIVES per the FL-4 exemption documented in §7.1 (required by the Eidi call site at `App.tsx:1667`).
 - Removal of `HydrationResolutionState` machine and all its consumers.
 
 **C2 — Form-stage rewrite**
@@ -865,7 +872,7 @@ Founder runs these after each phase exit. Manual smoke tests are the only verifi
   - `grep -r "applyCloudActiveToState" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
   - `grep -r "handleStaleRevision" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
   - `grep -r "handleBeginNew" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
-  - `grep -r "runOrPromptSignIn" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → EXPECTED matches: ONLY the Eidi-flow call site at App.tsx (currently ~:1667; line number may shift after Phase C). The function definition's fate is documented in §7.1 — if preserved for Eidi (FL-4), expect 1 call site match plus the definition line; if deleted with the Eidi call site rewired, see §7.1 for the resolution. Verify the only surviving reference is Eidi-scoped.
+  - `grep -r "runOrPromptSignIn" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → MUST RETURN EXACTLY 2 MATCHES: (1) the function definition at `App.tsx:514-528`, and (2) the Eidi call site at `App.tsx:1667`. Both are preserved per the FL-4 bounded exemption documented in §7.1. **More than 2 matches** indicates non-Eidi callers that should have been deleted by Phase C. **Fewer than 2 matches** (typically 0) indicates an inadvertent FL-4 violation — the function was deleted along with its Eidi consumer, breaking the Eidi mid-flow sign-in prompt.
 - [ ] **Cross-mode contamination removed (runtime/app code only):**
   - `grep -n "writeDraftId\|draftId" hooks/usePreparationPersistence.ts` → 0 matches.
   - `grep -n "writeDraftId" App.tsx` → 0 matches.
@@ -993,6 +1000,9 @@ Per §6.4. Revision is retained as a server-side audit counter even though CAS r
 
 **Rejected — Combining authenticated and guest paths under a "persistence interface" in `services/`.**
 Per P1 and P2. Adaptation preserves complexity; the goal is structural separation. Two hooks, two files, no shared parent.
+
+**Deferred — `runOrPromptSignIn` function cleanup.**
+Preserved by FL-4 as a bounded exemption to support the Eidi mid-flow sign-in prompt at `App.tsx:1667`. Function definition (`App.tsx:514-528`) and Eidi call site both survive PR-49. When Eidi gets its 2027 dual-mode alignment PR, the function and its Eidi caller are cleaned up together with full FL discipline. Until then, the function exists as a single-caller Eidi-only helper. This is an explicit doctrinal preservation, not forgotten cleanup. See §7.1 for the deletion/preservation split and §13 for the grep verification that enforces the bounded exemption (must return exactly 2 matches).
 
 **Deferred — `api/drafts/list.js` cleanup.**
 Phase D deletes this. Documented here for traceability — the endpoint is orphaned after Phase C wires authenticated hydration to `GET /api/draft`.
