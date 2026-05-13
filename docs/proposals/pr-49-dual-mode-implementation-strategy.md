@@ -118,7 +118,7 @@ PR-49 explicitly does NOT do the following. These are out of scope and the imple
 - **Eidi flow.** Per FL-4. Files at `pages/eidi/create.tsx`, `pages/eidi/receiver.tsx`, `components/EidPreparationForm.tsx`, `components/EidOrbitSelector.tsx`, `components/EidExperience.tsx`, `components/EidCountdown.tsx`, `components/EidiEnvelope.tsx`, `components/EidiShareCard.tsx`, and all `api/*-eidi.js` / `api/generate-eid-letter.js` / `api/claim-eidi.js` / `api/load-eidi.js` / `api/_create-eidi-backup.js` endpoints remain untouched. The Eidi mid-flow sign-in prompt at [`App.tsx:1667`](../../App.tsx:1667) stays untouched. `config/features.ts` Eidi gating remains as-is. **When Eidi is re-enabled for Eid 2027, dual-mode alignment becomes a separate follow-up PR.**
 - **Receiver-side flow.** Diagnostic §7.2 confirmed it's clean. Files at `components/MainExperience.tsx`, `components/PersonalIntro.tsx`, `components/InteractiveQuestion.tsx`, `components/SharePackage.tsx`, `components/SoulmateSync.tsx`, `hooks/usePathLinkLoader.ts`, `hooks/useLinkLoader.ts`, `api/load-session.js`, `api/save-reply.js`, `api/letters/mark-opened.js` are receiver-side only. PR-49 modifies receiver-side ONLY for the dual-collection slug lookup in `api/load-session.js` (per FL-3); no other receiver-side change.
 - **Razorpay webhook integration.** Per diagnostic §7.4. `api/razorpay-webhook.js` makes no user-context assumptions; anonymous letters work for it as-is.
-- **Receiver URL TTL.** Per FL-6 deferred. Existing permanence behavior survives unchanged. Anonymous and authenticated letters keep the same TTL semantics (none).
+- **Receiver URL TTL.** Deferred (not blocking PR-49). Existing permanence behavior survives unchanged. Anonymous and authenticated letters keep the same TTL semantics (none).
 - **Test infrastructure.** No test runner exists; PR-49 does not introduce one. Smoke tests are manual per §13 below.
 - **Bundle-size optimization.** ModeSelectionModal goes in the landing-page bundle (not lazy) per diagnostic §7.5. No other bundle changes.
 - **`/api/admin/*` endpoints.** Admin tooling is unaffected.
@@ -146,17 +146,19 @@ api/upload-media.js
 api/letters/mark-opened.js
 api/save-reply.js
 api/admin/*
-components/MainExperience.tsx (sender side; receiver-side render path unchanged)
 components/PersonalIntro.tsx
 components/InteractiveQuestion.tsx
 components/SoulmateSync.tsx
 hooks/usePathLinkLoader.ts
 hooks/useLinkLoader.ts
-hooks/usePathLinkLoader.ts
 config/features.ts
 ```
 
-Note: `App.tsx` and `components/MainExperience.tsx` ARE modified in PR-49 for sender-side changes; their receiver-side render paths and Eidi early returns are not touched. Implementation phases must call out which lines they touch within these files to avoid spillover.
+**`App.tsx` and `components/MainExperience.tsx` are partially modified — not in the NOT-to-modify perimeter.** Specifically:
+- **`components/MainExperience.tsx`** — sender-side prop removal (`onSaveAndContinueLater` and its button) IS modified during PR-49 Phase C (per §8.1 Phase C rewrites). The receiver-side render path inside this same file (the read-only letter-presentation surface that receivers see) remains untouched.
+- **`App.tsx`** — substantially rewritten in PR-49 Phase C (hydration effect, save handlers, Begin Again, reconciliation removal). The Eidi early-return block and its associated JSX (including the Eidi mid-flow sign-in prompt at the existing call site) remain untouched per FL-4.
+
+Implementation phases must call out which lines they touch within these files to avoid spillover into the untouchable regions.
 
 ---
 
@@ -316,7 +318,7 @@ Organized by phase. All file:line anchors cite current HEAD (`66719d8`); line nu
 - `App.tsx:2057` — `runOrPromptSignIn(() => safeSetStage(AppStage.PAYMENT))` call site in MainExperience `onPayment`. **NOTE:** the Eidi flow's call at `App.tsx:1667` is OUT OF SCOPE per FL-4 — that call site stays.
 
 **Cross-mode contamination in `usePreparationPersistence.ts` (Focus 1):**
-- `:23-28` — PR #21 `draftId` field on `StoredDraft` interface (diagnostic §3.12).
+- `:23-28` — `draftId` field on `StoredDraft` interface (cross-mode contamination per diagnostic §3.12).
 - `:204` — `draftId` field on `DraftPeek` type (diagnostic §3.12).
 - `:235-238` — `readDraft()` parsing of `draftId` (diagnostic §3.12).
 - `:259, :314, :351, :473` — every read-merge write that preserves `draftId` through localStorage round-trip.
@@ -428,11 +430,45 @@ Per diagnostic §4. Organized by phase.
 - `:124-149` — "Create Your Letter" click currently advances directly. New: opens ModeSelectionModal when `useAuth.user === null`; auto-sets `setActiveMode('authenticated')` and proceeds when signed in.
 - Per diagnostic §4.13.
 
-**`api/load-session.js` slug resolution (FL-3 dual-collection lookup, Focus 3):**
-- Receiver flow loads `shared/${sessionKey}` today. Under dual-mode, slugs may resolve to EITHER `shared/` (authenticated letters) OR `anonymousLetters/` (guest letters).
-- Lookup order: check `shared/${sessionKey}` first; if 404, check `anonymousLetters/${paymentId}` via a paymentId-keyed-by-slug index, OR check by reverse-lookup.
-- **Schema decision required during implementation:** does `anonymousLetters/{paymentId}` carry the slug as a field, with a separate `anonymousSlugs/{slug} → paymentId` index? Or does the receiver URL itself encode whether to look up via `shared/` or `anonymousLetters/` (different URL shape)?
-- Founder lock needed during Phase B to pick the slug-indexing approach. The diagnostic and proposal both leave this open as an implementation detail. **Recommendation:** use a uniform receiver URL shape (`/{slug}`), maintain a `anonymousSlugs/{slug}` → `{paymentId}` index alongside `anonymousLetters/{paymentId}`, and have `api/load-session.js` check `shared/{slug}` first, fall through to `anonymousSlugs/{slug}` → `anonymousLetters/{paymentId}`.
+**`api/load-session.js` slug resolution (FL-3 dual-collection lookup, Focus 3) — LOCKED.**
+
+Guest receiver URLs use the SAME outward URL shape as authenticated letters. The shape is `/v/<slug>` (or the existing equivalent — implementation preserves the current receiver-URL shape; this decision is about backend resolution, not URL surface).
+
+The receiver flow resolves via a TWO-STAGE lookup:
+
+**Authenticated path:**
+1. Check `shared/{slug}`.
+2. If found → return authenticated letter.
+
+**Guest path fallback (only fires if stage 1 returns null):**
+1. Check `anonymousSlugs/{slug}`.
+2. Resolve `{ paymentId }` from the lookup record.
+3. Load `anonymousLetters/{paymentId}`.
+4. Return anonymous letter.
+
+**Required RTDB structure:**
+
+```
+shared/{slug}                            // existing authenticated letter record
+anonymousSlugs/{slug} -> { paymentId, createdAt }   // new slug→paymentId index
+anonymousLetters/{paymentId}             // new anonymous letter record
+```
+
+**Doctrinal reasoning:**
+- Maintains one canonical outward receiver URL shape across both modes.
+- Prevents URL-shape leakage of anonymous vs authenticated origin (a receiver cannot tell from the URL whether the sender was a guest).
+- Keeps guest records detached from user identity (no `senderUid` field; keyed only by `paymentId`).
+- Makes receiver lookup deterministic (two-stage, both stages are constant-time RTDB reads).
+- Preserves FL-3's separate-collection doctrine.
+- Avoids hybrid key semantics (no per-record discriminator field; collection membership IS the discriminator).
+
+**Implementation requirement.** `api/load-session.js` MUST:
+1. Check `shared/{slug}` first.
+2. Fall through to `anonymousSlugs/{slug}`.
+3. Resolve to `anonymousLetters/{paymentId}`.
+4. Return 404 only after BOTH lookups fail.
+
+**No alternative slug architectures are permitted in implementation.** This is locked. Implementer judgment does not apply to the slug-resolution shape; only to incidental details (e.g., field naming conventions inside the records). If implementation pressure surfaces a variant ("just put a `mode` flag on `shared/`," "just use one collection with a discriminator"), the answer is NO — the doctrinal reasoning above applies.
 
 **`api/letters/list.js`:**
 - No changes per diagnostic §4.8. Already auth-gated and per-user. Anonymous letters do not appear here by design.
@@ -631,6 +667,45 @@ Five phases. Each ends in a compilable, runnable state. Each phase has explicit 
 - Guest and authenticated paths run end-to-end via mode-aware dispatch.
 - `npm run build` exits 0.
 
+#### Internal execution buckets (non-deploy boundaries)
+
+Phase C is too large for one uninterrupted reasoning block. Implementation proceeds through four execution buckets in the order C1 → C2 → C3 → C4. **These are NOT independently shippable phases. They are implementation-order buckets INSIDE the atomic cutover.** The codebase may be temporarily unstable between buckets during implementation work on the branch. Only the FULL completion of Phase C (all four buckets) restores the "compilable/runnable" guarantee.
+
+Treating a bucket as a deploy boundary is a doctrine violation. The "each phase ends runnable" guarantee in §12 applies at phase boundaries only — not at bucket boundaries.
+
+**C1 — Persistence routing rewrite**
+- App.tsx hydration effect rewrite (mode-aware dispatch reading `getActiveMode()` first).
+- App.tsx Begin Again rewrite (two separate handlers: `handleGuestBeginAgain`, `handleAuthenticatedBeginAgain`).
+- Removal of `runOrPromptSignIn` flow + `pendingActionRef` + `commitPendingAction` + the deferred-action watcher effect.
+- Removal of `HydrationResolutionState` machine and all its consumers.
+
+**C2 — Form-stage rewrite**
+- `components/PreparationForm.tsx` — mode-aware step button labels ("Continue" vs "Save and Continue"); mode-conditional `usePreparationPersistence` mount; mode-aware Begin Again wiring.
+- `components/RefineStage.tsx` — mode-aware Save and Continue button (authenticated only).
+- `components/MainExperience.tsx` — remove sender-side `onSaveAndContinueLater` prop and button.
+- `components/PaymentStage.tsx` — add inline guest email field conditional on mode.
+- Authenticated Save-and-Continue semantics: each step click commits to cloud, awaits success, advances.
+- Guest autosave-only semantics: `next()` from `usePreparationState` advances; autosave debounce writes localStorage.
+
+**C3 — Anonymous-letter infrastructure**
+- `api/verify-payment.js` mode branching: write to `shared/{slug}` for authenticated, `anonymousLetters/{paymentId}` + `anonymousSlugs/{slug}` for guest. Per §8.1 locked architecture.
+- New collections `anonymousLetters/` and `anonymousSlugs/` schema established at write time.
+- `api/load-session.js` dual-collection lookup (two-stage per §8.1).
+- Guest email captured at PaymentStage flows through to `sendLetterSealedEmail`.
+
+**C4 — Reconciliation surface destruction**
+- Delete `components/SignInReconciliationModal.tsx`, `components/StaleRevisionModal.tsx`, `components/BeginNewPromptModal.tsx`, `components/SignInPromptModal.tsx`.
+- Delete the stale-revision flow (already in C1's removals, but `StaleRevisionModal.tsx` deletion lands here).
+- Delete the BeginNew prompt flow (modal file deletion).
+- Remove all App.tsx reconciliation state + types + handlers + render switch entries (`ReconciliationState` union, `reconciliation` state, `setReconciliation`, `applyCloudActiveToState`, `handleSignInContinueDashboardDraft`, `handleSignInDiscardLocalDraft`, `handleStaleRevision*` handlers, `handleBeginNew*` handlers, `finalizeBeginNewLocalReset`, `beginNewInFlightRef`, `CloudDraftSnapshot`, `LocalDraftSnapshot` interfaces).
+- Remove App.tsx cross-mode contamination call sites (`writeDraftId` calls, `peekDraft().draftId` read in `draftRecord` lazy initializer).
+
+**Bucket ordering rationale (not for re-ordering):**
+- C1 first because the persistence-routing rewrite is the structural anchor everything else depends on. Without mode-aware dispatch, the form-stage rewrites have nothing to branch against.
+- C2 next because step-click save handlers (added in C2) are the authenticated path's runtime payload of C1's dispatch.
+- C3 next because guest payment depends on the inline email field (C2's PaymentStage change) and the anonymous-letter write path needs to be live before the guest E2E can complete.
+- C4 last because the reconciliation surfaces are the last thing to delete — earlier buckets reduce them to zero callers; C4 removes the now-dead code. Reversing this order would leave call sites pointing at deleted files.
+
 ### Phase D — Cleanup sweep (orphan deletions + type narrowing)
 
 **Why after Phase C:** Phase D deletes endpoints and types that became zero-caller in Phase C. Running Phase D before Phase C would 404 live flows. Running it after means each deletion has zero consumers — clean, mechanical.
@@ -737,7 +812,13 @@ Per P6, every phase must end in a compilable, runnable state. This section makes
 3. **No phase relies on a deferred-followup commit.** "We'll fix this in Phase D" is forbidden if it leaves Phase C broken. Each phase stands alone.
 4. **Smoke tests run at every phase exit.** Per §13.
 5. **No `--no-verify` or similar commit-hook bypass.** The standing repo discipline applies.
-6. **Phase commits are individually revertable.** `git revert` of a Phase C commit returns the codebase to its Phase B state, which was itself compilable and runnable. If Phase C is multi-commit, the squash for the PR-49 merge preserves the atomic boundary; the in-progress commits on the branch may have intermediate broken states, but the merged commit does not.
+6. **Only COMPLETED phase boundaries are rollback-safe.** Intermediate commits INSIDE a phase — especially intermediate commits inside Phase C's internal execution buckets (C1, C2, C3, C4) — are NOT guaranteed to be compilable, runnable, deployable, or revert-safe in isolation. The "each phase ends runnable" guarantee applies ONLY at:
+   - End of Phase A
+   - End of Phase B
+   - End of **full Phase C** (all four internal buckets complete)
+   - End of Phase D
+   - End of Phase E
+   It does NOT apply between internal execution buckets within a phase. `git revert` of a bucket-internal commit is undefined behavior; revert ONLY at phase boundaries (or revert the squashed Phase C merge as a whole).
 7. **Doc-only commits are separable.** Phase E commits do not touch application code; they can land independently of Phase D's cleanup if scheduling requires.
 8. **No application-code changes inside doc commits.** And vice versa. Mixing the two confuses review and rollback.
 
@@ -774,18 +855,18 @@ Founder runs these after each phase exit. Manual smoke tests are the only verifi
 - [ ] **Begin Again, authenticated:** save 50 chars to cloud, click Begin Again → confirm → cloud draft deleted (verify via `GET /api/draft` returns 404); fresh form.
 - [ ] **Anonymous letter receiver URL:** open the URL from the guest E2E test → letter loads. (This exercises the dual-collection slug lookup in `api/load-session.js`.)
 - [ ] **Authenticated letter receiver URL:** open the URL from the authenticated E2E test → letter loads.
-- [ ] **No reconciliation surfaces in code:**
-  - `grep -r "SignInReconciliationModal" --include='*.ts' --include='*.tsx' --include='*.js'` → 0 matches.
-  - `grep -r "StaleRevisionModal" --include='*.ts' --include='*.tsx' --include='*.js'` → 0 matches.
-  - `grep -r "BeginNewPromptModal" --include='*.ts' --include='*.tsx' --include='*.js'` → 0 matches.
-  - `grep -r "SignInPromptModal" --include='*.ts' --include='*.tsx' --include='*.js'` → 0 matches.
-  - `grep -r "runOrPromptSignIn" --include='*.ts' --include='*.tsx' --include='*.js'` → 0 matches.
-  - `grep -r "ReconciliationState" --include='*.ts' --include='*.tsx'` → 0 matches.
-  - `grep -r "HydrationResolutionState" --include='*.ts' --include='*.tsx'` → 0 matches.
-  - `grep -r "applyCloudActiveToState" --include='*.ts' --include='*.tsx'` → 0 matches.
-  - `grep -r "handleStaleRevision" --include='*.ts' --include='*.tsx'` → 0 matches.
-  - `grep -r "handleBeginNew" --include='*.ts' --include='*.tsx'` → 0 matches.
-- [ ] **Cross-mode contamination removed:**
+- [ ] **No reconciliation surfaces in runtime/app code.** All grep verifications below SCOPE to runtime/app code only (`App.tsx`, `index.tsx`, `components/`, `hooks/`, `api/`, `utils/`, `services/`, `lib/`, `types/`). Doc directories (`docs/`, archived material, audit reports, this strategy doc itself) are EXCLUDED from grep verification — those references are historical record, not live code.
+  - `grep -r "SignInReconciliationModal" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "StaleRevisionModal" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "BeginNewPromptModal" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "SignInPromptModal" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "ReconciliationState" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "HydrationResolutionState" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "applyCloudActiveToState" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "handleStaleRevision" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "handleBeginNew" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+  - `grep -r "runOrPromptSignIn" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → EXPECTED matches: ONLY the Eidi-flow call site at App.tsx (currently ~:1667; line number may shift after Phase C). The function definition's fate is documented in §7.1 — if preserved for Eidi (FL-4), expect 1 call site match plus the definition line; if deleted with the Eidi call site rewired, see §7.1 for the resolution. Verify the only surviving reference is Eidi-scoped.
+- [ ] **Cross-mode contamination removed (runtime/app code only):**
   - `grep -n "writeDraftId\|draftId" hooks/usePreparationPersistence.ts` → 0 matches.
   - `grep -n "writeDraftId" App.tsx` → 0 matches.
 - [ ] **Eidi untouched (FL-4):**
@@ -795,9 +876,10 @@ Founder runs these after each phase exit. Manual smoke tests are the only verifi
 
 ### Phase D checklist
 - [ ] Re-run all Phase C smoke tests. All still pass.
-- [ ] `grep -r "PersistenceStatus" --include='*.ts' --include='*.tsx' --include='*.js'` → 0 matches.
-- [ ] `grep -r "pauseDraft\|discardDraft\|lifecycleDraft" --include='*.ts' --include='*.tsx'` → 0 matches.
-- [ ] `grep -r "expectedRevision\|STALE_REVISION" --include='*.ts' --include='*.tsx' --include='*.js'` → 0 matches.
+- [ ] **All Phase D grep verifications SCOPE to runtime/app code only.** Doc directories are EXCLUDED.
+- [ ] `grep -r "PersistenceStatus" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+- [ ] `grep -r "pauseDraft\|discardDraft\|lifecycleDraft" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
+- [ ] `grep -r "expectedRevision\|STALE_REVISION" App.tsx index.tsx components/ hooks/ api/ utils/ services/ lib/ types/` → 0 matches.
 - [ ] `ls api/drafts/` shows only `save.js` (and `transition.js` if not yet deleted — verify intent).
 - [ ] `ls utils/` shows `cloudDraftSave.ts`, `emailValidation.ts`, `activeMode.ts`, NOT `lifecycleDraft.ts`.
 - [ ] `npm run build` exits 0.
@@ -813,12 +895,12 @@ Founder runs these after each phase exit. Manual smoke tests are the only verifi
 
 ## 14. Rollback Philosophy
 
-PR-49 is shipped as a series of phase commits squashed into a single merge to `development`. Rollback strategies depend on when the regression is discovered.
+PR-49 is shipped as a series of phase commits squashed into a single merge to `development`. Rollback operates at **completed phase boundaries only**. Phase C's internal execution buckets (C1, C2, C3, C4) are NOT revert-safe in isolation — see §12 rule 6. Revert Phase C as a whole, never a bucket-internal commit.
 
 **Pre-merge (in-branch rollback):**
 - Phase A regression: `git revert` the Phase A commit. Returns to pre-PR-49 state. No user impact (Phase A is additive).
 - Phase B regression: `git revert` the Phase B commit. New endpoints disappear. No client code references them yet, so no user impact.
-- Phase C regression: `git revert` the Phase C commit. **Reverts to Phase B state** — additive endpoints exist but the reconciliation flow is intact. This is the same as pre-PR-49 user-visible behavior. The orphan endpoints from Phase B linger but cause no harm.
+- Phase C regression: `git revert` the FULL squashed Phase C commit (or the merge commit that encloses all four buckets). **Reverts to Phase B state** — additive endpoints exist but the reconciliation flow is intact. This is the same as pre-PR-49 user-visible behavior. The orphan endpoints from Phase B linger but cause no harm. **Do not attempt to revert an individual C1/C2/C3/C4 bucket commit; those commits may have intermediate broken states by design (per §10 Phase C bucket structure).**
 - Phase D regression: `git revert` the Phase D commit. The retired endpoints/types come back. Phase C's dual-mode flow continues to work (the retired surfaces had no callers).
 - Phase E regression: `git revert` the Phase E commit. Doctrine reverts. Code is unaffected.
 
@@ -850,10 +932,11 @@ After PR-49 ships, the codebase has the following shape:
 - Step buttons: "Continue" (guest) or "Save and Continue" (authenticated).
 - Payment: email field rendered for guests; auth email used for authenticated.
 
-**Letter records:**
-- Authenticated: `shared/{sessionKey}` with `senderUid` field. Indexed at `users/${uid}/letters/${sessionKey}` for dashboard.
-- Anonymous: `anonymousLetters/{paymentId}` plus `anonymousSlugs/{slug}` → `{paymentId}` index.
-- Receiver: `api/load-session.js` checks `shared/` first, falls through to `anonymousSlugs/` → `anonymousLetters/`.
+**Letter records (locked per §8.1):**
+- Authenticated: `shared/{slug}` with `senderUid` field. Indexed at `users/${uid}/letters/${slug}` for dashboard.
+- Anonymous: `anonymousLetters/{paymentId}` keyed by Razorpay payment ID. Slug→paymentId index at `anonymousSlugs/{slug} -> { paymentId, createdAt }`.
+- Receiver URL shape: identical across both modes (no URL-shape leakage of anonymous vs authenticated origin).
+- Receiver resolution (`api/load-session.js`): two-stage lookup. Stage 1 checks `shared/{slug}`. Stage 2 (fallback) checks `anonymousSlugs/{slug}`, resolves to `paymentId`, loads `anonymousLetters/{paymentId}`. 404 only after both stages fail.
 
 **Endpoints (sender-side):**
 - `POST /api/drafts/save` — save authenticated draft (single record).
@@ -900,7 +983,7 @@ Per FL-1 + I2. A guest cannot upgrade to authenticated for the current draft. Th
 Per P4 and diagnostic §6.Q9. Guests are anonymous. They have email and Razorpay payment ID as recovery channels. No dashboard.
 
 **Rejected — Receiver URL TTL.**
-Per FL-6 deferred. Anonymous and authenticated letters keep the same TTL semantics (none). Revisit if real-world abuse or storage cost demands it.
+Receiver URL TTL remains deferred (not blocking PR-49). Anonymous and authenticated letters keep the same TTL semantics (none). Revisit if real-world abuse or storage cost demands it.
 
 **Rejected — Eidi dual-mode alignment in PR-49.**
 Per FL-4. Eidi is currently disabled (`config/features.ts`); when it re-enables for Eid 2027, a separate follow-up PR aligns it with dual-mode.
