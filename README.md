@@ -137,7 +137,7 @@ The persistence layer has gone through several iterations. The relevant history:
 
 - **PR-47 / PR-47.1** collapsed two parallel local-state buckets into a single `vday_data_draft` authority. Mount-time and resolver-effect cross-contamination is closed.
 - **PR-48 Phase 1–4** attempted multi-draft cloud sync with an ACTIVE/PAUSED/ABANDONED state machine and a three-button reconciliation modal. Built end-to-end; reverted before merging to production. The architectural mismatch was diagnosed in `docs/diagnostics/2026-05-13-phase4-continue-dashboard-bug.md` and the doctrine reversal in `docs/proposals/single-draft-pivot.md` (v1.2).
-- **PR-48.A (in progress)** implements the single-draft pivot: one cloud draft per user, UID-namespaced local autosave, debounced semantic-divergence dirty flag, and CAS-protected destructive operations. The full operational spec is `docs/proposals/pr-48a-implementation-strategy.md`. Commit 1 of six (Phase A — subtractive removals) has landed on `pr48-cloud-draft-sync`.
+- **PR-48.A** began the single-draft pivot. Commit 1 (Phase A — subtractive removals) landed on `pr48-cloud-draft-sync` at `14c1e9c`. Commits 2–6 were abandoned in favor of the dual-mode model described below. The strategy doc at `docs/proposals/pr-48a-implementation-strategy.md` is superseded; preserved for institutional learning only.
 
 The next direction is a **dual-mode persistence model** — anonymous-mode and signed-in-mode treated as distinct authorities with explicit boundaries between them, rather than as a single authority parameterized by auth state. The design will be written up under `docs/proposals/dual-mode-persistence.md` (forthcoming).
 
@@ -189,11 +189,12 @@ The repo uses no test runner, so every PR's audit happens via:
 
 Read these before making non-trivial changes:
 
+- `docs/proposals/dual-mode-persistence.md` — active architectural doctrine for the persistence layer. Authoritative for any change touching draft storage, sign-in flow, or save semantics.
 - `CLAUDE.md` — concise architectural map (current truth). Useful as a fast overview.
 - `docs/doctrine/local-persistence-contract.md` — load-bearing rules for local state. Amendments require explicit doctrine review.
-- `docs/proposals/single-draft-pivot.md` (v1.2) — product-level doctrine for the current persistence direction.
-- `docs/proposals/pr-48a-implementation-strategy.md` — the locked operational spec for the in-progress migration.
-- `docs/contracts/active-paused-state-machine.md` — superseded multi-draft contract. Will be archived under `docs/archived/` in PR-48.A Phase D. Preserved for institutional learning per `single-draft-pivot.md §10.4`. Do not extend it.
+- `docs/proposals/single-draft-pivot.md` (v1.2) — (superseded by dual-mode persistence) product-level doctrine that ruled out reconciliation-based multi-draft. Preserved for the reasoning trail.
+- `docs/proposals/pr-48a-implementation-strategy.md` — (superseded — only Commit 1 of six shipped) operational spec for the abandoned single-draft migration. Preserved for institutional learning.
+- `docs/contracts/active-paused-state-machine.md` — superseded multi-draft contract. Will be archived under `docs/archived/` as part of the dual-mode persistence transition. Preserved for institutional learning per `single-draft-pivot.md §10.4`. Do not extend it.
 - `docs/diagnostics/` — root-cause writeups for past incidents. Worth grepping before re-diagnosing a similar symptom.
 
 Repo-root reports (audit snapshots from earlier phases — historical, not authoritative for current state):
