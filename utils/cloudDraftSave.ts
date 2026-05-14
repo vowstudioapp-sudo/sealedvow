@@ -30,6 +30,10 @@ export interface CloudSaveInput {
   // authenticated refresh restores the exact step the user was on, not
   // just the broad PREPARE stage. Omitted from non-PREPARE stages.
   step?: 1 | 2 | 3;
+  // PR-49 Phase 1 QA: Step-2 inner phase (1 | 2 | 3). Meaningful only when
+  // step === 2; the server stores it unconditionally and the client ignores
+  // it at restore time for non-Step-2 stages.
+  phase?: 1 | 2 | 3;
 }
 
 export type CloudSaveResult =
@@ -44,6 +48,7 @@ export async function saveAndContinue(input: CloudSaveInput): Promise<CloudSaveR
   };
   if (input.draftId) payload.draftId = input.draftId;
   if (input.step) payload.step = input.step;
+  if (input.phase) payload.phase = input.phase;
 
   const result = await saveDraft(payload);
 

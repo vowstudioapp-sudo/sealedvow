@@ -21,6 +21,9 @@ import type { DraftState } from '../types/draft';
 export interface SaveDraftInput {
   data: Partial<CoupleData> | CoupleData;
   step?: 1 | 2 | 3;
+  // PR-49 Phase 1 QA: Step-2 inner phase. Server stores it; restore is
+  // gated on step === 2 at the client.
+  phase?: 1 | 2 | 3;
   draftState: DraftState;
   // Present → UPDATE existing draft. Absent → CREATE new draft (server
   // assigns draftId via .push().key).
@@ -52,6 +55,9 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
   }
   if (input.step === 1 || input.step === 2 || input.step === 3) {
     payload.step = input.step;
+  }
+  if (input.phase === 1 || input.phase === 2 || input.phase === 3) {
+    payload.phase = input.phase;
   }
 
   let res: Response;

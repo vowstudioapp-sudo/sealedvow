@@ -499,16 +499,22 @@ const App: React.FC = () => {
   // PR-49 Phase 1: `step` added so cloud hydration can restore the exact
   // PREPARE sub-step (1 | 2 | 3) the user was on at last save. Without this,
   // every refresh during PREPARE lands at step 1 regardless of progress.
+  //
+  // PR-49 Phase 1 QA: `phase` added for the Step-2 inner sub-screen. Same
+  // shape as step. Meaningful only when step === 2; PreparationForm ignores
+  // it for other steps at restore time.
   const [draftRecord, setDraftRecord] = useState<{
     draftId: string | null;
     seedDraftState: DraftState | null;
     revision: number | null;
     step: 1 | 2 | 3 | null;
+    phase: 1 | 2 | 3 | null;
   }>(() => ({
     draftId: null,
     seedDraftState: null,
     revision: null,
     step: null,
+    phase: null,
   }));
 
   // PR-49 C1: FL-4 bounded exemption. runOrPromptSignIn's function definition
@@ -702,6 +708,7 @@ const App: React.FC = () => {
         seedDraftState: candidate.draftState ?? null,
         revision: candidate.revision,
         step: null,
+        phase: null,
       });
       setLastSaveError(null);
       setLastSaveSuccessAt(
@@ -769,7 +776,7 @@ const App: React.FC = () => {
         return;
       }
       setData(null);
-      setDraftRecord({ draftId: null, seedDraftState: null, revision: null, step: null });
+      setDraftRecord({ draftId: null, seedDraftState: null, revision: null, step: null, phase: null });
       setLastSaveError(null);
       setLastSaveSuccessAt(null);
       setPrepFormResetKey((k) => k + 1);
@@ -845,9 +852,10 @@ const App: React.FC = () => {
         draftId: result.draftId,
         seedDraftState: draftStateToSend,
         revision: null,
-        // RefineStage save happens at REFINE+ stages; PREPARE sub-step is
-        // no longer meaningful here. Clear the step field.
+        // RefineStage save happens at REFINE+ stages; PREPARE sub-step and
+        // Step-2 phase are no longer meaningful here. Clear both.
         step: null,
+        phase: null,
       });
       // PR-49 Issue-1: this session now has a cloud draft. Future tab-local
       // refreshes should spin until hydration restores it.
@@ -925,6 +933,7 @@ const App: React.FC = () => {
             seedDraftState: draftStateToSend,
             revision: result.revision,
             step: null,
+            phase: null,
           });
           // PR-49 C1: writeDraftId(...) removed. Cloud is sole authority for
           // authenticated mode; localStorage hint mechanism retires (Focus 1).
@@ -982,7 +991,7 @@ const App: React.FC = () => {
     // choice on a new tab; cross-mode contamination is forbidden anyway).
     if (!authUser?.uid) {
       hydratedForRef.current = null;
-      setDraftRecord({ draftId: null, seedDraftState: null, revision: null, step: null });
+      setDraftRecord({ draftId: null, seedDraftState: null, revision: null, step: null, phase: null });
       setLastSaveSuccessAt(null);
       setLastSaveError(null);
       // PR-49 C2 hydration hotfix (LOCK-C): unblock the PREPARE render gate
@@ -1028,7 +1037,7 @@ const App: React.FC = () => {
         }
         if (res.status === 404) {
           // Authenticated user with no cloud draft. Empty state.
-          setDraftRecord({ draftId: null, seedDraftState: null, revision: null, step: null });
+          setDraftRecord({ draftId: null, seedDraftState: null, revision: null, step: null, phase: null });
           // PR-49 Issue-1: keep the flag in sync with server reality. If a
           // stale 'expected' flag was set (e.g., draft was deleted from
           // another tab or by admin), this clears it so future refreshes
@@ -1049,6 +1058,7 @@ const App: React.FC = () => {
           data?: CoupleData;
           draftState?: DraftState;
           step?: 1 | 2 | 3;
+          phase?: 1 | 2 | 3;
           createdAt?: number;
           updatedAt?: number;
           draftId?: string;
@@ -1061,6 +1071,10 @@ const App: React.FC = () => {
         // exact PREPARE step (1 | 2 | 3) on next mount.
         const restoredStep: 1 | 2 | 3 | null =
           json.step === 1 || json.step === 2 || json.step === 3 ? json.step : null;
+        // PR-49 Phase 1 QA: capture Step-2 inner phase. PreparationForm
+        // ignores this at restore time when step !== 2.
+        const restoredPhase: 1 | 2 | 3 | null =
+          json.phase === 1 || json.phase === 2 || json.phase === 3 ? json.phase : null;
         setDraftRecord({
           draftId: json.draftId ?? null,
           seedDraftState: json.draftState ?? null,
@@ -1068,6 +1082,7 @@ const App: React.FC = () => {
           // in Phase D and pre-PR-49 revision state is not load-bearing here.
           revision: null,
           step: restoredStep,
+          phase: restoredPhase,
         });
         if (typeof json.updatedAt === 'number') {
           setLastSaveSuccessAt(json.updatedAt);
@@ -1803,19 +1818,22 @@ const App: React.FC = () => {
                  key={prepFormResetKey}
                  initialData={data ?? undefined}
                  initialStep={draftRecord.step ?? undefined}
+                 initialPhase={draftRecord.phase ?? undefined}
                  onComplete={(d) => { setData(hydrateCoupleData(d)); safeSetStage(AppStage.REFINE); }}
                  onBeginAgainRequest={handleBeginAgain}
                  cloudDraftId={draftRecord.draftId}
-                 onCloudDraftSaved={(draftId, step) => {
-                   // PR-49 C2 hotfix + Phase 1: thread the server's authoritative
-                   // draftId AND the persisted sub-step into App-level state so
-                   // refresh restores the exact PREPARE step. Fires for both
-                   // explicit "Save and Continue" clicks and background autosave.
+                 onCloudDraftSaved={(draftId, step, phase) => {
+                   // PR-49 C2 hotfix + Phase 1 + Phase 1 QA: thread the
+                   // server's authoritative draftId AND the persisted sub-step
+                   // AND the Step-2 inner phase into App-level state so refresh
+                   // restores the exact position. Fires for both explicit
+                   // "Save and Continue" clicks and background autosave.
                    setDraftRecord((prev) => ({
                      ...prev,
                      draftId,
                      seedDraftState: 'IN_PROGRESS',
                      step,
+                     phase,
                    }));
                    // PR-49 Issue-1: this session now has a cloud draft.
                    // Future tab-local refreshes should spin until hydration

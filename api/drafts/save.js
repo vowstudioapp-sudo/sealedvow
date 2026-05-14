@@ -75,11 +75,12 @@ export default async function handler(req, res) {
     draftId: incomingDraftId,
     data,
     step,
+    phase,
     draftState,
     persistenceStatus,
   } = req.body || {};
 
-  const validation = validateDraftWrite({ data, step, draftState, persistenceStatus });
+  const validation = validateDraftWrite({ data, step, phase, draftState, persistenceStatus });
   if (!validation.ok) {
     return res.status(400).json({ error: validation.reason });
   }
@@ -134,6 +135,14 @@ export default async function handler(req, res) {
         } else if (current.step === 1 || current.step === 2 || current.step === 3) {
           updated.step = current.step;
         }
+        // PR-49 Phase 1 QA: Step-2 inner phase. Same persistence shape as
+        // step — preserve current value when request omits it so the field
+        // doesn't get wiped on saves that don't include it.
+        if (phase === 1 || phase === 2 || phase === 3) {
+          updated.phase = phase;
+        } else if (current.phase === 1 || current.phase === 2 || current.phase === 3) {
+          updated.phase = current.phase;
+        }
         return updated;
       });
     } catch (err) {
@@ -186,6 +195,10 @@ export default async function handler(req, res) {
         };
         if (step === 1 || step === 2 || step === 3) {
           created.step = step;
+        }
+        // PR-49 Phase 1 QA: Step-2 inner phase. Same persistence shape as step.
+        if (phase === 1 || phase === 2 || phase === 3) {
+          created.phase = phase;
         }
         return { ...drafts, [newDraftId]: created };
       });

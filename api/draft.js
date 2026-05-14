@@ -93,6 +93,7 @@ async function handleGet(req, res, user) {
       data: chosen.data,
       draftState: chosen.draftState,
       step: chosen.step,
+      phase: chosen.phase,
       createdAt: chosen.createdAt,
       updatedAt: chosen.updatedAt,
       draftId: chosen.draftId,

@@ -86,7 +86,7 @@ function hasPrototypePollution(node) {
   return false;
 }
 
-export function validateDraftWrite({ data, step, draftState, persistenceStatus }) {
+export function validateDraftWrite({ data, step, phase, draftState, persistenceStatus }) {
   // data shape
   if (data === undefined || data === null || typeof data !== 'object' || Array.isArray(data)) {
     return { ok: false, reason: 'INVALID_DATA_SHAPE' };
@@ -127,6 +127,13 @@ export function validateDraftWrite({ data, step, draftState, persistenceStatus }
   // step
   if (step !== undefined && step !== null && step !== 1 && step !== 2 && step !== 3) {
     return { ok: false, reason: 'INVALID_STEP' };
+  }
+
+  // PR-49 Phase 1 QA: phase (Step-2 internal sub-screen, 1 | 2 | 3).
+  // Meaningful only when step === 2; persisted unconditionally as restoration
+  // state and ignored at restore time for non-Step-2 stages.
+  if (phase !== undefined && phase !== null && phase !== 1 && phase !== 2 && phase !== 3) {
+    return { ok: false, reason: 'INVALID_PHASE' };
   }
 
   // draftState

@@ -44,8 +44,11 @@ interface Props {
   // PR-49 Phase 1: callback now also reports the sub-step that was just
   // persisted, so App.tsx can update draftRecord.step. Used by both the
   // explicit step-advance handler and the new authenticated autosave.
+  //
+  // PR-49 Phase 1 QA: callback also reports the Step-2 inner phase so
+  // refresh restores the exact sub-screen.
   cloudDraftId?: string | null;
-  onCloudDraftSaved?: (draftId: string, step: 1 | 2 | 3) => void;
+  onCloudDraftSaved?: (draftId: string, step: 1 | 2 | 3, phase: 1 | 2 | 3) => void;
 
   // PR-49 C2 hydration hotfix (LOCK-A): one-time mount seed for authenticated
   // mode. App.tsx passes cloud-hydrated data here when mode is 'authenticated'.
@@ -62,6 +65,10 @@ interface Props {
   // over the localStorage peek for authenticated mode; guest mode leaves
   // undefined and the existing initialDraftRef.step fallback applies.
   initialStep?: 1 | 2 | 3;
+  // PR-49 Phase 1 QA: cloud-restored Step-2 inner phase. App.tsx passes this
+  // from draftRecord.phase. Meaningful only when step === 2; for other steps
+  // the form still seeds phase=initialPhase but the value isn't user-visible.
+  initialPhase?: 1 | 2 | 3;
 }
 
 // CORE OCCASIONS — V1: Anniversary + Unsaid only.
@@ -121,6 +128,7 @@ export const PreparationForm: React.FC<Props> = ({
   onCloudDraftSaved,
   initialData,
   initialStep,
+  initialPhase,
 }) => {
   const [error, setError] = useState<string | null>(null);
 
@@ -348,7 +356,10 @@ export const PreparationForm: React.FC<Props> = ({
   
   const [showLocationFields, setShowLocationFields] = useState(false);
   const [activePhoto, setActivePhoto] = useState<number | null>(null);
-  const [phase, setPhase] = useState(1);
+  // PR-49 Phase 1 QA: seed phase from initialPhase (cloud-restored). Same
+  // shape as seedStep above. For non-Step-2 stages, the value is harmless
+  // (phase state is only user-visible inside the Step-2 render branch).
+  const [phase, setPhase] = useState<1 | 2 | 3>(initialPhase ?? 1);
   const [phaseDirection, setPhaseDirection] = useState<1 | -1>(1);
 
   const phaseVariants = {
@@ -374,12 +385,14 @@ export const PreparationForm: React.FC<Props> = ({
 
   const goNextPhase = () => {
     setPhaseDirection(1);
-    setPhase(p => p + 1);
+    // Caller gates on phase < 3 at click sites, so p+1 stays in 1|2|3.
+    setPhase(p => (p + 1) as 1 | 2 | 3);
   };
 
   const goBackPhase = () => {
     setPhaseDirection(-1);
-    setPhase(p => p - 1);
+    // Caller gates on phase > 1 at click sites, so p-1 stays in 1|2|3.
+    setPhase(p => (p - 1) as 1 | 2 | 3);
   };
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -495,11 +508,19 @@ export const PreparationForm: React.FC<Props> = ({
       // PR-49 Phase 1: target step after this advance. step=3 isFinal=true
       // → no bump (user completes form). Otherwise bump by 1.
       const targetStep: 1 | 2 | 3 = isFinal ? step : ((step + 1) as 1 | 2 | 3);
+      // PR-49 Phase 1 QA: target phase after this advance. The two callers
+      // are (a) handleSubmit step 1→2: phase resets to 1 (entering Step 2),
+      // (b) handleNextStepFromStep2 step 2→3: phase resets to 1 (the
+      // existing setPhase(1) inside onAdvance preserves this), (c) handleSubmit
+      // step 3→complete (isFinal): phase = 1 (form is exiting; phase only
+      // meaningful inside Step 2). All three resolve to 1.
+      const targetPhase: 1 | 2 | 3 = 1;
       const result = await cloudSaveAndContinue({
         data: { ...data, writingMode },
         draftState,
         draftId: cloudDraftId ?? null,
         step: targetStep,
+        phase: targetPhase,
       });
       if (result.kind === 'auth_required') {
         window.location.href = '/';
@@ -509,9 +530,9 @@ export const PreparationForm: React.FC<Props> = ({
         setStepSaveError(result.message);
         return;
       }
-      // ok — propagate authoritative draftId + step upward so App.tsx
-      // tracks both for the next mount.
-      if (onCloudDraftSaved) onCloudDraftSaved(result.draftId, targetStep);
+      // ok — propagate authoritative draftId + step + phase upward so
+      // App.tsx tracks all three for the next mount.
+      if (onCloudDraftSaved) onCloudDraftSaved(result.draftId, targetStep, targetPhase);
       if (isFinal) {
         if (previewAudioRef.current) previewAudioRef.current.pause();
         onComplete({ ...data, writingMode });
@@ -553,13 +574,19 @@ export const PreparationForm: React.FC<Props> = ({
           draftState,
           draftId: cloudDraftId ?? null,
           step,
+          // PR-49 Phase 1 QA: persist the current Step-2 inner phase. Server
+          // stores it unconditionally; restore at next mount uses it only
+          // when step === 2. phase is in the dep array below so changes
+          // within Step 2 (goNextPhase / goBackPhase) trigger a debounced
+          // save with the new value.
+          phase,
         });
         if (result.kind === 'auth_required') {
           window.location.href = '/';
           return;
         }
         if (result.kind === 'ok' && onCloudDraftSaved) {
-          onCloudDraftSaved(result.draftId, step);
+          onCloudDraftSaved(result.draftId, step, phase);
         }
         // Silent on 'error' — explicit advance surfaces errors. Autosave
         // is a background convenience; failures will retry on next change.
@@ -569,7 +596,7 @@ export const PreparationForm: React.FC<Props> = ({
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [data, step, mode, isStepSaving, writingMode, cloudDraftId, onCloudDraftSaved]);
+  }, [data, step, phase, mode, isStepSaving, writingMode, cloudDraftId, onCloudDraftSaved]);
 
   // PR-49 C2 (Task 4): wrapper for the two Step-2 "Continue" buttons that
   // bypass form submit (the desktop side-button and the mobile step-2 next
