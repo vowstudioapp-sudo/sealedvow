@@ -1052,7 +1052,20 @@ const App: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [stage, authUser?.uid, authLoading, serverSessionReady]);
+    // PR-49 hydration deadlock fix: `stage` removed from deps. Diagnostic
+    // proved the dep was not load-bearing — every live setActiveMode call
+    // site is followed by window.location.href (full reload), so a fresh
+    // App.tsx mount always reads the new mode synchronously. Including
+    // `stage` caused the effect cleanup to fire on every SPA stage
+    // transition (e.g., OccasionSelector → PREPARE via popstate), setting
+    // cancelled=true. The original /api/draft fetch's terminal handlers
+    // then bailed silently, and the hydratedForRef idempotent guard
+    // prevented a new fetch — leaving authHydrationComplete stuck at
+    // false. The PREPARE render gate then showed "Restoring your letter…"
+    // indefinitely. Removing `stage` allows the in-flight fetch to
+    // complete uninterrupted by SPA navigation. Auth identity changes
+    // (uid) still correctly trigger cleanup for stale-response protection.
+  }, [authUser?.uid, authLoading, serverSessionReady]);
 
   // PR-49 C2 hydration hotfix (LOCK-C): fresh sign-in restart. When a new
   // authenticated lifecycle begins (Firebase listener fires authLoading=true
