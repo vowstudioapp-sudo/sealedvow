@@ -83,6 +83,11 @@ import { StaleRevisionModal } from './components/StaleRevisionModal';
 import { BeginNewPromptModal } from './components/BeginNewPromptModal';
 import { SignInReconciliationModal } from './components/SignInReconciliationModal';
 import { getActiveMode, type ActiveMode } from './utils/activeMode';
+import {
+  hasCloudDraftExpected,
+  markCloudDraftExpected,
+  clearCloudDraftExpected,
+} from './utils/cloudDraftExpectation';
 
 // PR-48 Phase 4 — Reconciliation authority is owned by App.tsx via this
 // single discriminated union. Only ONE reconciliation modal renders at a
@@ -581,8 +586,18 @@ const App: React.FC = () => {
   // terminal path (200 / 404 / non-401 error / sign-out). It flips back to
   // false when a fresh authenticated lifecycle begins (authLoading=true with
   // mode='authenticated') — see the sign-in-restart effect below.
+  //
+  // PR-49 Issue-1 hotfix: also skip the spinner for authenticated users with
+  // NO known recoverable draft. LandingPage's handleEnter checked /api/draft
+  // before navigation and recorded the answer via cloudDraftExpectation.
+  // When the flag is absent, the form mounts immediately with empty state —
+  // no wasteful spinner flash for fresh users.
   const [authHydrationComplete, setAuthHydrationComplete] = useState(() => {
-    return getActiveMode() !== 'authenticated';
+    if (getActiveMode() !== 'authenticated') return true;
+    // Authenticated mount. If no cloud draft is expected (fresh user or
+    // post-discard), skip the spinner and render the empty form directly.
+    if (!hasCloudDraftExpected()) return true;
+    return false;
   });
   const [lastSaveSuccessAt, setLastSaveSuccessAt] = useState<number | null>(null);
   const [lastSaveError, setLastSaveError] = useState<string | null>(null);
@@ -751,6 +766,9 @@ const App: React.FC = () => {
       setLastSaveError(null);
       setLastSaveSuccessAt(null);
       setPrepFormResetKey((k) => k + 1);
+      // PR-49 Issue-1: cloud draft was deleted. Future refreshes should
+      // skip the spinner since no draft remains.
+      clearCloudDraftExpected();
     } catch {
       if (mountedRef.current) {
         setLastSaveError("Couldn't begin again. Try again in a moment.");
@@ -821,6 +839,9 @@ const App: React.FC = () => {
         seedDraftState: draftStateToSend,
         revision: null,
       });
+      // PR-49 Issue-1: this session now has a cloud draft. Future tab-local
+      // refreshes should spin until hydration restores it.
+      markCloudDraftExpected();
       setLastSaveError(null);
       setLastSaveSuccessAt(Date.now());
       safeSetStage(AppStage.MAIN_EXPERIENCE);
@@ -958,6 +979,10 @@ const App: React.FC = () => {
       // PreparationForm without spinning. The fresh-sign-in effect below
       // resets it back to false when the next authenticated lifecycle begins.
       setAuthHydrationComplete(true);
+      // PR-49 Issue-1: defensive clear (the Phase A lifecycle listener in
+      // useAuth also clears this flag on signed-out; doing it here too
+      // covers any non-Phase-A path that lands here).
+      clearCloudDraftExpected();
       return;
     }
 
@@ -993,6 +1018,11 @@ const App: React.FC = () => {
         if (res.status === 404) {
           // Authenticated user with no cloud draft. Empty state.
           setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
+          // PR-49 Issue-1: keep the flag in sync with server reality. If a
+          // stale 'expected' flag was set (e.g., draft was deleted from
+          // another tab or by admin), this clears it so future refreshes
+          // skip the spinner.
+          clearCloudDraftExpected();
           // LOCK-C: unblock PREPARE render — no draft to wait on.
           setAuthHydrationComplete(true);
           return;
@@ -1035,6 +1065,12 @@ const App: React.FC = () => {
         const resumeStage = appStageFromDraftState(json.draftState);
         if (resumeStage !== null) {
           setStage(resumeStage);
+          // PR-49 Issue-1: this is a resumable draft. Mark the expectation
+          // so future refreshes within this tab spin appropriately.
+          markCloudDraftExpected();
+        } else {
+          // COMPLETED or unrecognized: not resumable. Clear any stale flag.
+          clearCloudDraftExpected();
         }
 
         // LOCK-C: 200-success terminal. Cloud data is in App.tsx state;
@@ -1076,7 +1112,13 @@ const App: React.FC = () => {
   // from the prior sign-out and the new sign-in's cloud data would race
   // PreparationForm's mount again.
   useEffect(() => {
-    if (authLoading && getActiveMode() === 'authenticated') {
+    if (
+      authLoading &&
+      getActiveMode() === 'authenticated' &&
+      hasCloudDraftExpected()
+    ) {
+      // Only spin when we expect a draft to restore. Fresh users with no
+      // known draft skip the spinner (matches lazy-init logic).
       setAuthHydrationComplete(false);
     }
   }, [authLoading]);
@@ -1747,6 +1789,10 @@ const App: React.FC = () => {
                      draftId,
                      seedDraftState: 'IN_PROGRESS',
                    }));
+                   // PR-49 Issue-1: this session now has a cloud draft.
+                   // Future tab-local refreshes should spin until hydration
+                   // restores it.
+                   markCloudDraftExpected();
                  }}
                />
             </div>

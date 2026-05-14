@@ -10,6 +10,10 @@ import { AtmosphericShell } from './AtmosphericShell';
 import { useAuth } from '../hooks/useAuth';
 import { markIntentionalEntry } from '../utils/intentionalEntry';
 import { setActiveMode } from '../utils/activeMode';
+import {
+  markCloudDraftExpected,
+  clearCloudDraftExpected,
+} from '../utils/cloudDraftExpectation';
 
 interface Props {
   onEnter: () => void;
@@ -149,24 +153,37 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
       if (res.status === 200) {
         const json = await res.json() as { draftState?: string };
         if (json.draftState && json.draftState !== 'COMPLETED') {
+          // PR-49 Issue-1: a recoverable draft exists. Record the
+          // expectation so the next App.tsx mount (after Continue) shows
+          // the "Restoring your letter…" spinner appropriately.
+          markCloudDraftExpected();
           setShowResumeOrDiscard(true);
           return;
         }
         // COMPLETED letters aren't resumable; proceed fresh.
+        // PR-49 Issue-1: no spinner needed on next mount.
+        clearCloudDraftExpected();
         proceedToCreate();
         return;
       }
       if (res.status === 404) {
         // No cloud draft; proceed fresh.
+        // PR-49 Issue-1: no spinner needed on next mount.
+        clearCloudDraftExpected();
         proceedToCreate();
         return;
       }
       // 401 or other errors: defensive fallback. Proceed fresh — the
       // hydration effect on the /create route will surface auth errors
       // (OQ3 redirect) if the session is truly expired.
+      // PR-49 Issue-1: defensive clear — we don't know the draft state,
+      // so don't speculatively spin. The hydration effect's terminal
+      // paths will re-mark the flag if a draft actually exists.
+      clearCloudDraftExpected();
       proceedToCreate();
     } catch {
       // Network failure — proceed; hydration will retry / surface inline.
+      clearCloudDraftExpected();
       proceedToCreate();
     } finally {
       setIsCheckingForDraft(false);
@@ -193,6 +210,9 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     if (!res.ok) {
       throw new Error('discard failed');
     }
+    // PR-49 Issue-1: draft was deleted. Clear the expectation so the next
+    // App.tsx mount skips the spinner.
+    clearCloudDraftExpected();
     setShowResumeOrDiscard(false);
     proceedToCreate();
   };

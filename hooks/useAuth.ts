@@ -38,6 +38,7 @@ import {
   signOut as fbSignOut,
 } from '../services/firebase';
 import { clearActiveMode } from '../utils/activeMode';
+import { clearCloudDraftExpected } from '../utils/cloudDraftExpectation';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -72,6 +73,10 @@ export function useAuth() {
       // tab when one tab signs out).
       if (!u && wasSignedIn) {
         clearActiveMode();
+        // PR-49 Issue-1: the cloud-draft expectation flag is tied to the
+        // signed-in session. Sign-out invalidates it the same way it
+        // invalidates the active mode.
+        clearCloudDraftExpected();
       }
 
       setUser(u);
