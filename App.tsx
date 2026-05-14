@@ -1073,22 +1073,31 @@ const App: React.FC = () => {
           setLastSaveSuccessAt(json.updatedAt);
         }
 
-        // PR-49 C2 (LOCK-1): authenticated stage restoration. Map the
-        // server-persisted draftState to the App stage the user resumes at.
-        // null mapping (COMPLETED or unrecognized) → no setStage call; the
-        // user lands at the route default (PREPARE). For IN_PROGRESS with no
-        // data, the mapping returns PREPARE — equivalent to "no draft" since
-        // that's also the route default; safe to setStage either way.
+        // PR-49 C2 (LOCK-1) + Phase 1 QA fix: authenticated stage restoration.
+        // Map the server-persisted draftState to the App stage the user
+        // resumes at. null mapping (COMPLETED or unrecognized) → no setStage
+        // call; the user lands at the route default (PREPARE).
+        //
+        // Phase 1 QA: also gate the stage transition on the user not being
+        // on LANDING. Hydration fires automatically as soon as auth resolves;
+        // without this guard, a signed-in user sitting on LandingPage would
+        // be auto-yanked into their existing draft, bypassing the explicit
+        // "Create Your Letter" CTA → ResumeOrDiscardModal gate. Mid-flow
+        // refresh (already past LANDING) still restores stage as before.
+        // markCloudDraftExpected() also moves inside the guard — the flag is
+        // only meaningful when we actually restored the user's flow position.
         const resumeStage = appStageFromDraftState(json.draftState);
-        if (resumeStage !== null) {
+        if (resumeStage !== null && stage !== AppStage.LANDING) {
           setStage(resumeStage);
-          // PR-49 Issue-1: this is a resumable draft. Mark the expectation
-          // so future refreshes within this tab spin appropriately.
           markCloudDraftExpected();
-        } else {
+        } else if (resumeStage === null) {
           // COMPLETED or unrecognized: not resumable. Clear any stale flag.
           clearCloudDraftExpected();
         }
+        // resumeStage !== null && stage === AppStage.LANDING: user is on
+        // LandingPage. Don't auto-transition; don't touch the expectation
+        // flag here (the LandingPage handleEnter pre-fetch owns that flag
+        // for the resume-modal flow).
 
         // LOCK-C: 200-success terminal. Cloud data is in App.tsx state;
         // PreparationForm can now mount safely with initialData={data}.

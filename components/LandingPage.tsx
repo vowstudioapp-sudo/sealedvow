@@ -615,16 +615,21 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
               setIsSigningIn(true);
               try {
                 await signInWithGoogle();
-                // PR-49 Phase A bypass fix: this completion path navigates via
-                // onEnter() (App.tsx:handleEnterStudio → window.location.href),
-                // bypassing handleEnter / proceedToCreate. Restore both writes
-                // that proceedToCreate does before navigation so the showLogin
-                // path lands the same sessionStorage state as the Phase A CTAs.
-                // See docs/diagnostics/2026-05-13-pr49-phase-a-test6-null.md.
+                // PR-49 Phase 1 QA fix: signing in via the navbar should NOT
+                // auto-navigate the user into the create flow. Sign-in is its
+                // own intent (e.g., user just wants to access the dashboard);
+                // create-letter is a separate explicit click on "Create Your
+                // Letter" which then routes through handleEnter → GET /api/draft
+                // → ResumeOrDiscardModal if a draft exists.
+                //
+                // Removed: markIntentionalEntry() and onEnter() — both were
+                // tied to the now-removed auto-navigation. Mode write is kept
+                // (idempotent; handleEnter re-sets it on the Create click
+                // and a stale 'authenticated' flag is harmless because the
+                // hydration effect's stage-restore is now LANDING-gated on
+                // the App.tsx side).
                 setActiveMode('authenticated');
-                markIntentionalEntry();
                 setShowLogin(false);
-                onEnter();
               } catch (err) {
                 const code = (err as { code?: string })?.code || '';
                 if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
