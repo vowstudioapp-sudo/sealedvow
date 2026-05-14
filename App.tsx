@@ -75,13 +75,13 @@ const EidPreparationForm = lazy(() =>
 import { CoupleData, AppStage, Theme } from './types.ts';
 import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
-import { writeDraftFromExternal, peekDraft, writeStage, writeDraftId, clearPreparationDraft } from './hooks/usePreparationPersistence';
+import { writeDraftFromExternal, peekDraft, writeStage, clearPreparationDraft } from './hooks/usePreparationPersistence';
 import { saveDraft, type SaveDraftInput } from './utils/saveDraft';
 import { pauseDraft, discardDraft } from './utils/lifecycleDraft';
 import { StaleRevisionModal } from './components/StaleRevisionModal';
 import { BeginNewPromptModal } from './components/BeginNewPromptModal';
 import { SignInReconciliationModal } from './components/SignInReconciliationModal';
-import { getDraftMetadata } from './hooks/usePreparationPersistence';
+import { getActiveMode, type ActiveMode } from './utils/activeMode';
 
 // PR-48 Phase 4 — Reconciliation authority is owned by App.tsx via this
 // single discriminated union. Only ONE reconciliation modal renders at a
@@ -363,7 +363,16 @@ const App: React.FC = () => {
   const isDevPreview = !!previewParam;
 
   // Read once on mount; shared by the stage / data / isCreatorPreview initializers below.
-  const initialDraft = useMemo(() => peekDraft(), []);
+  // PR-49 C1: authenticated mode reads cloud only — never localStorage. Phase C's
+  // hydration effect populates state from GET /api/draft. The peekDraft() read
+  // below is the GUEST authority and must not fire in authenticated sessions
+  // (anti-patterns A8/A12 — co-presence of authorities is forbidden).
+  const initialDraft = useMemo(() => {
+    if (getActiveMode() === 'authenticated') {
+      return { data: null, step: null, stage: null };
+    }
+    return peekDraft();
+  }, []);
 
   const [stage, setStage] = useState<AppStage>(() => {
     const rt = getRouteType();
@@ -447,15 +456,6 @@ const App: React.FC = () => {
   // minted the cookie; gating the hydration effect on `authUser?.uid`
   // alone races onAuthStateChanged ahead of the cookie-set.
   const { user: authUser, loading: authLoading, serverSessionReady } = useAuth();
-  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
-  // PR #18b — variant of the sign-in modal. Default 'payment' preserves the
-  // byte-identical UX for the existing payment-context call sites.
-  const [signInVariant, setSignInVariant] = useState<'payment' | 'persistence'>('payment');
-  const pendingActionRef = useRef<(() => void) | null>(null);
-  // PR #18b — onCancel callback passed alongside the deferred action. Lets
-  // the caller (e.g., handleSaveAndContinueLater) clean up its in-flight ref
-  // when the user dismisses the modal without signing in.
-  const pendingCancelRef = useRef<(() => void) | null>(null);
 
   // PR #18b — Cross-device draft persistence (activation of PR #18a's dormant
   // observer). draftId + seedDraftState live in a SINGLE state object so that
@@ -486,108 +486,36 @@ const App: React.FC = () => {
   // reject as ACTIVE_DRAFT_EXISTS. The explicit-reconciliation rule from
   // doctrine §6.5 forbids chronological inference; the client must not
   // guess at a revision it has not been told.
+  // PR-49 C1: cloud-only draftId state. The optimistic localStorage hint
+  // mechanism (PR #21) retires — authenticated mode reads /api/draft directly,
+  // which is the cloud authority. No local hint, no cross-mode contamination.
   const [draftRecord, setDraftRecord] = useState<{
     draftId: string | null;
     seedDraftState: DraftState | null;
     revision: number | null;
   }>(() => ({
-    draftId: peekDraft().draftId,
+    draftId: null,
     seedDraftState: null,
     revision: null,
   }));
 
-  // PR #18b — variant + onCancel are additive. Existing payment call sites
-  // pass only `action` (variant defaults to 'payment', onCancel undefined),
-  // preserving byte-identical UX. Persistence callers pass 'persistence' to
-  // switch the modal copy/Guest-button visibility, and pass onCancel to be
-  // notified when the user dismisses without signing in.
-  // PR-48 Phase 4 (Commit 5) — Hydration gating layer integrated into the
-  // existing pendingAction system. commitPendingAction below defers
-  // signed-in pending actions until this state becomes 'resolved'. The
-  // /list hydration effect drives all transitions. Guests bypass this gate.
-  // Declared here (rather than alongside other state hooks below) so it
-  // is in scope for commitPendingAction's closure reference and for the
-  // watcher useEffect that releases deferred actions.
-  const [hydrationResolutionState, setHydrationResolutionState] =
-    useState<HydrationResolutionState>('idle');
-
+  // PR-49 C1: FL-4 bounded exemption. runOrPromptSignIn's function definition
+  // is preserved for the Eidi caller at App.tsx:1667 per strategy §7.1. The
+  // non-Eidi deferred-action infrastructure (pendingActionRef, commitPendingAction,
+  // hydration-gating state machine) is deleted in C1 along with the two non-Eidi
+  // call sites (save flow + Vow payment). The Eidi caller's signed-out UX
+  // degrades to an inline alert; the 2027 Eidi dual-mode alignment PR replaces
+  // this with an Eidi-native auth flow.
   const runOrPromptSignIn = (
     action: () => void,
-    variant: 'payment' | 'persistence' = 'payment',
-    onCancel?: () => void,
+    _variant: 'payment' | 'persistence' = 'payment',
+    _onCancel?: () => void,
   ) => {
     if (authUser) {
       action();
       return;
     }
-    pendingActionRef.current = action;
-    pendingCancelRef.current = onCancel ?? null;
-    setSignInVariant(variant);
-    setShowSignInPrompt(true);
-  };
-
-  const commitPendingAction = (guestCapturedEmail?: string) => {
-    setShowSignInPrompt(false);
-    if (guestCapturedEmail === undefined) {
-      setGuestEmail(null);
-    } else {
-      const t = guestCapturedEmail.trim();
-      setGuestEmail(t.length > 0 ? t : null);
-    }
-
-    // PR-48 Phase 4 (Commit 5) — hydration gating.
-    //
-    // Guest path (no authUser): preserve pre-Phase-4 behavior. Run the
-    // action immediately. No cloud state to reconcile. PR-46.5 guest email
-    // continuity is unaffected — guestCapturedEmail handling above is
-    // identical to the prior commit.
-    //
-    // Signed-in path: hold the action until /list hydration resolves.
-    // The action stays in pendingActionRef; the effect below watches
-    // hydrationResolutionState and fires the action when it becomes
-    // 'resolved' (Case A silent, Case C silent, or Case B post-user-choice).
-    //
-    // The hydrating effect is triggered by the same authUser?.uid change
-    // that leads to commitPendingAction being called — so by the time this
-    // function runs, hydration is already starting (state will be 'idle'
-    // or 'hydrating'). We don't need to kick it off here.
-    if (!authUser) {
-      const action = pendingActionRef.current;
-      pendingActionRef.current = null;
-      pendingCancelRef.current = null;
-      if (action) action();
-      return;
-    }
-
-    if (hydrationResolutionState === 'resolved') {
-      const action = pendingActionRef.current;
-      pendingActionRef.current = null;
-      pendingCancelRef.current = null;
-      if (action) action();
-      return;
-    }
-    // Else: leave action in pendingActionRef. The effect watching
-    // hydrationResolutionState below releases it once 'resolved'.
-  };
-
-  // PR-48 Phase 4 (Commit 5) — release deferred pending action when
-  // hydration resolution completes. This fires for all three resolution
-  // paths (silent Case A, silent Case C, user-resolved Case B).
-  useEffect(() => {
-    if (hydrationResolutionState !== 'resolved') return;
-    const action = pendingActionRef.current;
-    if (!action) return;
-    pendingActionRef.current = null;
-    pendingCancelRef.current = null;
-    action();
-  }, [hydrationResolutionState]);
-
-  const cancelPendingAction = () => {
-    const onCancel = pendingCancelRef.current;
-    pendingActionRef.current = null;
-    pendingCancelRef.current = null;
-    setShowSignInPrompt(false);
-    if (onCancel) onCancel();
+    window.alert('Please sign in to continue.');
   };
 
   const safeSetStage = (nextStage: AppStage) => {
@@ -603,12 +531,18 @@ const App: React.FC = () => {
     // PR #16: refresh-resilience persistence. Gate to the standard sender
     // authoring flow only — receiver, demo, eid, and dev-preview surfaces all
     // own their own state-restoration paths and must not write to the draft.
+    //
+    // PR-49 C1 (A2 protection): authenticated mode is forbidden from writing
+    // to localStorage. The cloud is the sole persistence authority for
+    // authenticated sessions; stage transitions are NOT persisted locally.
+    // Guest mode continues to write stage to vday_data_draft as before.
     const inSenderFlow =
       linkState === LoaderState.NO_LINK &&
       !isDemoMode &&
       !isEidFlow &&
       !isDevPreview &&
-      !isReceiverLink;
+      !isReceiverLink &&
+      getActiveMode() !== 'authenticated';
     if (inSenderFlow && PERSISTABLE_SENDER_STAGES.has(nextStage)) {
       writeStage(nextStage);
     }
@@ -630,6 +564,12 @@ const App: React.FC = () => {
   // settled-receipt rendering communicates persistence on glance.
   const saveInFlightRef = useRef(false);
   const mountedRef = useRef(true);
+
+  // PR-49 C1: idempotent hydration guard. The dispatcher effect depends on
+  // `stage` so mode-set-via-CTA reaches it, but the GET /api/draft fetch
+  // must fire only once per (uid, mode) pair — not on every stage transition
+  // inside the form. Cleared on sign-out.
+  const hydratedForRef = useRef<{ uid: string; mode: ActiveMode } | null>(null);
   const [lastSaveSuccessAt, setLastSaveSuccessAt] = useState<number | null>(null);
   const [lastSaveError, setLastSaveError] = useState<string | null>(null);
 
@@ -727,7 +667,6 @@ const App: React.FC = () => {
         seedDraftState: candidate.draftState ?? null,
         revision: candidate.revision,
       });
-      writeDraftId(candidate.draftId);
       setLastSaveError(null);
       setLastSaveSuccessAt(
         typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now(),
@@ -753,223 +692,92 @@ const App: React.FC = () => {
     // for UX clarity per the locked Phase 4 button copy.
   };
 
-  // PR-48 Phase 4 (Commit 4) — Begin New cloud-aware orchestration.
+  // PR-49 C1 — Begin Again dispatcher.
   //
-  // PreparationForm's resume modal "Begin again" button now delegates to
-  // App.tsx via the onBeginAgainRequest callback (props change in this
-  // commit). App.tsx inspects local meaningfulness + cloud-ACTIVE presence
-  // and either:
-  //   * Short-circuits (clear local immediately) if both are empty —
-  //     preserves the pre-Phase-4 fast path for trivial Begin Again.
-  //   * Opens BeginNewPromptModal otherwise — the user explicitly resolves.
+  // The pre-PR-49 multi-step BeginNewPromptModal orchestration (handleBeginAgainRequest +
+  // finalizeBeginNewLocalReset + handleBeginNew{Save,Discard,Cancel}* + beginNewInFlightRef)
+  // is destroyed. Reconciliation between local and cloud is forbidden under
+  // dual-mode (anti-pattern A3). Each mode owns its own clear flow; the
+  // dispatcher picks one by reading getActiveMode() exactly once.
   //
-  // prepFormResetKey is the React-key mechanism for force-remounting
-  // PreparationForm. Each "clear local + reset state" path bumps it,
-  // which causes React to discard the existing PreparationForm instance
-  // and mount a fresh one — picking up the (now-cleared) localStorage.
-  // This avoids coupling App.tsx to PreparationForm's internal reset
-  // hook (resetPreparationState is hook-internal).
+  // prepFormResetKey survives — it is the React-key mechanism for force-remounting
+  // PreparationForm after Begin Again so the form reads fresh state at mount.
+  // Guest path: remount picks up cleared localStorage. Authenticated path: remount
+  // picks up cloud-cleared draftRecord (no localStorage involved).
   const [prepFormResetKey, setPrepFormResetKey] = useState(0);
 
-  const beginNewInFlightRef = useRef(false);
+  const handleGuestBeginAgain = () => {
+    if (!window.confirm('Begin again? This will discard your current letter.')) return;
+    clearPreparationDraft();
+    setData(null);
+    setLastSaveError(null);
+    setLastSaveSuccessAt(null);
+    setPrepFormResetKey((k) => k + 1);
+  };
 
-  const handleBeginAgainRequest = () => {
-    if (beginNewInFlightRef.current) return;
-    if (reconciliation.kind !== 'none') return;
-
-    const localMeta = getDraftMetadata();
-    const localHasMeaningfulContent =
-      !!localMeta && localMeta.hasMeaningfulContent;
-    const hasCloudActive = !!draftRecord.draftId;
-
-    if (!localHasMeaningfulContent && !hasCloudActive) {
-      // Fast path: nothing to reconcile. Clear local + bump key.
-      // Preserves pre-Phase-4 trivial-Begin-Again behavior.
-      clearPreparationDraft();
-      writeDraftId(null);
+  const handleAuthenticatedBeginAgain = async () => {
+    if (!window.confirm('Begin again? This will discard your current letter.')) return;
+    try {
+      const res = await fetch('/api/draft', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!mountedRef.current) return;
+      if (res.status === 401) {
+        // OQ3 locked: any authenticated cloud 401 → hard redirect "/".
+        window.location.href = '/';
+        return;
+      }
+      if (!res.ok) {
+        setLastSaveError("Couldn't begin again. Try again in a moment.");
+        return;
+      }
       setData(null);
+      setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
       setLastSaveError(null);
       setLastSaveSuccessAt(null);
       setPrepFormResetKey((k) => k + 1);
-      return;
-    }
-
-    setReconciliation({
-      kind: 'begin_new',
-      source: 'begin_new_button',
-      hasCloudActive,
-    });
-  };
-
-  const finalizeBeginNewLocalReset = () => {
-    clearPreparationDraft();
-    writeDraftId(null);
-    setData(null);
-    setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
-    setLastSaveError(null);
-    setLastSaveSuccessAt(null);
-    setReconciliation({ kind: 'none' });
-    setPrepFormResetKey((k) => k + 1);
-    beginNewInFlightRef.current = false;
-  };
-
-  const handleBeginNewSaveAndStartNew = async () => {
-    if (reconciliation.kind !== 'begin_new') return;
-    if (beginNewInFlightRef.current) return;
-    beginNewInFlightRef.current = true;
-
-    // Step 1: save current composition to cloud. This either UPDATEs the
-    // existing cloud ACTIVE (if draftRecord.draftId present) or CREATEs
-    // a new ACTIVE (if not). draftStateToSend mirrors the save flow's
-    // monotonic computation.
-    const candidate = UI_STAGE_TO_DRAFT_STATE[stage] ?? 'IN_PROGRESS';
-    const seed = draftRecord.seedDraftState;
-    const draftStateToSend: DraftState =
-      seed !== null && DRAFT_STATE_ORDER[seed] > DRAFT_STATE_ORDER[candidate]
-        ? seed
-        : candidate;
-    const localStep = peekDraft().step;
-    const step = stage === AppStage.PREPARE ? (localStep ?? undefined) : undefined;
-
-    const saveInput: SaveDraftInput = {
-      data: data ?? {},
-      draftState: draftStateToSend,
-    };
-    if (draftRecord.draftId && typeof draftRecord.revision === 'number') {
-      saveInput.draftId = draftRecord.draftId;
-      saveInput.expectedRevision = draftRecord.revision;
-    }
-    if (step !== undefined) saveInput.step = step;
-
-    const saveResult = await saveDraft(saveInput);
-    if (!mountedRef.current) {
-      beginNewInFlightRef.current = false;
-      return;
-    }
-    if (saveResult.kind !== 'ok') {
-      // Save failed. Abort the multi-step. Local untouched, cloud may
-      // have advanced revision but no demotion happened. Surface error.
-      beginNewInFlightRef.current = false;
-      setReconciliation({ kind: 'none' });
-      setLastSaveError("Couldn't save just now. Your work is still here.");
-      return;
-    }
-
-    // Step 2: pause the just-saved ACTIVE. The revision is the one we
-    // just got back from save.
-    const pauseResult = await pauseDraft({
-      draftId: saveResult.draftId,
-      expectedRevision: saveResult.revision,
-    });
-    if (!mountedRef.current) {
-      beginNewInFlightRef.current = false;
-      return;
-    }
-    if (pauseResult.kind !== 'ok') {
-      // Pause failed. The cloud has an updated-content ACTIVE; local
-      // is still intact. User can retry; the next save would be a same-
-      // content UPDATE (revision bumped) and the next pause may succeed.
-      // Update draftRecord to reflect the successful save before bailing.
-      setDraftRecord({
-        draftId: saveResult.draftId,
-        seedDraftState: draftStateToSend,
-        revision: saveResult.revision,
-      });
-      writeDraftId(saveResult.draftId);
-      setLastSaveSuccessAt(Date.now());
-      beginNewInFlightRef.current = false;
-      setReconciliation({ kind: 'none' });
-      setLastSaveError("Couldn't finish starting a new draft. Try again.");
-      return;
-    }
-
-    // Step 3-5: clear local + reset draftRecord + remount PreparationForm.
-    finalizeBeginNewLocalReset();
-  };
-
-  const handleBeginNewDiscardAndStartNew = async () => {
-    if (reconciliation.kind !== 'begin_new') return;
-    if (beginNewInFlightRef.current) return;
-    beginNewInFlightRef.current = true;
-
-    // If cloud has an ACTIVE, transition it to ABANDONED first.
-    // If not, just clear local.
-    if (draftRecord.draftId && typeof draftRecord.revision === 'number') {
-      const discardResult = await discardDraft({
-        draftId: draftRecord.draftId,
-        expectedRevision: draftRecord.revision,
-      });
-      if (!mountedRef.current) {
-        beginNewInFlightRef.current = false;
-        return;
-      }
-      if (discardResult.kind !== 'ok') {
-        // Discard failed. Don't risk clearing local if cloud state is
-        // uncertain. Surface error; user can retry.
-        beginNewInFlightRef.current = false;
-        setReconciliation({ kind: 'none' });
-        setLastSaveError("Couldn't discard the cloud draft. Try again.");
-        return;
+    } catch {
+      if (mountedRef.current) {
+        setLastSaveError("Couldn't begin again. Try again in a moment.");
       }
     }
-
-    finalizeBeginNewLocalReset();
   };
 
-  const handleBeginNewCancel = () => {
-    if (reconciliation.kind !== 'begin_new') return;
-    setReconciliation({ kind: 'none' });
-  };
-
-  // PR-48 Phase 4 (Commit 5) — Sign-in Case B handlers.
-  //
-  // Continue Dashboard Draft: discard local, hydrate from cloud ACTIVE,
-  // update draftRecord to cloud's identity. Operationally convergent
-  // with Discard Local Draft (both clear local and trust cloud); distinct
-  // label per locked Phase 4 spec.
-  //
-  // Discard Local Draft: same outcome as Continue Dashboard Draft.
-  //
-  // Both paths transition hydrationResolutionState → 'resolved',
-  // which releases any deferred pending action via the effect above.
-
-  const applyCloudActiveToState = (cloud: CloudDraftSnapshot) => {
-    clearPreparationDraft();
-    writeDraftId(cloud.draftId);
-    // Replace App.tsx in-memory data with cloud's. PreparationForm will
-    // remount cleanly via key bump; the App-level data flows to downstream
-    // stages (REFINE/PERSONAL_INTRO/MAIN_EXPERIENCE) that read it directly.
-    setData(hydrateCoupleData(cloud.data));
-    setDraftRecord({
-      draftId: cloud.draftId,
-      seedDraftState: cloud.draftState,
-      revision: cloud.revision,
-    });
-    setLastSaveError(null);
-    if (typeof cloud.updatedAt === 'number') {
-      setLastSaveSuccessAt(cloud.updatedAt);
+  // Dispatcher — exactly one mode read; explicit branch. No shared abstraction.
+  const handleBeginAgain = () => {
+    const mode = getActiveMode();
+    if (mode === 'authenticated') {
+      void handleAuthenticatedBeginAgain();
+      return;
     }
-    setPrepFormResetKey((k) => k + 1);
+    if (mode === 'guest') {
+      handleGuestBeginAgain();
+      return;
+    }
+    // mode === null: user has not entered the create flow. Begin Again
+    // is not reachable from outside a flow; treat as guest fallback.
+    handleGuestBeginAgain();
   };
 
-  const handleSignInContinueDashboardDraft = () => {
-    if (reconciliation.kind !== 'sign_in_case_b') return;
-    applyCloudActiveToState(reconciliation.cloudDraft);
-    setReconciliation({ kind: 'none' });
-    setHydrationResolutionState('resolved');
-  };
-
-  const handleSignInDiscardLocalDraft = () => {
-    if (reconciliation.kind !== 'sign_in_case_b') return;
-    applyCloudActiveToState(reconciliation.cloudDraft);
-    setReconciliation({ kind: 'none' });
-    setHydrationResolutionState('resolved');
-  };
+  // PR-49 C1 — applyCloudActiveToState + handleSignInContinueDashboardDraft +
+  // handleSignInDiscardLocalDraft deleted. These were Case B reconciliation
+  // handlers (sign-in-time local↔cloud merge). Under dual-mode, mode is bound
+  // at entry and reconciliation cannot exist (anti-pattern A3, A5, A12).
 
   const handleSaveAndContinueLater = () => {
     // Concurrency guard — prevent overlapping saves from rapid re-clicks.
     if (saveInFlightRef.current) return;
     saveInFlightRef.current = true;
+
+    // PR-49 C1: authenticated-only save flow. The runOrPromptSignIn wrapper
+    // and its deferred-sign-in flow are deleted (mid-flow sign-in prompts are
+    // forbidden under invariant I3). If the user is not signed in, the save
+    // simply does not run — C2 will gate the save button on auth state.
+    if (!authUser) {
+      saveInFlightRef.current = false;
+      return;
+    }
 
     const action = async () => {
       // Compute the DraftState to record. Defense-in-depth monotonicity:
@@ -982,15 +790,10 @@ const App: React.FC = () => {
           ? seed
           : candidate;
 
-      // Step is the PREPARE form sub-step (1|2|3). Peek the local draft —
-      // it tracks the current sub-step authoritatively (PR #16 schema).
-      // Outside PREPARE, step is meaningless and omitted.
-      const localStep = peekDraft().step;
-      const step = stage === AppStage.PREPARE ? (localStep ?? undefined) : undefined;
-
-      // PR-48 Phase 4: migrated from inline fetch to canonical saveDraft
-      // helper. The pairing rule for draftId + expectedRevision is preserved
-      // (per Phase 2 doctrine: only send draftId when revision is known).
+      // PR-49 C1: authenticated mode is forbidden from reading localStorage
+      // (anti-pattern A12). The pre-PR-49 peekDraft().step read for PREPARE
+      // sub-step is gone — sub-step is not threaded through cloud saves.
+      // C2's mode-aware step-click handlers replace this.
       const input: SaveDraftInput = {
         data: data ?? {},
         draftState: draftStateToSend,
@@ -999,7 +802,6 @@ const App: React.FC = () => {
         input.draftId = draftRecord.draftId;
         input.expectedRevision = draftRecord.revision;
       }
-      if (step !== undefined) input.step = step;
 
       const result = await saveDraft(input);
 
@@ -1021,64 +823,27 @@ const App: React.FC = () => {
             saveInFlightRef.current = false;
             return;
           }
-
-          // Success — update draftRecord atomically (single setter, all
-          // fields together) so the observer's activation seeding sees the
-          // matching values in the same render. seedDraftState carries the
-          // state we just told the server about; the observer will treat
-          // the next /transition for the same state as a noop (same_state).
-          // PR-48 Phase 2 (D1): also capture revision from the response so
-          // subsequent UPDATE saves can echo it back as expectedRevision.
           setDraftRecord({
             draftId: result.draftId,
             seedDraftState: draftStateToSend,
             revision: result.revision,
           });
-
-          // PR #21 — mirror the just-confirmed draftId to localStorage as the
-          // optimistic hint. On the next page reload, the lazy initializer for
-          // draftRecord will read this and avoid the post-mount race window.
-          writeDraftId(result.draftId);
-
-          // PR #18b CP3.5 — set the settled-state anchor. No auto-dismiss
-          // timer; the affordance now renders the receipt as long as the
-          // session holds it. Re-saves refresh the timestamp; sign-out clears.
+          // PR-49 C1: writeDraftId(...) removed. Cloud is sole authority for
+          // authenticated mode; localStorage hint mechanism retires (Focus 1).
           setLastSaveError(null);
           setLastSaveSuccessAt(Date.now());
-
           saveInFlightRef.current = false;
           return;
         }
 
-        case 'stale_revision':
-          // PR-48 Phase 4 (Commit 3): route to StaleRevisionModal via the
-          // reconciliation authority. The user explicitly resolves: Reload
-          // Latest (replace local with cloud), Keep Local for Now (preserve
-          // local, no save), or Cancel (close modal only).
-          //
-          // Stash the original save input so a future Phase-4 retry (not
-          // shipped here) can replay if needed. lastSaveError remains set
-          // so the inline affordance shows the user there's an unresolved
-          // save attempt.
-          setLastSaveError("Couldn't save just now. Your work is still here.");
-          setReconciliation({
-            kind: 'stale_revision',
-            source: 'save',
-            currentRevision: result.currentRevision,
-            pendingSavePayload: input,
-          });
-          saveInFlightRef.current = false;
-          return;
-
-        case 'active_draft_exists':
-          // Server enforces single-ACTIVE invariant. This branch fires when
-          // the client tried to CREATE while a cloud ACTIVE already exists
-          // (e.g., post-sign-in race before hydration completed).
-          setLastSaveError("Couldn't save just now. Your work is still here.");
-          saveInFlightRef.current = false;
-          return;
-
         case 'unauthorized':
+          // OQ3 locked: any authenticated cloud 401 → hard redirect "/".
+          window.location.href = '/';
+          saveInFlightRef.current = false;
+          return;
+
+        case 'stale_revision':
+        case 'active_draft_exists':
         case 'rate_limited':
         case 'bad_request':
         case 'network_error':
@@ -1090,205 +855,112 @@ const App: React.FC = () => {
       }
     };
 
-    runOrPromptSignIn(action, 'persistence', () => {
-      // Sign-in cancel path. Silent (Decision #10).
-      saveInFlightRef.current = false;
-    });
+    void action();
   };
 
-  // PR #18b — Cross-device draft hydration. Gated on BOTH authUser?.uid AND
-  // serverSessionReady. The serverSessionReady gate is load-bearing: without
-  // it, this effect fires when Firebase's onAuthStateChanged updates the
-  // user (which happens immediately when signInWithPopup resolves), but
-  // BEFORE /api/auth/session has minted the session cookie. The fetch then
-  // goes out without a Cookie header and 401s. With the gate, the effect
-  // re-runs once serverSessionReady flips true, and the cookie is in the
-  // jar by then.
+  // PR-49 C1 — Mode-aware persistence dispatcher.
   //
-  // Stale-response protection via cancelled flag + uid-equality re-check
-  // guards against account-switch races where user A's /list response
-  // arrives after user B has signed in. RTDB writes happen exclusively
-  // through the observer (transitions) and the explicit save handler.
+  // Reads getActiveMode() FIRST (strategy §5.5 rule 1). Branches by mode:
+  //   - mode === null         → no-op (user hasn't entered the create flow)
+  //   - mode === 'guest'      → no cloud fetch; PreparationForm's local-resume
+  //                              flow handles draft restoration via peekDraft
+  //                              + DraftResumeModal. Guest mode reads localStorage
+  //                              only, never cloud.
+  //   - mode === 'authenticated' AND signed-out  → OQ3 hard redirect "/"
+  //   - mode === 'authenticated' AND signed-in   → fetch GET /api/draft
+  //
+  // No reconciliation. No local↔cloud comparison. No Case A/B/C. No fallback.
+  //
+  // The effect depends on `stage` so that mode-changes following the user's
+  // CTA click (LandingPage → ModeSelectionModal writes sessionStorage, then
+  // stage transitions away from LANDING) reach this dispatcher. Idempotent
+  // re-fires within a (uid, mode) pair are gated by hydratedForRef so stage
+  // transitions inside the form (PREPARE → REFINE → ...) do not re-fetch.
   useEffect(() => {
-    // PR #21 follow-up — Firebase still rehydrating its initial auth state.
-    // `authLoading` is true on cold mount until onAuthStateChanged fires once.
-    // Treating undefined-during-rehydration as a confirmed sign-out (the prior
-    // behavior — gate was only `!capturedUid`) wiped the localStorage draftId
-    // hint that the lazy initializer at draftRecord just loaded, reopening
-    // the post-mount race window PR #21 was meant to close. Hold the effect
-    // until Firebase has resolved one way or the other.
     if (authLoading) return;
 
-    const capturedUid = authUser?.uid;
-
-    // Confirmed sign-out: Firebase has resolved AND there is no user. Clear
-    // EVERYTHING — draftRecord, settled-state anchor, pending error, and the
-    // localStorage hint. Without the hint clear, a subsequent sign-in by a
-    // different user would briefly populate draftRecord with the prior
-    // user's stale draftId (cloud-wins reconciliation corrects it, but
-    // starting clean is preferable).
-    if (!capturedUid) {
+    // Confirmed sign-out: clear authenticated-mode state. Guest-mode local
+    // storage is the guest authority and is untouched here (the user may
+    // sign out then resume as a guest in the SAME session via a fresh mode
+    // choice on a new tab; cross-mode contamination is forbidden anyway).
+    if (!authUser?.uid) {
+      hydratedForRef.current = null;
       setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
       setLastSaveSuccessAt(null);
       setLastSaveError(null);
-      writeDraftId(null);
-      // PR-48 Phase 4 (Commit 5) — sign-out resets the hydration gate.
-      // Next sign-in re-enters the state machine from 'idle'.
-      setHydrationResolutionState('idle');
       return;
     }
 
-    // Mid-sign-in window (Firebase has the user, our session cookie is not
-    // yet minted). Hold draftRecord as-is — the lazy initializer's hint
-    // carries through. Clearing here would reopen the pre-PR-#21 race: a
-    // save POST during this window would omit draftId and trip the single-
-    // ACTIVE invariant on the server. If the user does click save in this
-    // window, the optimistic draftId rides along and either succeeds once
-    // the cookie lands or surfaces a 401 the user can retry.
+    const mode = getActiveMode();
+
+    // mode === null: user has not made a mode choice yet. Defer.
+    if (mode === null) return;
+
+    // Guest mode: cloud is forbidden (anti-pattern A2/A5). PreparationForm's
+    // existing local-resume flow handles guest draft restoration.
+    if (mode === 'guest') return;
+
+    // mode === 'authenticated'. Wait for the session cookie before fetching.
     if (!serverSessionReady) return;
 
-    // PR #21 follow-up — do NOT reset draftRecord before /list. The lazy
-    // initializer populated it with the optimistic localStorage hint;
-    // preserve that through the round-trip. Cloud-wins reconciliation
-    // below either confirms (overwrites with same id), replaces (different
-    // id), or clears (no ACTIVE found) — all three branches handle the
-    // initial-hint state correctly.
+    // Idempotent guard: only hydrate once per (uid, mode) pair. Prevents
+    // re-fetches on subsequent stage transitions inside the flow.
+    if (
+      hydratedForRef.current?.uid === authUser.uid &&
+      hydratedForRef.current?.mode === mode
+    ) return;
+    hydratedForRef.current = { uid: authUser.uid, mode };
 
     let cancelled = false;
-    // PR-48 Phase 4 (Commit 5) — gate begins. Hydration in-flight; any
-    // signed-in pending action is held until this resolves below.
-    setHydrationResolutionState('hydrating');
-    fetch('/api/drafts/list', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((json) => {
+    fetch('/api/draft', { credentials: 'include' })
+      .then(async (res) => {
         if (cancelled) return;
-        // Stale-response guard: if the auth identity changed mid-flight,
-        // discard. Only the most recent identity's response should hydrate.
-        if (authUser?.uid !== capturedUid) return;
-
-        const drafts = Array.isArray(json?.drafts) ? json.drafts : [];
-        const activeDrafts = drafts.filter(
-          (d: { persistenceStatus?: PersistenceStatus }) =>
-            d?.persistenceStatus === 'ACTIVE',
-        );
-        if (activeDrafts.length === 0) {
-          // PR #21 — cloud has no ACTIVE draft for this user. Any
-          // localStorage hint is stale (cloud was the source of truth and
-          // it now disagrees). Clear the hint and any draftRecord that may
-          // have been optimistically populated by the lazy initializer.
-          setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
-          writeDraftId(null);
-          // PR-48 Phase 4 (Commit 5) — Case C: no cloud ACTIVE + local
-          // remains authoritative (local content stays untouched). Silent
-          // resolution per locked spec — no modal, no auto-save.
-          setHydrationResolutionState('resolved');
+        if (res.status === 401) {
+          // OQ3 locked: any authenticated cloud 401 → hard redirect "/".
+          window.location.href = '/';
           return;
         }
-
-        // Match server's findActiveDraftForUser semantics: chronologically
-        // oldest ACTIVE wins. /list returns sorted by updatedAt desc, so we
-        // re-sort by createdAt asc to recover insertion order.
-        activeDrafts.sort(
-          (
-            a: { createdAt?: number },
-            b: { createdAt?: number },
-          ) => (a.createdAt || 0) - (b.createdAt || 0),
-        );
-        const oldest = activeDrafts[0] as {
-          draftId?: string;
+        if (res.status === 404) {
+          // Authenticated user with no cloud draft. Empty state.
+          setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
+          return;
+        }
+        if (!res.ok) {
+          setLastSaveError("Couldn't load your cloud draft. Try again in a moment.");
+          return;
+        }
+        const json = await res.json() as {
           data?: CoupleData;
           draftState?: DraftState;
+          createdAt?: number;
           updatedAt?: number;
-          revision?: number;
+          draftId?: string;
         };
-        if (!oldest?.draftId || !oldest?.draftState) {
-          // Malformed cloud response. Treat as 'resolved' to unblock any
-          // deferred pending action — draftRecord remains in its current
-          // state.
-          setHydrationResolutionState('resolved');
-          return;
+        if (cancelled) return;
+        if (json.data) {
+          setData(hydrateCoupleData(json.data));
         }
-
-        // PR-48 Phase 4 (Commit 5) — Case A vs B split.
-        // Case A: cloud ACTIVE + no meaningful local. Silent hydration.
-        // Case B: cloud ACTIVE + meaningful local. Surface modal; defer.
-        const localMeta = getDraftMetadata();
-        const localHasMeaningfulContent =
-          !!localMeta && localMeta.hasMeaningfulContent;
-
-        if (localHasMeaningfulContent && oldest.data) {
-          // Case B — explicit reconciliation required. Do NOT touch
-          // draftRecord yet; the user's choice in the modal determines
-          // which side wins.
-          const cloudRevision =
-            typeof oldest.revision === 'number' ? oldest.revision : 1;
-          const cloudUpdatedAt =
-            typeof oldest.updatedAt === 'number' ? oldest.updatedAt : null;
-          setReconciliation({
-            kind: 'sign_in_case_b',
-            source: 'sign_in',
-            cloudDraft: {
-              draftId: oldest.draftId,
-              data: oldest.data,
-              draftState: oldest.draftState,
-              revision: cloudRevision,
-              updatedAt: cloudUpdatedAt,
-            },
-            localMetadata: {
-              recipientName: localMeta?.recipientName ?? '',
-              wordCount: localMeta?.wordCount ?? 0,
-              photoCount: localMeta?.photoCount ?? 0,
-              savedAt: localMeta?.savedAt ?? '',
-            },
-          });
-          setHydrationResolutionState('needs_reconciliation');
-          return;
-        }
-
-        // Case A — silent hydration (existing behavior).
-        // PR-48 Phase 2 (D1): capture cloud revision so the next save can
-        // echo it back as expectedRevision. Pre-Phase-2 drafts without a
-        // revision field hydrate as null; first save against them falls
-        // through to CREATE-attempt path and the server's transaction
-        // detects the existing ACTIVE.
         setDraftRecord({
-          draftId: oldest.draftId,
-          seedDraftState: oldest.draftState,
-          revision: typeof oldest.revision === 'number' ? oldest.revision : null,
+          draftId: json.draftId ?? null,
+          seedDraftState: json.draftState ?? null,
+          // GET /api/draft (Phase B) projects without revision; CAS retires
+          // in Phase D and pre-PR-49 revision state is not load-bearing here.
+          revision: null,
         });
-        // PR #21 — cloud-wins reconciliation. Mirror the cloud's draftId
-        // into the localStorage hint. If the prior hint matched, this is a
-        // no-op write; if it differed (stale hint from a previous session
-        // or different cloud state), this overwrites it. Cloud is canonical.
-        writeDraftId(oldest.draftId);
-        // PR #18b CP3.5 — seed lastSaveSuccessAt from the cloud's updatedAt
-        // so the rehydrated session immediately renders the settled-state
-        // anchor ("Saved {relative time}") instead of the action affordance.
-        if (typeof oldest.updatedAt === 'number') {
-          setLastSaveSuccessAt(oldest.updatedAt);
+        if (typeof json.updatedAt === 'number') {
+          setLastSaveSuccessAt(json.updatedAt);
         }
-        setHydrationResolutionState('resolved');
       })
       .catch(() => {
-        // Silent: background hydration must never surface a UI error.
-        // draftRecord stays cleared; observer remains dormant.
-        // PR-48 Phase 4 (Commit 5) — also unblock any deferred pending
-        // action. The user can retry; the next /list fetch will re-enter
-        // the gate.
         if (!cancelled) {
-          setHydrationResolutionState('resolved');
+          setLastSaveError("Couldn't load your cloud draft. Try again in a moment.");
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [authUser?.uid, authLoading, serverSessionReady]);
+  }, [stage, authUser?.uid, authLoading, serverSessionReady]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -1932,7 +1604,7 @@ const App: React.FC = () => {
                <PreparationForm
                  key={prepFormResetKey}
                  onComplete={(d) => { setData(hydrateCoupleData(d)); safeSetStage(AppStage.REFINE); }}
-                 onBeginAgainRequest={handleBeginAgainRequest}
+                 onBeginAgainRequest={handleBeginAgain}
                />
             </div>
           )}
@@ -2054,7 +1726,11 @@ const App: React.FC = () => {
                     setIsCreatorPreview(false);
                   }}
                   onPayment={() => {
-                    runOrPromptSignIn(() => safeSetStage(AppStage.PAYMENT));
+                    // PR-49 C1: non-Eidi runOrPromptSignIn call site removed
+                    // per strategy §7.1. Mid-flow sign-in prompts are forbidden
+                    // under invariant I3. C2 wires PaymentStage's inline guest
+                    // email field; authenticated users proceed directly.
+                    safeSetStage(AppStage.PAYMENT);
                   }}
                   onSaveAndContinueLater={handleSaveAndContinueLater}
                   lastSaveSuccessAt={lastSaveSuccessAt}
@@ -2172,14 +1848,21 @@ const App: React.FC = () => {
         </div>
       )}
       <Analytics />
+      {/*
+        PR-49 C1 — Reconciliation modal renders below are ORPHANED. The C1
+        rewrite removed all active execution paths that set
+        reconciliation.kind to 'stale_revision' | 'begin_new' | 'sign_in_case_b'
+        (or showSignInPrompt → true). The JSX is preserved here pending C4's
+        mechanical file-deletion + render-switch removal. No code path can
+        trigger these modals after C1.
+      */}
       <SignInPromptModal
-        isOpen={showSignInPrompt}
-        onClose={cancelPendingAction}
-        onContinueAsGuest={(email) => commitPendingAction(email)}
-        onSignInSuccess={() => commitPendingAction()}
-        variant={signInVariant}
+        isOpen={false}
+        onClose={() => {}}
+        onContinueAsGuest={() => {}}
+        onSignInSuccess={() => {}}
+        variant="payment"
       />
-      {/* PR-48 Phase 4 — single exhaustive reconciliation render switch. */}
       {reconciliation.kind === 'stale_revision' && (
         <StaleRevisionModal
           isOpen={true}
@@ -2193,9 +1876,9 @@ const App: React.FC = () => {
         <BeginNewPromptModal
           isOpen={true}
           hasCloudActive={reconciliation.hasCloudActive}
-          onSaveAndStartNew={handleBeginNewSaveAndStartNew}
-          onDiscardAndStartNew={handleBeginNewDiscardAndStartNew}
-          onCancel={handleBeginNewCancel}
+          onSaveAndStartNew={() => {}}
+          onDiscardAndStartNew={() => {}}
+          onCancel={() => {}}
         />
       )}
       {reconciliation.kind === 'sign_in_case_b' && (
@@ -2212,8 +1895,8 @@ const App: React.FC = () => {
             photoCount: reconciliation.localMetadata.photoCount,
             savedAt: reconciliation.localMetadata.savedAt,
           }}
-          onContinueDashboardDraft={handleSignInContinueDashboardDraft}
-          onDiscardLocalDraft={handleSignInDiscardLocalDraft}
+          onContinueDashboardDraft={() => {}}
+          onDiscardLocalDraft={() => {}}
         />
       )}
     </div>

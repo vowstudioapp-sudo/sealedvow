@@ -20,12 +20,11 @@ interface StoredDraft {
   data: Partial<CoupleData>;
   step?: StepValue;
   stage?: AppStage;
-  // PR #21 — optimistic draftId hint. Persisted by App.tsx after a
-  // successful /api/drafts/save and at hydration completion. Cloud /list
-  // remains canonical; on hint vs cloud mismatch, cloud wins and the hint
-  // is overwritten. The hint exists solely to close the post-mount race
-  // window where the user could click save before /list hydration completed.
-  draftId?: string;
+  // PR-49 C1 (Focus 1): `draftId` field retired. Cross-mode contamination
+  // is forbidden — authenticated drafts live exclusively in the cloud;
+  // localStorage is the guest authority and has no draftId concept. The
+  // field type is gone; pre-PR-49 v2 records may still carry the field on
+  // disk, but readDraft no longer parses it (read-time tolerance).
   savedAt: string;
 }
 
@@ -200,8 +199,6 @@ interface DraftPeek {
   data: Partial<CoupleData> | null;
   step: StepValue | null;
   stage: AppStage | null;
-  // PR #21 — optimistic draftId hint surfaced for App.tsx's lazy initializer.
-  draftId: string | null;
 }
 
 function readDraft(): DraftPeek | null {
@@ -231,12 +228,10 @@ function readDraft(): DraftPeek | null {
     // optional for v1 drafts (no stage field); caller re-validates against data.
     const stage: AppStage | null =
       typeof parsed.stage === 'string' ? (parsed.stage as AppStage) : null;
-    // PR #21 — draftId hint, optional for any pre-PR-#21 draft.
-    const draftId: string | null =
-      typeof parsed.draftId === 'string' && parsed.draftId.length > 0
-        ? parsed.draftId
-        : null;
-    return { data: safe, step, stage, draftId };
+    // PR-49 C1 (Focus 1): draftId parsing retired. Pre-PR-49 v2 records may
+    // still carry a draftId field on disk; we silently ignore it (read-time
+    // tolerance — next write naturally drops the field).
+    return { data: safe, step, stage };
   } catch (err) {
     console.warn('[usePreparationPersistence] Read failed:', err);
     return null;
@@ -246,9 +241,10 @@ function readDraft(): DraftPeek | null {
 function writeDraft(data: CoupleData, step: StepValue): void {
   if (typeof window === 'undefined') return;
   try {
-    // Read-merge: preserve `stage` (PR #16) and `draftId` hint (PR #21) so
-    // debounced PreparationForm writes don't clobber values written by
-    // App.tsx via writeStage / writeDraftId.
+    // Read-merge: preserve `stage` (PR #16) so debounced PreparationForm
+    // writes don't clobber the value written by App.tsx via writeStage.
+    // PR-49 C1: draftId hint preservation retired — guest mode has no
+    // draftId concept; authenticated mode never writes here (anti-pattern A2).
     const existing = readDraft();
     const payload: StoredDraft = {
       version: CURRENT_SCHEMA_VERSION,
@@ -256,7 +252,6 @@ function writeDraft(data: CoupleData, step: StepValue): void {
       step,
       savedAt: new Date().toISOString(),
       ...(existing?.stage ? { stage: existing.stage } : {}),
-      ...(existing?.draftId ? { draftId: existing.draftId } : {}),
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {
@@ -270,7 +265,7 @@ function writeDraft(data: CoupleData, step: StepValue): void {
 // state hook initializes. Returns { data: null, step: null } if no
 // draft exists or the stored draft is incompatible / malformed.
 export function peekDraft(): DraftPeek {
-  return readDraft() ?? { data: null, step: null, stage: null, draftId: null };
+  return readDraft() ?? { data: null, step: null, stage: null };
 }
 
 // Ongoing-write-only hook. The hook does NOT hydrate — use peekDraft()
@@ -310,8 +305,7 @@ export function writeStage(stage: AppStage): void {
       data: existing.data as CoupleData,
       ...(existing.step ? { step: existing.step } : {}),
       stage,
-      // PR #21 — preserve draftId hint through stage transitions.
-      ...(existing.draftId ? { draftId: existing.draftId } : {}),
+      // PR-49 C1 (Focus 1): draftId hint preservation retired.
       savedAt: new Date().toISOString(),
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -320,42 +314,12 @@ export function writeStage(stage: AppStage): void {
   }
 }
 
-// PR #21 — Synchronous single-field draftId hint update. Called from App.tsx
-// after a successful /api/drafts/save (and during hydration when cloud
-// reconciles). Pass null to clear the hint (e.g., on sign-out, or when
-// hydration determines the cloud has no ACTIVE draft for this user).
-//
-// Cloud /list remains canonical. This hint exists solely to close the
-// post-mount race window where the user could click save before /list
-// hydration completed and trigger a 409 ACTIVE_DRAFT_EXISTS.
-//
-// No-ops gracefully if no draft exists yet — drafts get created lazily by
-// writeDraft / writeDraftFromExternal when the user types something. Calling
-// writeDraftId on an empty store doesn't materialize a draft; the hint will
-// be picked up by the next read-merge write.
-export function writeDraftId(draftId: string | null): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = readDraft();
-    if (!existing || !existing.data) {
-      // No draft exists yet (anonymous user with no localStorage content).
-      // Clearing a non-existent hint is a no-op; setting one without an
-      // underlying draft would create an orphan record. Skip both.
-      return;
-    }
-    const payload: StoredDraft = {
-      version: CURRENT_SCHEMA_VERSION,
-      data: existing.data as CoupleData,
-      ...(existing.step ? { step: existing.step } : {}),
-      ...(existing.stage ? { stage: existing.stage } : {}),
-      ...(draftId ? { draftId } : {}),
-      savedAt: new Date().toISOString(),
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch (err) {
-    console.warn('[usePreparationPersistence] DraftId write failed:', err);
-  }
-}
+// PR-49 C1 (Focus 1): writeDraftId() retired. The localStorage draftId hint
+// mechanism (PR #21) was load-bearing only for the PR-48 reconciliation
+// architecture's pre-hydration save race window. Under dual-mode (PR-49),
+// authenticated mode reads cloud directly via GET /api/draft and never
+// touches localStorage; guest mode has no draftId concept. Cross-mode
+// contamination is forbidden by anti-pattern A8/A12.
 
 export function clearPreparationDraft(): void {
   if (typeof window === 'undefined') return;
@@ -469,8 +433,7 @@ export function writeDraftFromExternal(updates: Partial<CoupleData>): void {
       step: existing.step ?? 1,
       savedAt: new Date().toISOString(),
       ...(existing.stage ? { stage: existing.stage } : {}),
-      // PR #21 — preserve draftId hint through external content updates.
-      ...(existing.draftId ? { draftId: existing.draftId } : {}),
+      // PR-49 C1 (Focus 1): draftId hint preservation retired.
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {
