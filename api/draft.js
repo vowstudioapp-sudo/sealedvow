@@ -92,6 +92,7 @@ async function handleGet(req, res, user) {
     return res.status(200).json({
       data: chosen.data,
       draftState: chosen.draftState,
+      step: chosen.step,
       createdAt: chosen.createdAt,
       updatedAt: chosen.updatedAt,
       draftId: chosen.draftId,

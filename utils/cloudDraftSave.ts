@@ -26,6 +26,10 @@ export interface CloudSaveInput {
   // populated on subsequent saves so the server UPDATEs the same record
   // rather than refusing with ACTIVE_DRAFT_EXISTS.
   draftId: string | null;
+  // PR-49 Phase 1: sub-step within PREPARE (1 | 2 | 3). Persisted so that
+  // authenticated refresh restores the exact step the user was on, not
+  // just the broad PREPARE stage. Omitted from non-PREPARE stages.
+  step?: 1 | 2 | 3;
 }
 
 export type CloudSaveResult =
@@ -39,6 +43,7 @@ export async function saveAndContinue(input: CloudSaveInput): Promise<CloudSaveR
     draftState: input.draftState,
   };
   if (input.draftId) payload.draftId = input.draftId;
+  if (input.step) payload.step = input.step;
 
   const result = await saveDraft(payload);
 

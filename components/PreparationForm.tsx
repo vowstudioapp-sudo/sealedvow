@@ -40,8 +40,12 @@ interface Props {
   // fires after a successful server save with the authoritative draftId
   // (the server assigns one on first save; echoes it back on updates).
   // Guest mode does not use these props (passes neither; both are optional).
+  //
+  // PR-49 Phase 1: callback now also reports the sub-step that was just
+  // persisted, so App.tsx can update draftRecord.step. Used by both the
+  // explicit step-advance handler and the new authenticated autosave.
   cloudDraftId?: string | null;
-  onCloudDraftSaved?: (draftId: string) => void;
+  onCloudDraftSaved?: (draftId: string, step: 1 | 2 | 3) => void;
 
   // PR-49 C2 hydration hotfix (LOCK-A): one-time mount seed for authenticated
   // mode. App.tsx passes cloud-hydrated data here when mode is 'authenticated'.
@@ -52,6 +56,12 @@ interface Props {
   // After the mount-time hydration effect runs, PreparationForm is the sole
   // owner of PREPARE state.
   initialData?: Partial<CoupleData>;
+
+  // PR-49 Phase 1: cloud-restored PREPARE sub-step. App.tsx passes this from
+  // draftRecord.step (populated by hydration GET /api/draft). Takes precedence
+  // over the localStorage peek for authenticated mode; guest mode leaves
+  // undefined and the existing initialDraftRef.step fallback applies.
+  initialStep?: 1 | 2 | 3;
 }
 
 // CORE OCCASIONS — V1: Anniversary + Unsaid only.
@@ -110,6 +120,7 @@ export const PreparationForm: React.FC<Props> = ({
   cloudDraftId,
   onCloudDraftSaved,
   initialData,
+  initialStep,
 }) => {
   const [error, setError] = useState<string | null>(null);
 
@@ -198,9 +209,13 @@ export const PreparationForm: React.FC<Props> = ({
     window.dispatchEvent(new PopStateEvent('popstate'));
   }, [shouldRedirectAway]);
 
+  // PR-49 Phase 1: seed sub-step from initialStep (cloud-restored for
+  // authenticated mode) > localStorage peek (guest fallback) > 1 (fresh).
+  // Locked at first render via the destructuring assignment.
+  const seedStep: 1 | 2 | 3 = initialStep ?? initialDraftRef.current.step ?? 1;
   const { step, data, updateData, next, back, resetPreparationState } = usePreparationState(
     DEFAULT_COUPONS,
-    initialDraftRef.current.step ?? 1,
+    seedStep,
   );
 
   // PR-49 C2 (Task 4): mode is captured once at mount. Mode is bound at the
@@ -217,6 +232,16 @@ export const PreparationForm: React.FC<Props> = ({
 
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
   const [isStepSaving, setIsStepSaving] = useState(false);
+
+  // PR-49 Phase 1: authenticated-mode continuous autosave. P3 doctrine
+  // (no autosave) was revoked because it caused silent data loss (photos
+  // uploaded in step 2 vanished on refresh because the user hadn't clicked
+  // an advance button). The form now persists to cloud on every change
+  // (debounced 1.5s) so refresh restores whatever the user was last typing.
+  //
+  // Guest mode is unchanged — usePreparationPersistence handles localStorage
+  // autosave. Authenticated mode skips that (enabled: false at line ~190).
+  const autosaveInFlightRef = useRef(false);
 
   // One-shot data hydration. Step is hydrated via usePreparationState's
   // initialStep arg above; this effect merges the text-safe field values
@@ -467,10 +492,14 @@ export const PreparationForm: React.FC<Props> = ({
     setStepSaveError(null);
     try {
       const draftState = UI_STAGE_TO_DRAFT_STATE[AppStage.PREPARE] ?? 'IN_PROGRESS';
+      // PR-49 Phase 1: target step after this advance. step=3 isFinal=true
+      // → no bump (user completes form). Otherwise bump by 1.
+      const targetStep: 1 | 2 | 3 = isFinal ? step : ((step + 1) as 1 | 2 | 3);
       const result = await cloudSaveAndContinue({
         data: { ...data, writingMode },
         draftState,
         draftId: cloudDraftId ?? null,
+        step: targetStep,
       });
       if (result.kind === 'auth_required') {
         window.location.href = '/';
@@ -480,8 +509,9 @@ export const PreparationForm: React.FC<Props> = ({
         setStepSaveError(result.message);
         return;
       }
-      // ok — propagate authoritative draftId upward so App.tsx tracks identity.
-      if (onCloudDraftSaved) onCloudDraftSaved(result.draftId);
+      // ok — propagate authoritative draftId + step upward so App.tsx
+      // tracks both for the next mount.
+      if (onCloudDraftSaved) onCloudDraftSaved(result.draftId, targetStep);
       if (isFinal) {
         if (previewAudioRef.current) previewAudioRef.current.pause();
         onComplete({ ...data, writingMode });
@@ -492,6 +522,54 @@ export const PreparationForm: React.FC<Props> = ({
       setIsStepSaving(false);
     }
   };
+
+  // PR-49 Phase 1: authenticated continuous autosave. Debounced 1.5s.
+  // Skipped when: not auth mode; explicit save in flight; data is empty.
+  // Silent on error (the explicit step-advance handler surfaces errors;
+  // background autosave failures shouldn't interrupt the user).
+  useEffect(() => {
+    if (mode !== 'authenticated') return;
+    if (isStepSaving) return;
+
+    // Skip autosave when the form has no meaningful content yet. A brand-new
+    // user mounting with empty defaults shouldn't trigger a create-empty save.
+    const hasContent =
+      (data.recipientName ?? '').trim().length > 0 ||
+      (data.senderName ?? '').trim().length > 0 ||
+      (data.finalLetter ?? '').trim().length > 0 ||
+      (data.senderRawThoughts ?? '').trim().length > 0 ||
+      (Array.isArray(data.memoryBoard) && data.memoryBoard.length > 0) ||
+      !!data.userImageUrl ||
+      !!data.audio?.url;
+    if (!hasContent) return;
+
+    const timer = setTimeout(async () => {
+      if (autosaveInFlightRef.current) return;
+      autosaveInFlightRef.current = true;
+      try {
+        const draftState = UI_STAGE_TO_DRAFT_STATE[AppStage.PREPARE] ?? 'IN_PROGRESS';
+        const result = await cloudSaveAndContinue({
+          data: { ...data, writingMode },
+          draftState,
+          draftId: cloudDraftId ?? null,
+          step,
+        });
+        if (result.kind === 'auth_required') {
+          window.location.href = '/';
+          return;
+        }
+        if (result.kind === 'ok' && onCloudDraftSaved) {
+          onCloudDraftSaved(result.draftId, step);
+        }
+        // Silent on 'error' — explicit advance surfaces errors. Autosave
+        // is a background convenience; failures will retry on next change.
+      } finally {
+        autosaveInFlightRef.current = false;
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [data, step, mode, isStepSaving, writingMode, cloudDraftId, onCloudDraftSaved]);
 
   // PR-49 C2 (Task 4): wrapper for the two Step-2 "Continue" buttons that
   // bypass form submit (the desktop side-button and the mobile step-2 next
