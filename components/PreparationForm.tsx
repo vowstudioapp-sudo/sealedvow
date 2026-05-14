@@ -42,6 +42,16 @@ interface Props {
   // Guest mode does not use these props (passes neither; both are optional).
   cloudDraftId?: string | null;
   onCloudDraftSaved?: (draftId: string) => void;
+
+  // PR-49 C2 hydration hotfix (LOCK-A): one-time mount seed for authenticated
+  // mode. App.tsx passes cloud-hydrated data here when mode is 'authenticated'.
+  // Guest mode leaves this undefined and the form continues to seed from
+  // localStorage via peekDraft() — guest authority is unchanged.
+  //
+  // This is a ONE-TIME mount seed. No reactive sync, no prop→state listener.
+  // After the mount-time hydration effect runs, PreparationForm is the sole
+  // owner of PREPARE state.
+  initialData?: Partial<CoupleData>;
 }
 
 // CORE OCCASIONS — V1: Anniversary + Unsaid only.
@@ -99,19 +109,43 @@ export const PreparationForm: React.FC<Props> = ({
   onBeginAgainRequest,
   cloudDraftId,
   onCloudDraftSaved,
+  initialData,
 }) => {
   const [error, setError] = useState<string | null>(null);
-  
+
   // Read any saved draft once on mount, BEFORE state hook init.
   // useRef ensures the read runs exactly once (initializer fires only on
   // the first render); subsequent renders return the same captured peek.
   const initialDraftRef = useRef(peekDraft());
 
+  // PR-49 C2 hydration hotfix (LOCK-A): one-time mount seed selector.
+  // Authenticated mode passes hydrated cloud data via `initialData` —
+  // takes precedence over the localStorage peek. Guest mode (and no-mode)
+  // pass undefined, falling back to peekDraft() unchanged. useMemo with
+  // empty deps locks this to a single read at first render; later prop
+  // changes are intentionally ignored (LOCK-A: no reactive sync).
+  const initialDataSource = useMemo<Partial<CoupleData> | null>(() => {
+    if (initialData) return initialData;
+    return initialDraftRef.current.data;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // PR #11 — Decide on mount whether to show the resume modal, silent-
   // restore, or start empty. Computed once via useMemo (empty deps).
   // consumeIntentionalEntry has a side effect (clears the sessionStorage
   // flag) — that's intentional, fires exactly once per mount.
+  //
+  // PR-49 C2 hydration hotfix: authenticated mode skips the resume modal
+  // entirely. The Continue/Discard prompt at LandingPage already gates
+  // resume vs. discard; by the time PreparationForm mounts for an
+  // authenticated user, the choice was already made (Continue → mount
+  // with cloud data; Discard → mount with empty data after DELETE).
+  // Guest mode preserves the pre-PR-49 DraftResumeModal flow exactly.
   const initialDecision = useMemo(() => {
+    if (initialData) {
+      // Authenticated path: cloud data already chosen at LandingPage gate.
+      return { mode: 'empty' as const };
+    }
     const metadata = getDraftMetadata();
     if (!metadata) return { mode: 'empty' as const };
     if (!metadata.hasMeaningfulContent) {
@@ -186,18 +220,21 @@ export const PreparationForm: React.FC<Props> = ({
 
   // One-shot data hydration. Step is hydrated via usePreparationState's
   // initialStep arg above; this effect merges the text-safe field values
-  // from the saved draft into form state on mount only.
-  // PR #11 — gated on hydrationDeferred so the modal flow can decide
-  // whether to apply hydration (Continue) or skip it (Begin Again).
+  // from the chosen seed source into form state on mount only.
+  // PR #11 — gated on hydrationDeferred so the guest DraftResumeModal
+  // flow can decide whether to apply hydration (Continue) or skip it
+  // (Begin Again).
+  // PR-49 C2 hydration hotfix (LOCK-A): seed source is initialDataSource
+  // (cloud data for authenticated, peekDraft() for guest). One-time only.
   const hasHydratedRef = useRef(false);
   useEffect(() => {
     if (hasHydratedRef.current) return;
     if (hydrationDeferred) return;
-    if (initialDraftRef.current.data) {
-      updateData(initialDraftRef.current.data);
+    if (initialDataSource) {
+      updateData(initialDataSource);
     }
     hasHydratedRef.current = true;
-  }, [updateData, hydrationDeferred]);
+  }, [updateData, hydrationDeferred, initialDataSource]);
 
   // PR #11 modal handlers.
   const handleContinue = () => {

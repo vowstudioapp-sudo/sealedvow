@@ -571,6 +571,19 @@ const App: React.FC = () => {
   // must fire only once per (uid, mode) pair — not on every stage transition
   // inside the form. Cleared on sign-out.
   const hydratedForRef = useRef<{ uid: string; mode: ActiveMode } | null>(null);
+
+  // PR-49 C2 hydration hotfix (LOCK-C): PREPARE render gate for authenticated
+  // mode. Authenticated users must wait for the GET /api/draft fetch to
+  // settle before PreparationForm mounts, otherwise the form snapshots empty
+  // localStorage at mount and never sees the cloud data that arrives async.
+  // Guest and no-mode flows have no cloud-hydration step, so they start
+  // already-complete. The hydration effect below flips this to true at every
+  // terminal path (200 / 404 / non-401 error / sign-out). It flips back to
+  // false when a fresh authenticated lifecycle begins (authLoading=true with
+  // mode='authenticated') — see the sign-in-restart effect below.
+  const [authHydrationComplete, setAuthHydrationComplete] = useState(() => {
+    return getActiveMode() !== 'authenticated';
+  });
   const [lastSaveSuccessAt, setLastSaveSuccessAt] = useState<number | null>(null);
   const [lastSaveError, setLastSaveError] = useState<string | null>(null);
 
@@ -940,6 +953,11 @@ const App: React.FC = () => {
       setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
       setLastSaveSuccessAt(null);
       setLastSaveError(null);
+      // PR-49 C2 hydration hotfix (LOCK-C): unblock the PREPARE render gate
+      // on confirmed sign-out so any subsequent guest/no-mode flow renders
+      // PreparationForm without spinning. The fresh-sign-in effect below
+      // resets it back to false when the next authenticated lifecycle begins.
+      setAuthHydrationComplete(true);
       return;
     }
 
@@ -975,10 +993,15 @@ const App: React.FC = () => {
         if (res.status === 404) {
           // Authenticated user with no cloud draft. Empty state.
           setDraftRecord({ draftId: null, seedDraftState: null, revision: null });
+          // LOCK-C: unblock PREPARE render — no draft to wait on.
+          setAuthHydrationComplete(true);
           return;
         }
         if (!res.ok) {
           setLastSaveError("Couldn't load your cloud draft. Try again in a moment.");
+          // LOCK-C: unblock PREPARE render so the user sees an empty form
+          // with the inline error rather than an indefinite spinner.
+          setAuthHydrationComplete(true);
           return;
         }
         const json = await res.json() as {
@@ -1013,10 +1036,16 @@ const App: React.FC = () => {
         if (resumeStage !== null) {
           setStage(resumeStage);
         }
+
+        // LOCK-C: 200-success terminal. Cloud data is in App.tsx state;
+        // PreparationForm can now mount safely with initialData={data}.
+        setAuthHydrationComplete(true);
       })
       .catch(() => {
         if (!cancelled) {
           setLastSaveError("Couldn't load your cloud draft. Try again in a moment.");
+          // LOCK-C: error terminal. Same rationale as the !res.ok branch.
+          setAuthHydrationComplete(true);
         }
       });
 
@@ -1024,6 +1053,20 @@ const App: React.FC = () => {
       cancelled = true;
     };
   }, [stage, authUser?.uid, authLoading, serverSessionReady]);
+
+  // PR-49 C2 hydration hotfix (LOCK-C): fresh sign-in restart. When a new
+  // authenticated lifecycle begins (Firebase listener fires authLoading=true
+  // while mode is already 'authenticated' — e.g., a sign-out/sign-in cycle
+  // in the same tab), reset the PREPARE render gate. The hydration effect
+  // above re-fires after authLoading flips false and flips it back to true
+  // at its terminal paths. Without this, the gate would stay stuck at true
+  // from the prior sign-out and the new sign-in's cloud data would race
+  // PreparationForm's mount again.
+  useEffect(() => {
+    if (authLoading && getActiveMode() === 'authenticated') {
+      setAuthHydrationComplete(false);
+    }
+  }, [authLoading]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -1662,10 +1705,22 @@ const App: React.FC = () => {
             <LandingPage onEnter={handleEnterStudio} />
           )}
 
-          {stage === AppStage.PREPARE && (
+          {/* PR-49 C2 hydration hotfix (LOCK-C/LOCK-E): authenticated PREPARE
+              waits for cloud hydration to settle before mounting the form, so
+              PreparationForm initializes with cloud data via initialData
+              rather than snapshotting empty localStorage. Guest and no-mode
+              flows render immediately (authHydrationComplete is true from
+              first render). */}
+          {stage === AppStage.PREPARE && !authHydrationComplete && (
+            <div className="min-h-screen flex items-center justify-center">
+              <span className="cold-load-text">Restoring your letter…</span>
+            </div>
+          )}
+          {stage === AppStage.PREPARE && authHydrationComplete && (
             <div className="animate-fade-in py-12 px-4">
                <PreparationForm
                  key={prepFormResetKey}
+                 initialData={data ?? undefined}
                  onComplete={(d) => { setData(hydrateCoupleData(d)); safeSetStage(AppStage.REFINE); }}
                  onBeginAgainRequest={handleBeginAgain}
                  cloudDraftId={draftRecord.draftId}
