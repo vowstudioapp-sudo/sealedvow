@@ -1,13 +1,18 @@
 // ============================================================================
-// utils/saveDraft.ts — Canonical save-draft helper (PR-48 Phase 4)
+// utils/saveDraft.ts — Canonical save-draft helper.
 //
 // Pure typed-result helper around POST /api/drafts/save. No React state. No
-// localStorage writes. No side-effect orchestration. Callers handle revision
-// tracking, local state, UX, and recovery.
+// localStorage writes. No side-effect orchestration. Callers handle local
+// state, UX, and recovery.
 //
-// Returns a discriminated union covering every Phase 3 server error code
-// plus network failure. The shape of `kind: 'ok'` mirrors the server's
-// 200 response.
+// PR-49 C2 hotfix (LOCK-3): CAS plumbing retired. expectedRevision removed
+// from the input. stale_revision variant removed from the result union.
+// Under dual-mode's single-writer-per-mode invariant (I7), concurrent-edit
+// conflicts cannot occur; last-write-wins is correct semantics.
+//
+// The `revision` field is preserved as a server-side audit counter (LOCK-4):
+// the server still increments it on each write, and this helper still parses
+// it from the response, but client code does not branch on it.
 // ============================================================================
 
 import type { CoupleData } from '../types';
@@ -17,10 +22,9 @@ export interface SaveDraftInput {
   data: Partial<CoupleData> | CoupleData;
   step?: 1 | 2 | 3;
   draftState: DraftState;
-  // Present → UPDATE existing draft (expectedRevision required).
-  // Absent → CREATE new draft (expectedRevision ignored).
+  // Present → UPDATE existing draft. Absent → CREATE new draft (server
+  // assigns draftId via .push().key).
   draftId?: string;
-  expectedRevision?: number;
 }
 
 export type SaveDraftResult =
@@ -29,11 +33,6 @@ export type SaveDraftResult =
       draftId: string;
       revision: number;
       updatedAt: number | null;
-    }
-  | {
-      kind: 'stale_revision';
-      currentRevision: number;
-      yourRevision: number;
     }
   | { kind: 'active_draft_exists'; existingDraftId: string }
   | { kind: 'unauthorized' }
@@ -50,9 +49,6 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
   };
   if (input.draftId) {
     payload.draftId = input.draftId;
-  }
-  if (typeof input.expectedRevision === 'number') {
-    payload.expectedRevision = input.expectedRevision;
   }
   if (input.step === 1 || input.step === 2 || input.step === 3) {
     payload.step = input.step;
@@ -76,8 +72,6 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
     revision?: number;
     updatedAt?: number | null;
     error?: string;
-    currentRevision?: number;
-    yourRevision?: number;
     existingDraftId?: string;
   } | null = null;
   try {
@@ -104,15 +98,6 @@ export async function saveDraft(input: SaveDraftInput): Promise<SaveDraftResult>
   }
   if (res.status === 429) {
     return { kind: 'rate_limited' };
-  }
-  if (res.status === 409 && body?.error === 'STALE_REVISION') {
-    return {
-      kind: 'stale_revision',
-      currentRevision:
-        typeof body.currentRevision === 'number' ? body.currentRevision : 0,
-      yourRevision:
-        typeof body.yourRevision === 'number' ? body.yourRevision : 0,
-    };
   }
   if (res.status === 409 && body?.error === 'ACTIVE_DRAFT_EXISTS') {
     return {

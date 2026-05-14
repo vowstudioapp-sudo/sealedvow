@@ -8,12 +8,11 @@
 // see ONLY authenticated-mode primitives; a reviewer reading the persistence
 // hook should see ONLY localStorage primitives. There is no shared abstraction.
 //
-// This helper wraps saveDraft from utils/saveDraft.ts (which itself wraps
-// POST /api/drafts/save). The result type is narrowed to a simple
-// ok/error union — Phase D will narrow utils/saveDraft.ts to match.
+// PR-49 C2 hotfix (LOCK-3): CAS plumbing retired. expectedRevision removed
+// from the input type. Last-write-wins is the locked dual-mode behavior —
+// there is no concurrent-edit scenario under single-writer-per-mode (I7).
 //
-// OQ3 contract: callers handle 'unauthorized' by hard-redirecting to "/".
-// This helper surfaces 'error' for the 401 case; the caller branches.
+// OQ3 contract: callers handle 'auth_required' by hard-redirecting to "/".
 // ============================================================================
 
 import type { CoupleData } from '../types';
@@ -23,13 +22,15 @@ import { saveDraft, type SaveDraftInput } from './saveDraft';
 export interface CloudSaveInput {
   data: Partial<CoupleData> | CoupleData;
   draftState: DraftState;
-  draftId?: string;
-  expectedRevision?: number;
+  // null on first save (server assigns a new draftId via .push().key);
+  // populated on subsequent saves so the server UPDATEs the same record
+  // rather than refusing with ACTIVE_DRAFT_EXISTS.
+  draftId: string | null;
 }
 
 export type CloudSaveResult =
   | { kind: 'ok'; draftId: string; updatedAt: number | null }
-  | { kind: 'unauthorized' }
+  | { kind: 'auth_required' }
   | { kind: 'error'; message: string };
 
 export async function saveAndContinue(input: CloudSaveInput): Promise<CloudSaveResult> {
@@ -38,9 +39,6 @@ export async function saveAndContinue(input: CloudSaveInput): Promise<CloudSaveR
     draftState: input.draftState,
   };
   if (input.draftId) payload.draftId = input.draftId;
-  if (typeof input.expectedRevision === 'number') {
-    payload.expectedRevision = input.expectedRevision;
-  }
 
   const result = await saveDraft(payload);
 
@@ -48,7 +46,7 @@ export async function saveAndContinue(input: CloudSaveInput): Promise<CloudSaveR
     case 'ok':
       return { kind: 'ok', draftId: result.draftId, updatedAt: result.updatedAt };
     case 'unauthorized':
-      return { kind: 'unauthorized' };
+      return { kind: 'auth_required' };
     case 'network_error':
       return { kind: 'error', message: "Couldn't save just now. Check your connection." };
     case 'rate_limited':

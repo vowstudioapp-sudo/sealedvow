@@ -143,28 +143,19 @@ export function validateDraftWrite({ data, step, draftState, persistenceStatus }
 }
 
 // ============================================================================
-// PR-48 Phase 2 (D1) — expectedRevision request-shape validator.
+// PR-49 C2 hotfix (LOCK-2): CAS plumbing retired for /api/drafts/save.js.
+// Under dual-mode's single-writer-per-mode invariant (I7), concurrent-edit
+// conflicts cannot occur; last-write-wins is correct.
 //
-// Every mutating request against an existing draft MUST include
-// `expectedRevision: number` matching the stored draft's current revision.
-// Per docs/contracts/active-paused-state-machine.md §6:
-//   * UPDATE without expectedRevision  → 400 MISSING_EXPECTED_REVISION
-//   * UPDATE with non-integer / < 1    → 400 INVALID_EXPECTED_REVISION_FORMAT
-//   * UPDATE with stale value          → 409 STALE_REVISION (handled in
-//                                         /api/drafts/save.js inside the
-//                                         atomic transaction, not here)
-//
-// This helper checks request shape only. Comparison against stored value
-// happens inside the transaction boundary at the call site.
+// This function remains as a NO-OP STUB for the four PR-48 lifecycle
+// endpoints (pause/resume/discard/transition) that still import it. Those
+// endpoints are zero-caller after PR-49 C1 (the client lifecycleDraft.ts
+// callers were deleted with the BeginNew flow) and are scheduled for
+// outright file deletion in Phase D. Keeping the export as a stub avoids
+// module-load failures during the C2→D transition. The stub returns
+// { ok: true } unconditionally so the orphan endpoints' CAS branches
+// become permissive — harmless since no client calls them.
 // ============================================================================
-export function validateExpectedRevision(value, { required }) {
-  if (value === undefined || value === null) {
-    return required
-      ? { ok: false, reason: 'MISSING_EXPECTED_REVISION' }
-      : { ok: true };
-  }
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
-    return { ok: false, reason: 'INVALID_EXPECTED_REVISION_FORMAT' };
-  }
+export function validateExpectedRevision(_value, _opts) {
   return { ok: true };
 }

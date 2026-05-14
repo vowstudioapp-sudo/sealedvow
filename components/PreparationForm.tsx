@@ -33,6 +33,15 @@ interface Props {
   // When omitted (legacy callers), the local-only fallback is preserved:
   // clearPreparationDraft + resetPreparationState run inline.
   onBeginAgainRequest?: () => void;
+
+  // PR-49 C2 hotfix: authenticated-mode draft identity threading. Passed by
+  // App.tsx from draftRecord.draftId so subsequent saves UPDATE the same
+  // record rather than triggering ACTIVE_DRAFT_EXISTS on CREATE. The callback
+  // fires after a successful server save with the authoritative draftId
+  // (the server assigns one on first save; echoes it back on updates).
+  // Guest mode does not use these props (passes neither; both are optional).
+  cloudDraftId?: string | null;
+  onCloudDraftSaved?: (draftId: string) => void;
 }
 
 // CORE OCCASIONS — V1: Anniversary + Unsaid only.
@@ -85,7 +94,12 @@ const ENABLE_VIDEO = false;
 // normally — the redirect is gated on draft absence (see shouldRedirectAway).
 const REMOVED_OCCASIONS = new Set<string>(['birthday', 'apology', 'thank-you']);
 
-export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainRequest }) => {
+export const PreparationForm: React.FC<Props> = ({
+  onComplete,
+  onBeginAgainRequest,
+  cloudDraftId,
+  onCloudDraftSaved,
+}) => {
   const [error, setError] = useState<string | null>(null);
   
   // Read any saved draft once on mount, BEFORE state hook init.
@@ -395,11 +409,18 @@ export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainReque
     }));
   };
 
-  // PR-49 C2 (Task 4): mode-aware step advance. Guest mode advances locally
-  // (autosave persists in the background). Authenticated mode performs an
-  // explicit cloud save first and only advances on success. On 401, hard
-  // redirect to "/" (OQ3). On other errors, surface inline message and stay
-  // on the current step.
+  // PR-49 C2 (Task 4) + C2 hotfix: mode-aware step advance. Guest mode
+  // advances locally (autosave persists in the background). Authenticated
+  // mode performs an explicit cloud save first and only advances on success.
+  //
+  // C2 hotfix: cloudDraftId is threaded through every save so subsequent
+  // calls UPDATE the same record. Without this, the server returns 409
+  // ACTIVE_DRAFT_EXISTS on the second save attempt. On success, the
+  // server's authoritative draftId is reported back via onCloudDraftSaved
+  // so App.tsx's draftRecord stays in sync for downstream stages.
+  //
+  // On 401: hard redirect to "/" (OQ3). On other errors: inline message;
+  // stay on the current step.
   const advanceStepAuthenticated = async (
     onAdvance: () => void,
     isFinal: boolean,
@@ -409,12 +430,12 @@ export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainReque
     setStepSaveError(null);
     try {
       const draftState = UI_STAGE_TO_DRAFT_STATE[AppStage.PREPARE] ?? 'IN_PROGRESS';
-      const payload: Parameters<typeof cloudSaveAndContinue>[0] = {
+      const result = await cloudSaveAndContinue({
         data: { ...data, writingMode },
         draftState,
-      };
-      const result = await cloudSaveAndContinue(payload);
-      if (result.kind === 'unauthorized') {
+        draftId: cloudDraftId ?? null,
+      });
+      if (result.kind === 'auth_required') {
         window.location.href = '/';
         return;
       }
@@ -422,7 +443,8 @@ export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainReque
         setStepSaveError(result.message);
         return;
       }
-      // ok
+      // ok — propagate authoritative draftId upward so App.tsx tracks identity.
+      if (onCloudDraftSaved) onCloudDraftSaved(result.draftId);
       if (isFinal) {
         if (previewAudioRef.current) previewAudioRef.current.pause();
         onComplete({ ...data, writingMode });

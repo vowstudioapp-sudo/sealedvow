@@ -788,15 +788,12 @@ const App: React.FC = () => {
       const result = await cloudSaveAndContinue({
         data: data ?? {},
         draftState: draftStateToSend,
-        ...(draftRecord.draftId ? { draftId: draftRecord.draftId } : {}),
-        ...(typeof draftRecord.revision === 'number'
-          ? { expectedRevision: draftRecord.revision }
-          : {}),
+        draftId: draftRecord.draftId,
       });
 
       if (!mountedRef.current) return;
 
-      if (result.kind === 'unauthorized') {
+      if (result.kind === 'auth_required') {
         window.location.href = '/';
         return;
       }
@@ -805,7 +802,7 @@ const App: React.FC = () => {
         return;
       }
 
-      // ok
+      // ok — propagate authoritative draftId from server.
       setDraftRecord({
         draftId: result.draftId,
         seedDraftState: draftStateToSend,
@@ -853,9 +850,10 @@ const App: React.FC = () => {
         data: data ?? {},
         draftState: draftStateToSend,
       };
-      if (draftRecord.draftId && typeof draftRecord.revision === 'number') {
+      // PR-49 C2 hotfix (LOCK-3): CAS retired. draftId alone identifies the
+      // record; expectedRevision is no longer sent or checked.
+      if (draftRecord.draftId) {
         input.draftId = draftRecord.draftId;
-        input.expectedRevision = draftRecord.revision;
       }
 
       const result = await saveDraft(input);
@@ -897,7 +895,6 @@ const App: React.FC = () => {
           saveInFlightRef.current = false;
           return;
 
-        case 'stale_revision':
         case 'active_draft_exists':
         case 'rate_limited':
         case 'bad_request':
@@ -1671,6 +1668,18 @@ const App: React.FC = () => {
                  key={prepFormResetKey}
                  onComplete={(d) => { setData(hydrateCoupleData(d)); safeSetStage(AppStage.REFINE); }}
                  onBeginAgainRequest={handleBeginAgain}
+                 cloudDraftId={draftRecord.draftId}
+                 onCloudDraftSaved={(draftId) => {
+                   // PR-49 C2 hotfix: thread the server's authoritative draftId
+                   // into App-level state so subsequent saves (in this form or
+                   // downstream stages) UPDATE the same record. seedDraftState
+                   // advances to IN_PROGRESS reflecting what was just persisted.
+                   setDraftRecord((prev) => ({
+                     ...prev,
+                     draftId,
+                     seedDraftState: 'IN_PROGRESS',
+                   }));
+                 }}
                />
             </div>
           )}

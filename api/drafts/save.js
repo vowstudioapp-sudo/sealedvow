@@ -1,28 +1,27 @@
 // ============================================================================
-// /api/drafts/save.js — Create or update a draft (PR-48 Phase 2 + 2.1)
+// /api/drafts/save.js — Create or update a draft (authenticated mode).
 //
-// Auth required. All state validation occurs INSIDE an RTDB .transaction()
-// boundary, satisfying contract §5 ATR-3 / ATR-4 atomicity (validation
-// occurs INSIDE the transaction, not before).
+// PR-49 C2 hotfix (LOCK-2): CAS plumbing retired. expectedRevision is no
+// longer required or checked. STALE_REVISION / INVALID_REVISION response
+// branches removed. Under dual-mode's single-writer-per-mode invariant (I7),
+// concurrent-edit conflicts cannot occur — last-write-wins is the locked
+// behavior. The `revision` field on the persisted record stays as an audit
+// counter (LOCK-4): the server still increments it on each write.
 //
 // CREATE path (no draftId in request): .transaction() on the parent
-// users/{uid}/drafts subtree — the cap and single-ACTIVE checks must read
-// across all of the user's drafts inside one atomic boundary.
+// users/{uid}/drafts subtree — the single-ACTIVE check must read across all
+// of the user's drafts inside one atomic boundary.
 //
 // UPDATE path (draftId in request): pre-fetch the specific draft via
-// .once('value') to confirm existence, then .transaction() on that same
-// specific draft node. The pre-fetch warms the Admin SDK cache so the
-// transaction's first callback invocation receives the actual server data
-// (per Phase 2.1: without it, the Admin SDK's first call may pass null
-// even when data exists, and our previous "return undefined to abort"
-// produced a spurious DRAFT_NOT_FOUND for every UPDATE).
+// .once('value') to confirm existence, then .transaction() on that specific
+// draft node. The pre-fetch warms the Admin SDK cache so the transaction's
+// first callback invocation receives the actual server data (Phase 2.1 fix
+// for the null-first-call quirk; preserved).
 //
 // Body:
-//   { draftId?, data, step?, draftState?, persistenceStatus?, expectedRevision? }
-//   * draftId absent  → CREATE. Server generates id via .push().key. No
-//                       expectedRevision required (revision starts at 1).
-//   * draftId present → UPDATE. expectedRevision REQUIRED. Mismatch returns
-//                       STALE_REVISION (stale) or INVALID_REVISION (ahead).
+//   { draftId?, data, step?, draftState?, persistenceStatus? }
+//   * draftId absent  → CREATE. Server generates id via .push().key.
+//   * draftId present → UPDATE. Server overwrites the existing record.
 //
 // Defaults:
 //   * draftState         → 'IN_PROGRESS'
@@ -31,15 +30,16 @@
 // Response (200):
 //   { ok: true, draftId, revision, updatedAt }
 //
-// Atomic-transaction rejections (409):
-//   { error: 'ACTIVE_DRAFT_EXISTS', existingDraftId }
-//   { error: 'STALE_REVISION', currentRevision, yourRevision }
-//   { error: 'INVALID_REVISION', currentRevision, yourRevision }
+// 409 rejections:
+//   { error: 'ACTIVE_DRAFT_EXISTS', existingDraftId } — CREATE attempted
+//     while user already has an ACTIVE draft. Defensive guard (LOCK-5).
+//     After PR-49 C2 hotfix, client always passes draftId on subsequent
+//     saves, so this should not trigger in normal flow.
 //
 // Other rejections:
 //   401 Unauthorized
 //   429 TOO_MANY_REQUESTS
-//   400 (validation reasons from validateDraftWrite or expectedRevision check)
+//   400 (validation reasons from validateDraftWrite)
 //   404 DRAFT_NOT_FOUND (UPDATE path with unknown draftId)
 //   500 TRANSACTION_FAILED / WRITE_FAILED
 //
@@ -50,10 +50,7 @@
 import admin from 'firebase-admin';
 import { adminDb, guardPost, rateLimit } from '../lib/middleware.js';
 import { getSessionUser } from '../lib/auth.js';
-import {
-  validateDraftWrite,
-  validateExpectedRevision,
-} from '../lib/draftValidation.js';
+import { validateDraftWrite } from '../lib/draftValidation.js';
 
 export default async function handler(req, res) {
   if (guardPost(req, res)) return;
@@ -80,7 +77,6 @@ export default async function handler(req, res) {
     step,
     draftState,
     persistenceStatus,
-    expectedRevision,
   } = req.body || {};
 
   const validation = validateDraftWrite({ data, step, draftState, persistenceStatus });
@@ -89,46 +85,18 @@ export default async function handler(req, res) {
   }
 
   const isUpdate = typeof incomingDraftId === 'string' && incomingDraftId.length > 0;
-  const revisionCheck = validateExpectedRevision(expectedRevision, { required: isUpdate });
-  if (!revisionCheck.ok) {
-    return res.status(400).json({ error: revisionCheck.reason });
-  }
 
   const finalDraftState = draftState || 'IN_PROGRESS';
   const finalPersistenceStatus = persistenceStatus || 'ACTIVE';
 
-  // The transaction callback may be invoked multiple times under contention.
-  // We capture the abort reason via a closure that the callback re-sets on
-  // every entry; only the final committed/aborted state is read after.
   let abortReason = null;
-
   let txResult;
   let resultDraftId;
 
   if (isUpdate) {
-    // ATR-4: Save Draft (overwriting existing).
-    //
-    // PR-48 Phase 2.1 fix: scope this transaction to the SPECIFIC draft
-    // path (not the parent users/{uid}/drafts subtree) and pre-fetch via
-    // .once('value') to verify existence before transacting.
-    //
-    // Why: Firebase Admin SDK's .transaction() may invoke the callback with
-    // null on its first call when its local cache is cold — which is always
-    // the case for serverless invocations. Phase 2's original
-    // implementation, scoped to the parent path, returned undefined when
-    // drafts[incomingDraftId] was missing (because currentDrafts was null
-    // → drafts === {} → lookup undefined). Returning undefined ABORTS the
-    // transaction without retry. Firebase never got a chance to re-invoke
-    // the callback with real server data, producing a spurious
-    // DRAFT_NOT_FOUND on every UPDATE in production.
-    //
-    // The fix: (a) pre-fetch the specific draft node to confirm existence,
-    // returning 404 immediately if absent; (b) run the transaction on that
-    // same specific path. The pre-fetch warms the Admin SDK cache so the
-    // transaction's first callback invocation receives the actual server
-    // data. The transaction still provides the atomic compare-and-set on
-    // the revision field — that property is what makes the UPDATE safe
-    // against concurrent writers.
+    // UPDATE: scoped to the specific draft path. Pre-fetch warms the Admin
+    // SDK cache so the transaction's first callback invocation receives the
+    // actual server data (Phase 2.1 fix preserved).
     const draftRef = adminDb.ref(`users/${user.uid}/drafts/${incomingDraftId}`);
     const preSnap = await draftRef.once('value');
     if (!preSnap.exists()) {
@@ -141,48 +109,16 @@ export default async function handler(req, res) {
         abortReason = null;
 
         if (current === null) {
-          // Firebase Admin SDK may invoke transaction callback with null
-          // on first call even when data exists. Returning the pre-fetched
-          // value forces compare-and-set retry semantics so Firebase
-          // re-invokes the callback with actual server state. The next
-          // invocation will deliver `current` as the real stored draft,
-          // and the revision validation below runs against authoritative
-          // data. Returning preSnap.val() does NOT commit stale data — it
-          // tells Firebase "this is what I observed"; the server detects
-          // the mismatch against its real state (which may differ if a
-          // concurrent writer changed the draft) and retries the callback.
+          // Firebase Admin SDK null-first-call quirk: return preSnap.val()
+          // to trigger compare-and-set retry so the callback re-runs with
+          // authoritative server state.
           return preSnap.val();
         }
 
-        // Graceful retro-migration: pre-Phase-2 drafts without a revision
-        // field are treated as revision = 1. First update increments to 2.
+        // PR-49 C2 hotfix: no revision check. Last-write-wins. The server
+        // increments the audit counter on every write.
         const storedRevision =
           typeof current.revision === 'number' ? current.revision : 1;
-        if (expectedRevision < storedRevision) {
-          abortReason = {
-            http: 409,
-            body: {
-              error: 'STALE_REVISION',
-              currentRevision: storedRevision,
-              yourRevision: expectedRevision,
-            },
-          };
-          return;
-        }
-        if (expectedRevision > storedRevision) {
-          // Client claimed a revision the server has never issued. Hard bug
-          // signal — surfaces to client per contract §6 client-policy note.
-          abortReason = {
-            http: 409,
-            body: {
-              error: 'INVALID_REVISION',
-              currentRevision: storedRevision,
-              yourRevision: expectedRevision,
-            },
-          };
-          return;
-        }
-        // expectedRevision === storedRevision: apply update, increment.
         const updated = {
           draftId: incomingDraftId,
           userId: user.uid,
@@ -205,17 +141,9 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'TRANSACTION_FAILED' });
     }
   } else {
-    // ATR-3: Save Draft (creating new).
-    //
-    // CREATE remains on the parent users/{uid}/drafts path because the cap
-    // check and single-ACTIVE check must read across all of the user's
-    // drafts inside the atomic boundary. CREATE handles the null-first-
-    // call quirk implicitly: when currentDrafts is null on the first
-    // invocation, the callback falls through to returning the new draft
-    // payload; Firebase then attempts compare-and-set; if the server is
-    // also null, the commit succeeds; if the server has data, Firebase
-    // re-invokes the callback with the real data and the existing-ACTIVE /
-    // cap checks fire correctly.
+    // CREATE: scoped to the parent users/{uid}/drafts path so the
+    // single-ACTIVE check reads across all of the user's drafts inside the
+    // atomic boundary.
     const userDraftsRef = adminDb.ref(`users/${user.uid}/drafts`);
     const newDraftId = userDraftsRef.push().key;
     resultDraftId = newDraftId;
@@ -231,6 +159,11 @@ export default async function handler(req, res) {
             (d) => d.persistenceStatus === 'ACTIVE',
           );
           if (existingActive) {
+            // LOCK-5: defensive guard. After PR-49 C2 hotfix, the client
+            // always passes draftId on subsequent saves; this fires only if
+            // a CREATE comes in while the user already has an ACTIVE draft
+            // (programmer error or stale client). Client receives the
+            // existingDraftId and can retry as UPDATE.
             abortReason = {
               http: 409,
               body: {
@@ -266,9 +199,6 @@ export default async function handler(req, res) {
     if (abortReason) {
       return res.status(abortReason.http).json(abortReason.body);
     }
-    // RTDB aborted the transaction without our intervention — typically
-    // because the callback returned undefined too many times under
-    // contention, or because of network. Treat as a write failure.
     return res.status(500).json({ error: 'TRANSACTION_FAILED' });
   }
 
