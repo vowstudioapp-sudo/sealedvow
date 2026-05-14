@@ -338,9 +338,12 @@ export const RefineStage: React.FC<Props> = ({
           {(() => {
             const isErrored = !!lastSaveError;
             const isSettled = !isErrored && lastSaveSuccessAt != null;
+            // PR-49 C2 (Task 5): label changes from "Save and continue later"
+            // (pre-PR-49 soft-save semantic) to "Save and Continue" (now
+            // save + advance). Settled-state label preserved.
             const linkLabel = isSettled
               ? `Saved ${formatRelativeTime(new Date(lastSaveSuccessAt as number).toISOString())}`
-              : 'Save and continue later';
+              : 'Save and Continue';
             // Settled state uses softer opacity to communicate "done /
             // resting"; default uses higher opacity to communicate "do this".
             const linkOpacity = isSettled ? 'text-luxury-gold/50' : 'text-luxury-gold/70';

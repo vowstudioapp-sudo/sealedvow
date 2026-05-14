@@ -4,6 +4,7 @@ import { TermsModal } from './TermsModal';
 import { HelpModal } from './HelpModal';
 import { MyLettersModal } from './MyLettersModal';
 import { ModeSelectionModal } from './ModeSelectionModal';
+import { ResumeOrDiscardModal } from './ResumeOrDiscardModal';
 import { UserMenu } from './UserMenu';
 import { AtmosphericShell } from './AtmosphericShell';
 import { useAuth } from '../hooks/useAuth';
@@ -26,10 +27,16 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [showMyLetters, setShowMyLetters] = useState(false);
-  // PR-49 Phase A — Mode entry primitive (dormant). Modal fires only when
-  // a signed-out user clicks "Create Your Letter"; signed-in users skip
-  // the gate per strategy §5.6.
+  // PR-49 Phase A — Mode entry primitive. Modal fires only when a signed-out
+  // user clicks "Create Your Letter"; signed-in users skip the gate per
+  // strategy §5.6.
   const [showModeSelection, setShowModeSelection] = useState(false);
+
+  // PR-49 C2 (Task 3 / LOCK-2): Continue/Discard modal for signed-in users
+  // with an existing unfinished cloud draft. Shown when handleEnter detects
+  // a non-COMPLETED draft via GET /api/draft.
+  const [showResumeOrDiscard, setShowResumeOrDiscard] = useState(false);
+  const [isCheckingForDraft, setIsCheckingForDraft] = useState(false);
 
   const { user, signInWithGoogle, signOut } = useAuth();
 
@@ -120,22 +127,74 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     window.location.href = "/create";
   };
 
-  const handleEnter = () => {
+  const handleEnter = async () => {
     // PR-49 Phase A — gate the Create flow on mode selection.
-    // Signed-in users skip the gate per strategy §5.6 (auto-authenticated).
     // Signed-out users see ModeSelectionModal; the chosen mode is written
     // to sessionStorage by the modal, then handleModeChosen below resumes
     // the navigation.
-    //
-    // The mode write is currently DORMANT — no persistence-routing code
-    // consumes it yet. Phase C wires the consumers in App.tsx hydration,
-    // save handlers, Begin Again, and PreparationForm.
-    if (user) {
-      setActiveMode('authenticated');
-      proceedToCreate();
+    if (!user) {
+      setShowModeSelection(true);
       return;
     }
-    setShowModeSelection(true);
+
+    // PR-49 C2 (Task 3): signed-in user. Check for an existing cloud draft
+    // before proceeding. If one exists (non-COMPLETED), surface the
+    // Continue/Discard prompt. Otherwise proceed to a fresh /create.
+    setActiveMode('authenticated');
+
+    if (isCheckingForDraft) return;
+    setIsCheckingForDraft(true);
+    try {
+      const res = await fetch('/api/draft', { credentials: 'include' });
+      if (res.status === 200) {
+        const json = await res.json() as { draftState?: string };
+        if (json.draftState && json.draftState !== 'COMPLETED') {
+          setShowResumeOrDiscard(true);
+          return;
+        }
+        // COMPLETED letters aren't resumable; proceed fresh.
+        proceedToCreate();
+        return;
+      }
+      if (res.status === 404) {
+        // No cloud draft; proceed fresh.
+        proceedToCreate();
+        return;
+      }
+      // 401 or other errors: defensive fallback. Proceed fresh — the
+      // hydration effect on the /create route will surface auth errors
+      // (OQ3 redirect) if the session is truly expired.
+      proceedToCreate();
+    } catch {
+      // Network failure — proceed; hydration will retry / surface inline.
+      proceedToCreate();
+    } finally {
+      setIsCheckingForDraft(false);
+    }
+  };
+
+  const handleResumeContinue = () => {
+    setShowResumeOrDiscard(false);
+    proceedToCreate();
+  };
+
+  const handleResumeConfirmDiscard = async () => {
+    const res = await fetch('/api/draft', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (res.status === 401) {
+      // OQ3: hard redirect on auth expiry. window.location.href to "/"
+      // is a no-op here (already on landing) but forcing a reload clears
+      // any stale state and re-runs the auth lifecycle.
+      window.location.reload();
+      return;
+    }
+    if (!res.ok) {
+      throw new Error('discard failed');
+    }
+    setShowResumeOrDiscard(false);
+    proceedToCreate();
   };
 
   const handleModeChosen = () => {
@@ -171,6 +230,11 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
         isOpen={showModeSelection}
         onChosen={handleModeChosen}
         onSignIn={handleModeSelectionSignIn}
+      />
+      <ResumeOrDiscardModal
+        isOpen={showResumeOrDiscard}
+        onContinue={handleResumeContinue}
+        onConfirmDiscard={handleResumeConfirmDiscard}
       />
 
       {/* ══════════════════════════════════════

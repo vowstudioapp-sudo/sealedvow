@@ -32,10 +32,12 @@ interface Props {
   isDemoMode?: boolean;
   onPayment?: () => void;
   onEdit?: () => void;
-  // PR #18b — explicit "Save and continue later" wiring. Rendered ONLY
-  // under isPreview AND only by sender (receiver path passes none of
-  // these). CP4 consumes these to render the top-right utility container.
-  onSaveAndContinueLater?: () => void;
+  // PR-49 C2: onSaveAndContinueLater removed. Per proposal §2.2 and §2.3,
+  // the sender-side Preview Experience is read-only in both modes. Save
+  // happens at step-button clicks during PREPARE/REFINE (authenticated only),
+  // never on the preview surface itself. lastSaveSuccessAt/lastSaveError/
+  // clearLastSaveError remain wired for the orphan affordance which is
+  // gated out below; C4 removes the type definitions entirely.
   lastSaveSuccessAt?: number | null;
   lastSaveError?: string | null;
   clearLastSaveError?: () => void;
@@ -96,7 +98,6 @@ export const MainExperience: React.FC<Props> = ({
   isDemoMode = false,
   onPayment,
   onEdit,
-  onSaveAndContinueLater,
   lastSaveSuccessAt,
   lastSaveError,
   clearLastSaveError,
@@ -793,61 +794,10 @@ export const MainExperience: React.FC<Props> = ({
         />
       )}
 
-      {/* PR #18b CP4 — Persistence affordance (top-right ownership whisper).
-          Renders ONLY in sender preview mode (gated identically to the bottom
-          CTA stack). Receivers (isPreview=false in PR #17's unified flow)
-          never see this container.
-
-          Shape B per LETTERS doctrine: link transformation only, NO continuity
-          line. Continuity narration ("Yours to return to, on any device.")
-          belongs to the LETTERS surface; in-flow surfaces (this one,
-          RefineStage) just need the per-surface receipt. RefineStage is the
-          inaugural-save surface and keeps the continuity line as the user's
-          first encounter with the model; this surface is a return-trip
-          opportunity and stays minimal.
-
-          Quieter than RefineStage's affordance: opacity tier dropped one
-          step (gold/60 default → gold/40 settled vs RefineStage's /70 → /50),
-          text-xs (vs RefineStage's text-sm), corner placement (vs centered
-          footer). Reads as ambient ownership whisper, not narration.
-
-          z-index 320: above cinematic background, below the bottom CTA stack
-          (z-[400]) so the payment surface remains visually dominant if the
-          regions ever overlap. Within the spec'd [300, 350] range. */}
-      {isPreview && (onPayment || onEdit) && (
-        <div className="fixed top-4 right-6 z-[320] text-right">
-          {(() => {
-            const isErrored = !!lastSaveError;
-            const isSettled = !isErrored && lastSaveSuccessAt != null;
-            const linkLabel = isSettled
-              ? `Saved ${formatRelativeTime(new Date(lastSaveSuccessAt as number).toISOString())}`
-              : 'Save and continue later';
-            const linkOpacity = isSettled ? 'text-luxury-gold/40' : 'text-luxury-gold/60';
-            return (
-              <button
-                type="button"
-                onClick={onSaveAndContinueLater}
-                className={`font-serif-elegant italic text-xs ${linkOpacity} hover:text-luxury-gold hover:underline underline-offset-4 bg-transparent border-none p-0 cursor-pointer transition-colors duration-200`}
-              >
-                {linkLabel}
-              </button>
-            );
-          })()}
-
-          {/* Error feedback — necessary infrastructure (silent failure would
-              leave the user with no signal). Same restraint as RefineStage:
-              tap to dismiss, no retry button, no alert-box energy. */}
-          {lastSaveError && (
-            <p
-              className="font-serif-elegant italic text-xs text-luxury-gold/60 mt-2 cursor-pointer"
-              onClick={clearLastSaveError}
-              aria-live="polite"
-            >
-              {lastSaveError}
-            </p>
-          )}
-        </div>
-      )}
+      {/* PR-49 C2: sender-side "Save and continue later" affordance removed.
+          Preview Experience is read-only in both modes per proposal §2.2/§2.3.
+          Save happens at step-button clicks during PREPARE/REFINE (authenticated
+          only), never on this surface. */}
 
       {/* Creator Preview Controls — Modify + Seal & Deliver */}
       {isPreview && (onPayment || onEdit) && (

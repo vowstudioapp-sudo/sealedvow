@@ -10,6 +10,16 @@ interface Letter {
   status: 'sent' | 'opened' | 'replied';
 }
 
+// PR-49 C2 (Task 11 / LOCK-3): Drafts section data shape. Mirrors the
+// GET /api/draft response (Phase B) projected onto the dashboard surface.
+interface DraftSummary {
+  draftId: string;
+  recipientName: string;
+  occasion: string;
+  draftState: string;
+  updatedAt: number | null;
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -43,11 +53,18 @@ export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // PR-49 C2 (Task 11 / LOCK-3): authenticated user's one cloud draft.
+  // Fetched alongside letters; null = none, undefined = still loading.
+  const [draft, setDraft] = useState<DraftSummary | null | undefined>(undefined);
+
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setDraft(undefined);
+
+    // Letters list (existing behavior — sent letters from shared/*).
     fetch('/api/letters/list', {
       method: 'POST',
       credentials: 'include',
@@ -64,12 +81,56 @@ export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
+    // Drafts: authenticated user's one cloud draft (Phase B endpoint).
+    fetch('/api/draft', { credentials: 'include' })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.status === 404 || res.status === 401) {
+          setDraft(null);
+          return;
+        }
+        if (!res.ok) {
+          setDraft(null);
+          return;
+        }
+        const json = await res.json() as {
+          data?: { recipientName?: string; occasion?: string };
+          draftState?: string;
+          updatedAt?: number;
+          draftId?: string;
+        };
+        if (cancelled) return;
+        // Defensive: skip COMPLETED records — they aren't resumable drafts
+        // (verify-payment.js sets draftState='COMPLETED' on payment success;
+        // such records should not appear under "Drafts").
+        if (json.draftState === 'COMPLETED' || !json.draftId) {
+          setDraft(null);
+          return;
+        }
+        setDraft({
+          draftId: json.draftId,
+          recipientName: json.data?.recipientName || '',
+          occasion: json.data?.occasion || '',
+          draftState: json.draftState || '',
+          updatedAt: typeof json.updatedAt === 'number' ? json.updatedAt : null,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setDraft(null);
+      });
+
     return () => {
       cancelled = true;
     };
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleResumeDraft = () => {
+    onClose();
+    window.location.href = '/create';
+  };
 
   return (
     <div
@@ -91,6 +152,59 @@ export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }
           + Create
         </button>
         <div className="lp-modal__rule" />
+
+        {/* PR-49 C2 (Task 11 / LOCK-3): Drafts section. Shown above Letters
+            so the user's in-progress work is the first thing they see. */}
+        <div style={{ marginBottom: 16 }}>
+          <p
+            className="lp-modal__sub"
+            style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 8 }}
+          >
+            Drafts
+          </p>
+          {draft === undefined && (
+            <p className="lp-modal__sub" style={{ fontSize: 11 }}>Loading…</p>
+          )}
+          {draft === null && (
+            <p className="lp-modal__sub" style={{ fontSize: 11 }}>
+              No saved drafts.
+            </p>
+          )}
+          {draft && (
+            <div className="lp-letter-item">
+              <div className="lp-letter-item__main">
+                <div className="lp-letter-item__row">
+                  <span className="lp-letter-item__recipient">
+                    {draft.recipientName || 'Untitled draft'}
+                  </span>
+                  {draft.occasion && (
+                    <span className="lp-letter-item__occasion">{displayOccasion(draft.occasion)}</span>
+                  )}
+                </div>
+                <div className="lp-letter-item__meta">
+                  <span className="lp-letter-item__date">
+                    {draft.updatedAt ? `Updated ${formatDate(draft.updatedAt)}` : 'In progress'}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="lp-letter-item__view"
+                onClick={handleResumeDraft}
+              >
+                Resume
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="lp-modal__rule" />
+
+        <p
+          className="lp-modal__sub"
+          style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 8, marginTop: 8 }}
+        >
+          Sent
+        </p>
 
         {loading && <p className="lp-modal__sub">Loading…</p>}
 

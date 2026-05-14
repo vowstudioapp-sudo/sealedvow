@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CoupleData } from '../types';
+import { getActiveMode } from '../utils/activeMode';
+import { isValidEmailShape } from '../utils/emailValidation';
 
 interface PaymentResult {
   replyEnabled: boolean;
@@ -51,6 +53,23 @@ export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentCompl
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const paymentInProgressRef = useRef(false);
 
+  // PR-49 C2 (Task 8): inline guest email capture. The pre-PR-49 flow captured
+  // this in SignInPromptModal (deleted in C4); guest checkout now collects the
+  // email directly here. Authenticated users have an account email — no field
+  // is rendered for them; the email plumbing on the server reads authEmail
+  // from the verified session cookie.
+  //
+  // Mode is captured once at mount. Per invariant I2 it cannot change mid-flow.
+  const [mode] = useState(() => getActiveMode());
+  const isGuestMode = mode === 'guest';
+  const [inlineEmail, setInlineEmail] = useState(guestEmail ?? '');
+  const trimmedInlineEmail = inlineEmail.trim();
+  const inlineEmailLooksInvalid =
+    isGuestMode && trimmedInlineEmail.length > 0 && !isValidEmailShape(trimmedInlineEmail);
+  // The email value forwarded to /api/verify-payment. For authenticated mode
+  // this is empty (server falls back to the verified session email).
+  const effectiveEmailForServer = isGuestMode ? trimmedInlineEmail : '';
+
   // Founder access
   const [founderCode, setFounderCode] = useState('');
   const [founderError, setFounderError] = useState<string | null>(null);
@@ -97,8 +116,8 @@ export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentCompl
           paymentMode: 'founder',
           founderToken: orderData.founderToken,
           coupleData: data,
-          ...(guestEmail && guestEmail.trim()
-            ? { recipientEmail: guestEmail.trim() }
+          ...(effectiveEmailForServer
+            ? { recipientEmail: effectiveEmailForServer }
             : {}),
         }),
       });
@@ -191,8 +210,8 @@ export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentCompl
         order_id: orderId,
         prefill: {
           name: data.senderName || '',
-          ...(guestEmail && guestEmail.trim()
-            ? { email: guestEmail.trim() }
+          ...(effectiveEmailForServer
+            ? { email: effectiveEmailForServer }
             : {}),
         },
         theme: { color: '#722F37' },
@@ -210,8 +229,8 @@ export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentCompl
                 razorpay_signature: response.razorpay_signature,
                 coupleData: data,
                 ...(requestId ? { requestId } : {}),
-                ...(guestEmail && guestEmail.trim()
-                  ? { recipientEmail: guestEmail.trim() }
+                ...(effectiveEmailForServer
+                  ? { recipientEmail: effectiveEmailForServer }
                   : {}),
               }),
             });
@@ -300,6 +319,41 @@ export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentCompl
             >
               {error}
               <span className="block text-[9px] text-red-300/50 mt-1 uppercase tracking-widest">Tap to dismiss</span>
+            </div>
+          )}
+
+          {/* PR-49 C2 (Task 8): inline guest email field. Rendered only when
+              mode === 'guest'. Authenticated users have an account email; the
+              server reads it from the verified session cookie. The email here
+              is forwarded as recipientEmail on /api/verify-payment so the
+              guest can receive their share link by email — no account is
+              created. */}
+          {isGuestMode && (
+            <div className="mb-4">
+              <label
+                className="block text-[9px] uppercase tracking-[0.28em] text-luxury-stone/70 font-bold mb-2"
+                htmlFor="guest-delivery-email"
+              >
+                Where should we send your share link?
+              </label>
+              <input
+                id="guest-delivery-email"
+                type="email"
+                name="delivery-email"
+                autoComplete="email"
+                placeholder="your@email.com"
+                value={inlineEmail}
+                onChange={(e) => setInlineEmail(e.target.value)}
+                className="w-full bg-transparent border-b border-luxury-stone/30 py-2 px-1 text-[12px] text-luxury-ink focus:outline-none focus:border-luxury-gold"
+                style={
+                  inlineEmailLooksInvalid
+                    ? { borderColor: 'rgba(232, 136, 136, 0.55)' }
+                    : undefined
+                }
+              />
+              <p className="text-[9px] text-luxury-stone/55 tracking-wide mt-1.5 italic">
+                Optional. No account is created.
+              </p>
             </div>
           )}
 

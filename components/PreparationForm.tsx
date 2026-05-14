@@ -10,11 +10,14 @@ import {
 import { useMediaUploads } from '../hooks/useMediaUploads';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useDictation } from '../hooks/useDictation';
-import { CoupleData, Occasion, GiftType, Theme, Coupon, RevealMethod } from '../types.ts';
+import { CoupleData, Occasion, GiftType, Theme, Coupon, RevealMethod, AppStage } from '../types.ts';
 import { FEATURES } from '../config/features';
 import DraftResumeModal from './DraftResumeModal';
 import { consumeIntentionalEntry } from '../utils/intentionalEntry';
 import { isWithinLastMinutes } from '../utils/relativeTime';
+import { getActiveMode } from '../utils/activeMode';
+import { saveAndContinue as cloudSaveAndContinue } from '../utils/cloudDraftSave';
+import { UI_STAGE_TO_DRAFT_STATE } from '../hooks/draftStateLogic';
 
 const SILENT_RESTORE_WINDOW_MINUTES = 10;
 
@@ -152,7 +155,20 @@ export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainReque
     initialDraftRef.current.step ?? 1,
   );
 
-  usePreparationPersistence(data, step);
+  // PR-49 C2 (Task 4): mode is captured once at mount. Mode is bound at the
+  // entry-point gate and CANNOT change mid-flow (invariant I2). Reading via
+  // useState initializer guarantees a stable value across renders, which is
+  // required for the conditional persistence-hook gate below (Rules of Hooks:
+  // the hook is always called, but `enabled` toggles its effect).
+  const [mode] = useState(() => getActiveMode());
+
+  // Guest-mode autosave. Authenticated mode skips local persistence (cloud
+  // is sole authority — invariant I4 / anti-pattern A2). The hook is always
+  // invoked (Rules of Hooks); `enabled: false` makes the effect a no-op.
+  usePreparationPersistence(data, step, { enabled: mode === 'guest' });
+
+  const [stepSaveError, setStepSaveError] = useState<string | null>(null);
+  const [isStepSaving, setIsStepSaving] = useState(false);
 
   // One-shot data hydration. Step is hydrated via usePreparationState's
   // initialStep arg above; this effect merges the text-safe field values
@@ -379,10 +395,77 @@ export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainReque
     }));
   };
 
+  // PR-49 C2 (Task 4): mode-aware step advance. Guest mode advances locally
+  // (autosave persists in the background). Authenticated mode performs an
+  // explicit cloud save first and only advances on success. On 401, hard
+  // redirect to "/" (OQ3). On other errors, surface inline message and stay
+  // on the current step.
+  const advanceStepAuthenticated = async (
+    onAdvance: () => void,
+    isFinal: boolean,
+  ) => {
+    if (isStepSaving) return;
+    setIsStepSaving(true);
+    setStepSaveError(null);
+    try {
+      const draftState = UI_STAGE_TO_DRAFT_STATE[AppStage.PREPARE] ?? 'IN_PROGRESS';
+      const payload: Parameters<typeof cloudSaveAndContinue>[0] = {
+        data: { ...data, writingMode },
+        draftState,
+      };
+      const result = await cloudSaveAndContinue(payload);
+      if (result.kind === 'unauthorized') {
+        window.location.href = '/';
+        return;
+      }
+      if (result.kind === 'error') {
+        setStepSaveError(result.message);
+        return;
+      }
+      // ok
+      if (isFinal) {
+        if (previewAudioRef.current) previewAudioRef.current.pause();
+        onComplete({ ...data, writingMode });
+      } else {
+        onAdvance();
+      }
+    } finally {
+      setIsStepSaving(false);
+    }
+  };
+
+  // PR-49 C2 (Task 4): wrapper for the two Step-2 "Continue" buttons that
+  // bypass form submit (the desktop side-button and the mobile step-2 next
+  // button). Same mode-aware semantics as handleSubmit.
+  const handleNextStepFromStep2 = () => {
+    if (mode === 'authenticated') {
+      void advanceStepAuthenticated(
+        () => { next(); setPhase(1); },
+        false,
+      );
+      return;
+    }
+    next();
+    setPhase(1);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (step < 3) {
+    const isFinal = step === 3;
+
+    if (mode === 'authenticated') {
+      void advanceStepAuthenticated(
+        () => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          next();
+        },
+        isFinal,
+      );
+      return;
+    }
+
+    if (!isFinal) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       next();
     } else {
@@ -494,10 +577,13 @@ export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainReque
             ) : (
               <button
                 type="button"
-                onClick={() => { next(); setPhase(1); }}
-                className="hidden lg:block absolute -right-36 top-1/2 -translate-y-1/2 px-6 py-3 rounded-full bg-luxury-wine text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-[#3D1F1F] transition-all duration-300 shadow-lg whitespace-nowrap"
+                onClick={handleNextStepFromStep2}
+                disabled={isStepSaving}
+                className="hidden lg:block absolute -right-36 top-1/2 -translate-y-1/2 px-6 py-3 rounded-full bg-luxury-wine text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-[#3D1F1F] transition-all duration-300 shadow-lg whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Continue →
+                {mode === 'authenticated'
+                  ? (isStepSaving ? 'Saving…' : 'Save and Continue →')
+                  : 'Continue →'}
               </button>
             )}
 
@@ -910,10 +996,13 @@ export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainReque
               ) : (
                 <button
                   type="button"
-                  onClick={() => { next(); setPhase(1); }}
-                  className="px-10 py-4 bg-luxury-wine text-white font-bold rounded-full shadow-2xl hover:bg-[#3D1F1F] transition-all uppercase tracking-[0.3em] text-[10px] md:text-xs"
+                  onClick={handleNextStepFromStep2}
+                  disabled={isStepSaving}
+                  className="px-10 py-4 bg-luxury-wine text-white font-bold rounded-full shadow-2xl hover:bg-[#3D1F1F] transition-all uppercase tracking-[0.3em] text-[10px] md:text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Continue
+                  {mode === 'authenticated'
+                    ? (isStepSaving ? 'Saving…' : 'Save and Continue')
+                    : 'Continue'}
                 </button>
               )}
             </div>
@@ -1162,11 +1251,28 @@ export const PreparationForm: React.FC<Props> = ({ onComplete, onBeginAgainReque
            
            <button
              type="submit"
-             className="px-12 py-5 bg-luxury-wine text-white font-bold rounded-full shadow-2xl hover:bg-[#3D1F1F] transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs"
+             disabled={isStepSaving}
+             className="px-12 py-5 bg-luxury-wine text-white font-bold rounded-full shadow-2xl hover:bg-[#3D1F1F] transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs disabled:opacity-60 disabled:cursor-not-allowed"
            >
-             {step === 3 ? 'Generate Draft' : 'Continue'}
+             {/* PR-49 C2: mode-aware labels per strategy §8.1. Step 3 retains
+                 the 'Generate Draft' semantic regardless of mode — that click
+                 launches AI generation, not a stage save. */}
+             {step === 3
+               ? (isStepSaving ? 'Saving…' : 'Generate Draft')
+               : mode === 'authenticated'
+                 ? (isStepSaving ? 'Saving…' : 'Save and Continue')
+                 : 'Continue'}
            </button>
         </div>
+        {stepSaveError && (
+          <p
+            role="alert"
+            className="text-center text-xs text-luxury-gold/70 italic pb-4"
+            style={{ color: '#e88' }}
+          >
+            {stepSaveError}
+          </p>
+        )}
       </form>
     </div>
     </>

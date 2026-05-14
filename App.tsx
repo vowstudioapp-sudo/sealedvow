@@ -77,6 +77,7 @@ import { useLinkLoader, LoaderState } from './hooks/useLinkLoader';
 import { validateCoupleData } from './lib/coupleDataValidator.js';
 import { writeDraftFromExternal, peekDraft, writeStage, clearPreparationDraft } from './hooks/usePreparationPersistence';
 import { saveDraft, type SaveDraftInput } from './utils/saveDraft';
+import { saveAndContinue as cloudSaveAndContinue } from './utils/cloudDraftSave';
 import { pauseDraft, discardDraft } from './utils/lifecycleDraft';
 import { StaleRevisionModal } from './components/StaleRevisionModal';
 import { BeginNewPromptModal } from './components/BeginNewPromptModal';
@@ -141,7 +142,7 @@ type HydrationResolutionState =
   | 'resolved';
 import type { DraftState, PersistenceStatus } from './types/draft';
 import { DRAFT_STATE_ORDER } from './types/draft';
-import { UI_STAGE_TO_DRAFT_STATE } from './hooks/draftStateLogic';
+import { UI_STAGE_TO_DRAFT_STATE, appStageFromDraftState } from './hooks/draftStateLogic';
 import { getDemoData } from './data/demoData.ts';
 
 import { THEME_ORDER, THEME_SYSTEM } from './theme/themeSystem';
@@ -765,6 +766,60 @@ const App: React.FC = () => {
   // handlers (sign-in-time local↔cloud merge). Under dual-mode, mode is bound
   // at entry and reconciliation cannot exist (anti-pattern A3, A5, A12).
 
+  // PR-49 C2 (Task 5): authenticated-mode "Save and Continue" — cloud save
+  // followed by advance to MAIN_EXPERIENCE. Wired into RefineStage's existing
+  // onSaveAndContinueLater slot, conditional on getActiveMode() === 'authenticated'.
+  // Guest mode does not receive this prop; the affordance is not rendered.
+  //
+  // OQ3: 401 → hard redirect "/". Other errors → inline error, no advance.
+  // The advance target (MAIN_EXPERIENCE) is per the C2 prompt spec; this
+  // skips the PERSONAL_INTRO + QUESTION ceremonial chain by design.
+  const handleAuthenticatedSaveAndContinue = async () => {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+    try {
+      const candidate = UI_STAGE_TO_DRAFT_STATE[stage] ?? 'IN_PROGRESS';
+      const seed = draftRecord.seedDraftState;
+      const draftStateToSend: DraftState =
+        seed !== null && DRAFT_STATE_ORDER[seed] > DRAFT_STATE_ORDER[candidate]
+          ? seed
+          : candidate;
+
+      const result = await cloudSaveAndContinue({
+        data: data ?? {},
+        draftState: draftStateToSend,
+        ...(draftRecord.draftId ? { draftId: draftRecord.draftId } : {}),
+        ...(typeof draftRecord.revision === 'number'
+          ? { expectedRevision: draftRecord.revision }
+          : {}),
+      });
+
+      if (!mountedRef.current) return;
+
+      if (result.kind === 'unauthorized') {
+        window.location.href = '/';
+        return;
+      }
+      if (result.kind === 'error') {
+        setLastSaveError(result.message);
+        return;
+      }
+
+      // ok
+      setDraftRecord({
+        draftId: result.draftId,
+        seedDraftState: draftStateToSend,
+        revision: null,
+      });
+      setLastSaveError(null);
+      setLastSaveSuccessAt(Date.now());
+      safeSetStage(AppStage.MAIN_EXPERIENCE);
+      setIsCreatorPreview(true);
+    } finally {
+      if (mountedRef.current) saveInFlightRef.current = false;
+    }
+  };
+
   const handleSaveAndContinueLater = () => {
     // Concurrency guard — prevent overlapping saves from rapid re-clicks.
     if (saveInFlightRef.current) return;
@@ -949,6 +1004,17 @@ const App: React.FC = () => {
         });
         if (typeof json.updatedAt === 'number') {
           setLastSaveSuccessAt(json.updatedAt);
+        }
+
+        // PR-49 C2 (LOCK-1): authenticated stage restoration. Map the
+        // server-persisted draftState to the App stage the user resumes at.
+        // null mapping (COMPLETED or unrecognized) → no setStage call; the
+        // user lands at the route default (PREPARE). For IN_PROGRESS with no
+        // data, the mapping returns PREPARE — equivalent to "no draft" since
+        // that's also the route default; safe to setStage either way.
+        const resumeStage = appStageFromDraftState(json.draftState);
+        if (resumeStage !== null) {
+          setStage(resumeStage);
         }
       })
       .catch(() => {
@@ -1626,7 +1692,15 @@ const App: React.FC = () => {
                 // extended selectiveHydrate allowlist preserves refined-state
                 // fidelity (myth, sacredLocation, video, audio, aiImageUrl)
                 // on refresh.
-                writeDraftFromExternal({ ...enrichedData, finalLetter });
+                //
+                // PR-49 C2 (LOCK-4): gated on guest mode only. Authenticated
+                // mode is forbidden from writing localStorage; cloud is the
+                // sole authority. Authenticated REFINE→PREPARE back-navigation
+                // preserves content via App-level setData (line 1629), not
+                // localStorage.
+                if (getActiveMode() === 'guest') {
+                  writeDraftFromExternal({ ...enrichedData, finalLetter });
+                }
               }}
               onBack={() => safeSetStage(AppStage.PREPARE)}
               onUpdateLetter={(letter) => {
@@ -1635,10 +1709,16 @@ const App: React.FC = () => {
                 // is unmounted during REFINE, so its persistence hook can't see
                 // this change — writeDraftFromExternal merges into the existing
                 // draft (preserving step) so Back-to-Details restores fully.
+                //
+                // PR-49 C2 (LOCK-4): gated on guest mode only (A2 invariant).
                 setData(prev => (prev ? { ...prev, finalLetter: letter } : prev));
-                writeDraftFromExternal({ finalLetter: letter });
+                if (getActiveMode() === 'guest') {
+                  writeDraftFromExternal({ finalLetter: letter });
+                }
               }}
-              onSaveAndContinueLater={handleSaveAndContinueLater}
+              {...(getActiveMode() === 'authenticated'
+                ? { onSaveAndContinueLater: handleAuthenticatedSaveAndContinue }
+                : {})}
               lastSaveSuccessAt={lastSaveSuccessAt}
               lastSaveError={lastSaveError}
               clearLastSaveError={clearLastSaveError}
@@ -1732,7 +1812,6 @@ const App: React.FC = () => {
                     // email field; authenticated users proceed directly.
                     safeSetStage(AppStage.PAYMENT);
                   }}
-                  onSaveAndContinueLater={handleSaveAndContinueLater}
                   lastSaveSuccessAt={lastSaveSuccessAt}
                   lastSaveError={lastSaveError}
                   clearLastSaveError={clearLastSaveError}
