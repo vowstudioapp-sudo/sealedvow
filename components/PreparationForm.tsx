@@ -383,16 +383,62 @@ export const PreparationForm: React.FC<Props> = ({
     }),
   };
 
+  // PR-49 Phase 1 QA fix: phase navigation is a discrete user event, not
+  // continuous typing. Routing it through the 1.5s autosave debounce created
+  // a window where refresh after a phase click restored the previous phase
+  // (server hadn't been told yet). Phase changes now persist immediately —
+  // same pattern as step transitions via advanceStepAuthenticated. Data
+  // typing autosave is unchanged (still debounced).
+  //
+  // lastPersistedPhaseRef tracks the latest phase value we've committed to
+  // persist. Updated synchronously at intent time (before the network call)
+  // so back-to-back same-value requests are skipped. Initialized from the
+  // cloud-restored phase so the form's first visible phase doesn't trigger
+  // a redundant save.
+  const lastPersistedPhaseRef = useRef<1 | 2 | 3>(initialPhase ?? 1);
+
+  const persistPhaseImmediate = async (newPhase: 1 | 2 | 3) => {
+    if (mode !== 'authenticated') return;
+    if (isStepSaving) return;
+    if (newPhase === lastPersistedPhaseRef.current) return;
+    lastPersistedPhaseRef.current = newPhase;
+    try {
+      const draftState = UI_STAGE_TO_DRAFT_STATE[AppStage.PREPARE] ?? 'IN_PROGRESS';
+      const result = await cloudSaveAndContinue({
+        data: { ...data, writingMode },
+        draftState,
+        draftId: cloudDraftId ?? null,
+        step,
+        phase: newPhase,
+      });
+      if (result.kind === 'auth_required') {
+        window.location.href = '/';
+        return;
+      }
+      if (result.kind === 'ok' && onCloudDraftSaved) {
+        onCloudDraftSaved(result.draftId, step, newPhase);
+      }
+      // Silent on 'error' — the debounced autosave will retry with the
+      // same phase value on the next data/phase change cycle.
+    } catch {
+      /* swallow */
+    }
+  };
+
   const goNextPhase = () => {
     setPhaseDirection(1);
     // Caller gates on phase < 3 at click sites, so p+1 stays in 1|2|3.
-    setPhase(p => (p + 1) as 1 | 2 | 3);
+    const newPhase = (phase + 1) as 1 | 2 | 3;
+    setPhase(newPhase);
+    void persistPhaseImmediate(newPhase);
   };
 
   const goBackPhase = () => {
     setPhaseDirection(-1);
     // Caller gates on phase > 1 at click sites, so p-1 stays in 1|2|3.
-    setPhase(p => (p - 1) as 1 | 2 | 3);
+    const newPhase = (phase - 1) as 1 | 2 | 3;
+    setPhase(newPhase);
+    void persistPhaseImmediate(newPhase);
   };
   
   const fileInputRef = useRef<HTMLInputElement>(null);
