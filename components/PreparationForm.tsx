@@ -1453,21 +1453,22 @@ export const PreparationForm: React.FC<Props> = ({
         )}
 
         <div className={`pt-8 pb-20 flex justify-between items-center border-t border-white/10 ${(step as number) === 2 ? "hidden" : ""}`}>
-           {/* Secondary navigation cluster — left side. Back to Home is
-               always present in this row; the step-Back button joins it
-               from Step 2 onward (Step 1 has no "previous step"). Both
-               reuse the same in-flow back-button styling for visual
-               continuity. Persistence is untouched on either: autosave
-               keeps the draft alive on the way out. */}
+           {/* Secondary navigation cluster — left side. Back to Home only
+               appears on Step 1 (a quiet exit point before the user has
+               committed to any step progression). From Step 2 onward the
+               step-Back button takes its place. Persistence is untouched
+               either way: autosave keeps the draft alive on the way out. */}
            <div className="flex items-center gap-3 md:gap-4">
-             <button
-               type="button"
-               onClick={() => { window.location.href = '/'; }}
-               aria-label="Back to Home"
-               className="px-12 py-5 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs font-bold shadow-2xl"
-             >
-               ← Back to Home
-             </button>
+             {step === 1 && (
+               <button
+                 type="button"
+                 onClick={() => { window.location.href = '/'; }}
+                 aria-label="Back to Home"
+                 className="px-12 py-5 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs font-bold shadow-2xl"
+               >
+                 ← Back to Home
+               </button>
+             )}
              {step > 1 && (
                <button type="button" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); back(); }} className="px-12 py-5 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs font-bold shadow-2xl">
                  ← Back
