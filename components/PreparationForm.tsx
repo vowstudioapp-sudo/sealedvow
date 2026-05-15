@@ -21,6 +21,56 @@ import { UI_STAGE_TO_DRAFT_STATE } from '../hooks/draftStateLogic';
 
 const SILENT_RESTORE_WINDOW_MINUTES = 10;
 
+// "How long together?" structured input. Stored field stays a string for
+// backward-compat with the AI prompt / receiver caption consumers — we
+// just constrain the shape to "<n> <days|months|years>" so users can't
+// type free prose like "15 years of everything" anymore. Legacy free-text
+// values that don't match the pattern surface as an empty amount + Years
+// default; the user is then prompted to fill the structured fields.
+type TimeUnit = 'Days' | 'Months' | 'Years';
+
+function parseTimeShared(value: string | undefined): { amount: string; unit: TimeUnit } {
+  if (!value) return { amount: '', unit: 'Years' };
+  const m = value.trim().match(/^(\d{1,2})\s*(day|days|month|months|year|years)$/i);
+  if (!m) return { amount: '', unit: 'Years' };
+  const u = m[2].toLowerCase();
+  const unit: TimeUnit =
+    u.startsWith('day') ? 'Days' :
+    u.startsWith('month') ? 'Months' :
+    'Years';
+  return { amount: m[1], unit };
+}
+
+function composeTimeShared(amount: string, unit: TimeUnit): string {
+  const trimmed = amount.replace(/\D/g, '').slice(0, 2);
+  if (!trimmed) return '';
+  return `${trimmed} ${unit.toLowerCase()}`;
+}
+
+// Google Maps link validation. Accepts empty OR an http(s) URL whose host
+// is one of the four canonical Google Maps share-link surfaces:
+//   maps.app.goo.gl/...      (mobile share)
+//   goo.gl/maps/...          (legacy short)
+//   maps.google.<tld>/...    (web maps subdomain)
+//   [www.]google.<tld>/maps/...  (web maps under root host)
+// Rejects bare text, non-URL strings, and non-Google hosts.
+function isValidGoogleMapsUrl(value: string): boolean {
+  if (!value || !value.trim()) return true;
+  let u: URL;
+  try {
+    u = new URL(value.trim());
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  if (host === 'maps.app.goo.gl') return true;
+  if (host === 'goo.gl' && u.pathname.startsWith('/maps')) return true;
+  if (host.startsWith('maps.google.')) return true;
+  if ((host === 'google.com' || host.endsWith('.google.com')) && u.pathname.startsWith('/maps')) return true;
+  return false;
+}
+
 interface Props {
   onComplete: (data: CoupleData) => void;
   // PR-48 Phase 4 — optional cloud-aware Begin Again hook. When provided,
@@ -240,6 +290,12 @@ export const PreparationForm: React.FC<Props> = ({
 
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
   const [isStepSaving, setIsStepSaving] = useState(false);
+
+  // Validation-only state for the optional Google Maps link. Cleared on
+  // every keystroke; populated on blur when the value is non-empty AND
+  // not a valid Google Maps URL. Does not block submit (the field is
+  // optional and persistence is unchanged).
+  const [mapLinkError, setMapLinkError] = useState<string | null>(null);
 
   // PR-49 Phase 1: authenticated-mode continuous autosave. P3 doctrine
   // (no autosave) was revoked because it caused silent data loss (photos
@@ -992,7 +1048,38 @@ export const PreparationForm: React.FC<Props> = ({
                       
                       <div className="space-y-3 group">
                         <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">How long together?</label>
-                        <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink placeholder-luxury-ink/50" placeholder="e.g. 10 years, or just a few months" value={data.timeShared} onChange={e => updateData({ timeShared: e.target.value })} required />
+                        {(() => {
+                          const parsed = parseTimeShared(data.timeShared);
+                          return (
+                            <div className="flex gap-3">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="\d*"
+                                maxLength={2}
+                                className="w-24 bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink placeholder-luxury-ink/50"
+                                placeholder="0"
+                                value={parsed.amount}
+                                onChange={(e) => {
+                                  const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                  updateData({ timeShared: composeTimeShared(digitsOnly, parsed.unit) });
+                                }}
+                                required
+                              />
+                              <select
+                                className="flex-1 bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all font-serif-elegant text-xl italic text-luxury-ink"
+                                value={parsed.unit}
+                                onChange={(e) => {
+                                  updateData({ timeShared: composeTimeShared(parsed.amount, e.target.value as TimeUnit) });
+                                }}
+                              >
+                                <option value="Days">Days</option>
+                                <option value="Months">Months</option>
+                                <option value="Years">Years</option>
+                              </select>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="space-y-3 group">
@@ -1027,14 +1114,32 @@ export const PreparationForm: React.FC<Props> = ({
                           </div>
                           <div>
                             <label className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-luxury-ink/80 group-focus-within:text-luxury-ink transition-colors">Google Maps Link (Optional)</label>
-                            <input 
-                              type="text" 
-                              className="w-full bg-white/50 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all text-xs text-luxury-ink placeholder-luxury-ink/50" 
-                              placeholder="Paste a direct Google Maps link for 100% accuracy..." 
-                              value={data.manualMapLink || ''} 
-                              onChange={e => updateData({ manualMapLink: e.target.value })} 
+                            <input
+                              type="url"
+                              inputMode="url"
+                              className="w-full bg-white/50 border-b-2 border-luxury-ink/30 py-3 px-3 rounded-t focus:border-luxury-ink outline-none transition-all text-xs text-luxury-ink placeholder-luxury-ink/50"
+                              placeholder="Paste a direct Google Maps link for 100% accuracy..."
+                              value={data.manualMapLink || ''}
+                              onChange={e => {
+                                updateData({ manualMapLink: e.target.value });
+                                // Clear inline error eagerly while the user
+                                // is editing — re-validate on blur.
+                                if (mapLinkError) setMapLinkError(null);
+                              }}
+                              onBlur={e => {
+                                setMapLinkError(
+                                  isValidGoogleMapsUrl(e.target.value)
+                                    ? null
+                                    : 'Enter a valid Google Maps link or leave this field empty.'
+                                );
+                              }}
+                              aria-invalid={mapLinkError ? 'true' : undefined}
                             />
-                            <p className="text-[11px] text-luxury-ink/70 italic text-right mt-1 font-medium">If provided, we will use this exact location instead of searching.</p>
+                            {mapLinkError ? (
+                              <p role="alert" className="text-[11px] italic text-right mt-1 font-medium" style={{ color: '#c4624b' }}>{mapLinkError}</p>
+                            ) : (
+                              <p className="text-[11px] text-luxury-ink/70 italic text-right mt-1 font-medium">If provided, we will use this exact location instead of searching.</p>
+                            )}
                           </div>
                         </div>
                       )}
