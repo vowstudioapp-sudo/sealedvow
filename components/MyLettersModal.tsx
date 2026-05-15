@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { setActiveMode } from '../utils/activeMode';
+import { markCloudDraftExpected } from '../utils/cloudDraftExpectation';
 
 interface Letter {
   sessionKey: string;
@@ -128,10 +130,26 @@ export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }
   if (!isOpen) return null;
 
   const handleResumeDraft = () => {
+    // PR-49 Phase 1 QA: mirror LandingPage handleEnter's 200-non-COMPLETED
+    // setup. Both writes must happen BEFORE the navigation so they survive
+    // the full reload to /letter/create:
+    //
+    // 1. setActiveMode('authenticated') — hydration effect's mode-read
+    //    bails on mode===null; defensive write covers any edge case where
+    //    the user reaches Dashboard with mode unset.
+    // 2. markCloudDraftExpected() — flips the authHydrationComplete lazy
+    //    init at the next App.tsx mount to false, causing the spinner to
+    //    show and PreparationForm's mount to wait until hydration's
+    //    setData populates App.data. Without this, PreparationForm mounts
+    //    too early with initialData=undefined and the form-seed lock
+    //    (initialDataSource useMemo) prevents cloud data from ever
+    //    reaching the controlled inputs.
+    setActiveMode('authenticated');
+    markCloudDraftExpected();
     onClose();
-    // PR-49 Phase 1 QA: resume flows skip OccasionSelector — the draft
-    // already has its occasion locked. Navigate directly to /letter/create.
-    // App.tsx hydration restores the saved state on mount.
+    // Resume flows skip OccasionSelector — the draft already has its
+    // occasion locked. Navigate directly to /letter/create. App.tsx
+    // hydration restores the saved state on mount.
     window.location.href = '/letter/create';
   };
 
