@@ -47,6 +47,30 @@ function composeTimeShared(amount: string, unit: TimeUnit): string {
   return `${trimmed} ${unit.toLowerCase()}`;
 }
 
+// Soundtrack URL validation. Accepts empty OR an http(s) URL whose host
+// matches YouTube / YouTube Music / Spotify share surfaces:
+//   youtube.com (and any subdomain — covers www, m, music)
+//   youtu.be                  (YouTube short-link)
+//   open.spotify.com          (Spotify canonical share host)
+//   spotify.link              (Spotify mobile smart-link)
+// Rejects bare text, non-URL strings, MP3 URLs, and every other host.
+function isValidSoundtrackUrl(value: string): boolean {
+  if (!value || !value.trim()) return true;
+  let u: URL;
+  try {
+    u = new URL(value.trim());
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  if (host === 'youtube.com' || host.endsWith('.youtube.com')) return true;
+  if (host === 'youtu.be') return true;
+  if (host === 'open.spotify.com') return true;
+  if (host === 'spotify.link') return true;
+  return false;
+}
+
 // Google Maps link validation. Accepts empty OR an http(s) URL whose host
 // is one of the four canonical Google Maps share-link surfaces:
 //   maps.app.goo.gl/...      (mobile share)
@@ -296,6 +320,13 @@ export const PreparationForm: React.FC<Props> = ({
   // not a valid Google Maps URL. Does not block submit (the field is
   // optional and persistence is unchanged).
   const [mapLinkError, setMapLinkError] = useState<string | null>(null);
+
+  // Soundtrack URL validation. Same UX pattern as mapLinkError (clear on
+  // keystroke, set on blur). Unlike the maps field, this one ALSO blocks
+  // Step 3 submit / generation — invalid URLs must not enter the final
+  // generation pipeline. Cleared automatically when the field is empty
+  // (musicType resets to 'preset', which the validator treats as valid).
+  const [musicUrlError, setMusicUrlError] = useState<string | null>(null);
 
   // PR-49 Phase 1: authenticated-mode continuous autosave. P3 doctrine
   // (no autosave) was revoked because it caused silent data loss (photos
@@ -717,6 +748,16 @@ export const PreparationForm: React.FC<Props> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Block generation on invalid soundtrack URL. Field is optional —
+    // clearing it resets musicType to 'preset', so this guard only
+    // fires when the user actively pasted something that isn't a
+    // YouTube / YouTube Music / Spotify link. Surfaces the same inline
+    // error so the user sees why submit didn't advance.
+    if (step === 3 && data.musicType === 'youtube' && !isValidSoundtrackUrl(data.musicUrl || '')) {
+      setMusicUrlError('Enter a valid YouTube, YouTube Music, or Spotify link.');
+      return;
+    }
 
     const isFinal = step === 3;
 
@@ -1464,10 +1505,11 @@ export const PreparationForm: React.FC<Props> = ({
                         </span>
                     </div>
                     
-                    <input 
-                        type="text" 
+                    <input
+                        type="url"
+                        inputMode="url"
                         className="w-full bg-luxury-ink/5 border-2 border-luxury-ink/20 py-3 px-4 rounded-lg focus:border-luxury-gold outline-none text-base text-luxury-ink placeholder-luxury-ink/50"
-                        placeholder="e.g. https://www.youtube.com/watch?v=..." 
+                        placeholder="e.g. https://www.youtube.com/watch?v=..."
                         value={data.musicType === 'youtube' ? data.musicUrl : ''}
                         onChange={e => {
                            const val = e.target.value;
@@ -1476,8 +1518,25 @@ export const PreparationForm: React.FC<Props> = ({
                            } else {
                              updateData({ musicType: 'preset', musicUrl: MUSIC_PRESETS[0].url });
                            }
+                           // Clear inline error eagerly while the user is
+                           // editing; re-validate on blur. Matches the
+                           // Google Maps field's validation UX.
+                           if (musicUrlError) setMusicUrlError(null);
                         }}
+                        onBlur={e => {
+                          setMusicUrlError(
+                            isValidSoundtrackUrl(e.target.value)
+                              ? null
+                              : 'Enter a valid YouTube, YouTube Music, or Spotify link.'
+                          );
+                        }}
+                        aria-invalid={musicUrlError ? 'true' : undefined}
                     />
+                    {musicUrlError && (
+                      <p role="alert" className="text-[11px] italic mt-1 font-medium" style={{ color: '#c4624b' }}>
+                        {musicUrlError}
+                      </p>
+                    )}
 
                     {data.musicType === 'youtube' && (
                         <div className="flex items-start space-x-2 mt-4 p-3 bg-luxury-ink/5 rounded-lg border border-luxury-ink/10">
