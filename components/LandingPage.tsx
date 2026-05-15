@@ -14,12 +14,24 @@ import {
   markCloudDraftExpected,
   clearCloudDraftExpected,
 } from '../utils/cloudDraftExpectation';
+import type { DraftState } from '../types/draft';
 
 interface Props {
   onEnter: () => void;
+  // LandingPage perf fix: when App.tsx's GET /api/draft has already resolved,
+  // handleEnter uses the in-memory result instead of issuing a duplicate
+  // network call. Optional so non-cloud entry points (the showLogin Google
+  // path, etc.) keep working without rewiring. When undefined / false, the
+  // existing await-fetch fallback runs unchanged.
+  cloudDraftHydrationResolved?: boolean;
+  hydratedDraftState?: DraftState | null;
 }
 
-export const LandingPage: React.FC<Props> = ({ onEnter }) => {
+export const LandingPage: React.FC<Props> = ({
+  onEnter,
+  cloudDraftHydrationResolved = false,
+  hydratedDraftState = null,
+}) => {
   const [isVisible,   setIsVisible]   = useState(false);
   const [isEntering,  setIsEntering]  = useState(false);
   const [progress,    setProgress]    = useState(0);
@@ -145,6 +157,26 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
     // before proceeding. If one exists (non-COMPLETED), surface the
     // Continue/Discard prompt. Otherwise proceed to a fresh /create.
     setActiveMode('authenticated');
+
+    // LandingPage perf fix: when App.tsx hydration has already resolved
+    // GET /api/draft, use that in-memory result instead of issuing a
+    // duplicate network round-trip. This collapses the previous 3+s
+    // click-to-modal delay into the next render frame. The fallback
+    // await-fetch below still covers the click-before-hydration race
+    // (fresh tab where mode wasn't 'authenticated' when the hydration
+    // effect first fired, so it deferred).
+    if (cloudDraftHydrationResolved) {
+      if (hydratedDraftState && hydratedDraftState !== 'COMPLETED') {
+        markCloudDraftExpected();
+        setShowResumeOrDiscard(true);
+        return;
+      }
+      // No draft, or COMPLETED (not resumable). Proceed fresh. Matches the
+      // 404 / COMPLETED branches of the await-fetch fallback below.
+      clearCloudDraftExpected();
+      proceedToCreate();
+      return;
+    }
 
     if (isCheckingForDraft) return;
     setIsCheckingForDraft(true);

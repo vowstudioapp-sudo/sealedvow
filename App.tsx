@@ -611,6 +611,15 @@ const App: React.FC = () => {
     if (!hasCloudDraftExpected()) return true;
     return false;
   });
+
+  // PR-49 LandingPage perf fix: distinct from authHydrationComplete (which is
+  // a PreparationForm-mount spinner gate and is true-by-default for the
+  // no-flag case). cloudDraftHydrationResolved tracks whether the
+  // GET /api/draft request has actually returned. Used by LandingPage to
+  // decide ResumeOrDiscardModal synchronously instead of issuing its own
+  // duplicate fetch. False until the hydration effect's terminal handlers
+  // run; reset on sign-out and on fresh-sign-in restart.
+  const [cloudDraftHydrationResolved, setCloudDraftHydrationResolved] = useState(false);
   const [lastSaveSuccessAt, setLastSaveSuccessAt] = useState<number | null>(null);
   const [lastSaveError, setLastSaveError] = useState<string | null>(null);
 
@@ -999,6 +1008,9 @@ const App: React.FC = () => {
       // PreparationForm without spinning. The fresh-sign-in effect below
       // resets it back to false when the next authenticated lifecycle begins.
       setAuthHydrationComplete(true);
+      // LandingPage perf fix: clear resolved-flag so a re-sign-in cannot
+      // reuse stale draft state for the next user's modal decision.
+      setCloudDraftHydrationResolved(false);
       // PR-49 Issue-1: defensive clear (the Phase A lifecycle listener in
       // useAuth also clears this flag on signed-out; doing it here too
       // covers any non-Phase-A path that lands here).
@@ -1045,6 +1057,8 @@ const App: React.FC = () => {
           clearCloudDraftExpected();
           // LOCK-C: unblock PREPARE render — no draft to wait on.
           setAuthHydrationComplete(true);
+          // LandingPage perf fix: hydration GET resolved (no draft).
+          setCloudDraftHydrationResolved(true);
           return;
         }
         if (!res.ok) {
@@ -1052,6 +1066,10 @@ const App: React.FC = () => {
           // LOCK-C: unblock PREPARE render so the user sees an empty form
           // with the inline error rather than an indefinite spinner.
           setAuthHydrationComplete(true);
+          // LandingPage perf fix: hydration GET resolved (failed). Falls
+          // through to proceedToCreate at LandingPage — same as today's
+          // defensive fallback in handleEnter.
+          setCloudDraftHydrationResolved(true);
           return;
         }
         const json = await res.json() as {
@@ -1117,12 +1135,20 @@ const App: React.FC = () => {
         // LOCK-C: 200-success terminal. Cloud data is in App.tsx state;
         // PreparationForm can now mount safely with initialData={data}.
         setAuthHydrationComplete(true);
+        // LandingPage perf fix: hydration GET resolved with a draft.
+        // draftRecord.seedDraftState now reflects server state, so
+        // LandingPage's handleEnter can decide the modal synchronously.
+        setCloudDraftHydrationResolved(true);
       })
       .catch(() => {
         if (!cancelled) {
           setLastSaveError("Couldn't load your cloud draft. Try again in a moment.");
           // LOCK-C: error terminal. Same rationale as the !res.ok branch.
           setAuthHydrationComplete(true);
+          // LandingPage perf fix: GET resolved (network failure). Falls
+          // through to proceedToCreate on click — same as the existing
+          // defensive .catch fallback in handleEnter.
+          setCloudDraftHydrationResolved(true);
         }
       });
 
@@ -1161,6 +1187,10 @@ const App: React.FC = () => {
       // Only spin when we expect a draft to restore. Fresh users with no
       // known draft skip the spinner (matches lazy-init logic).
       setAuthHydrationComplete(false);
+      // LandingPage perf fix: a new authenticated lifecycle is starting;
+      // last cycle's resolved-flag is no longer authoritative for the
+      // upcoming user. Cleared in lockstep with the spinner gate.
+      setCloudDraftHydrationResolved(false);
     }
   }, [authLoading]);
 
@@ -1798,7 +1828,11 @@ const App: React.FC = () => {
             )}
           
           {stage === AppStage.LANDING && !isReceiverLink && (
-            <LandingPage onEnter={handleEnterStudio} />
+            <LandingPage
+              onEnter={handleEnterStudio}
+              cloudDraftHydrationResolved={cloudDraftHydrationResolved}
+              hydratedDraftState={draftRecord.seedDraftState}
+            />
           )}
 
           {/* PR-49 C2 hydration hotfix (LOCK-C/LOCK-E): authenticated PREPARE
