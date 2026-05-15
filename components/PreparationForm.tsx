@@ -47,6 +47,83 @@ function composeTimeShared(amount: string, unit: TimeUnit): string {
   return `${trimmed} ${unit.toLowerCase()}`;
 }
 
+// "Booking or Surprise Link" (data.giftLink) validation. Two-layer model
+// kept deliberately small — the field accepts an open-ended set of
+// emotionally meaningful surfaces (hotels, flights, gifts, events,
+// restaurant bookings, shared plans, travel/shopping/docs), so we DO NOT
+// enumerate a brand whitelist. Layer 1 enforces structural sanity; a
+// small denylist (Layer 1.5) blocks the specific abuse classes flagged
+// in product review. Return shape is a discriminated reason so future
+// work can swap in richer messages or category classification without
+// changing the call site.
+type GiftLinkRejectReason = 'invalid' | 'shortener' | 'blocked_host';
+
+const GIFT_LINK_SHORTENER_HOSTS: readonly string[] = [
+  'bit.ly', 'tinyurl.com', 't.co', 'is.gd', 'ow.ly',
+  'buff.ly', 'cutt.ly', 'rebrand.ly', 'lnkd.in', 'goo.gl',
+];
+
+const GIFT_LINK_BLOCKED_HOSTS: readonly string[] = [
+  // Messaging / invite surfaces — almost always recipient-hostile in a
+  // surprise/gift context.
+  'discord.gg', 'discord.com', 'discordapp.com',
+  't.me', 'telegram.me', 'telegram.org',
+  'chat.whatsapp.com', 'wa.me', 'api.whatsapp.com',
+  // Adult — out of scope for the emotional intent of this field.
+  'pornhub.com', 'xvideos.com', 'xnxx.com', 'redtube.com',
+  'onlyfans.com', 'fansly.com',
+  // Crypto/trading exchanges and NFT marketplaces.
+  'binance.com', 'coinbase.com', 'kraken.com', 'bybit.com', 'okx.com',
+  'uniswap.org', 'opensea.io',
+  // Bio-link aggregators — common spam/phishing surface; obscure destination.
+  'linktr.ee', 'beacons.ai', 'lnk.bio', 'bio.link', 'carrd.co',
+];
+
+function hostMatchesEntry(host: string, entry: string): boolean {
+  return host === entry || host.endsWith('.' + entry);
+}
+
+function validateGiftLink(value: string): { reason: GiftLinkRejectReason } | null {
+  if (!value || !value.trim()) return null;
+  const trimmed = value.trim();
+  if (trimmed.length > 2000) return { reason: 'invalid' };
+  let u: URL;
+  try {
+    u = new URL(trimmed);
+  } catch {
+    return { reason: 'invalid' };
+  }
+  if (u.protocol !== 'https:') return { reason: 'invalid' };
+  const host = u.hostname.toLowerCase();
+  if (!host) return { reason: 'invalid' };
+  if (host === 'localhost') return { reason: 'invalid' };
+  // Bare-IP literals (IPv4 dotted-quad or IPv6 with colons) — never a
+  // legitimate gift/booking surface.
+  if (/^\d+(?:\.\d+){3}$/.test(host)) return { reason: 'invalid' };
+  if (host.includes(':')) return { reason: 'invalid' };
+  // Must look like a registrable domain (has at least one dot).
+  if (!host.includes('.')) return { reason: 'invalid' };
+  for (const entry of GIFT_LINK_SHORTENER_HOSTS) {
+    if (hostMatchesEntry(host, entry)) return { reason: 'shortener' };
+  }
+  for (const entry of GIFT_LINK_BLOCKED_HOSTS) {
+    if (hostMatchesEntry(host, entry)) return { reason: 'blocked_host' };
+  }
+  return null;
+}
+
+function giftLinkErrorMessage(reason: GiftLinkRejectReason): string {
+  switch (reason) {
+    case 'shortener':
+      return 'Shortened links hide where they go — please paste the full link.';
+    case 'blocked_host':
+      return "This kind of link doesn't fit the gift or surprise field.";
+    case 'invalid':
+    default:
+      return 'Use a direct https link — a booking, ticket, gift, or shared plan.';
+  }
+}
+
 // Soundtrack URL validation. Accepts empty OR an http(s) URL whose host
 // matches YouTube / YouTube Music / Spotify share surfaces:
 //   youtube.com (and any subdomain — covers www, m, music)
@@ -327,6 +404,12 @@ export const PreparationForm: React.FC<Props> = ({
   // generation pipeline. Cleared automatically when the field is empty
   // (musicType resets to 'preset', which the validator treats as valid).
   const [musicUrlError, setMusicUrlError] = useState<string | null>(null);
+
+  // "Booking or Surprise Link" validation. Same UX shape as the two above:
+  // clear-on-keystroke, validate-on-blur. Submit gate fires once on Step 3
+  // when hasGift is on AND the URL fails structural validation — the
+  // user fixes or clears, then can submit. Field stays optional otherwise.
+  const [giftLinkError, setGiftLinkError] = useState<string | null>(null);
 
   // PR-49 Phase 1: authenticated-mode continuous autosave. P3 doctrine
   // (no autosave) was revoked because it caused silent data loss (photos
@@ -757,6 +840,19 @@ export const PreparationForm: React.FC<Props> = ({
     if (step === 3 && data.musicType === 'youtube' && !isValidSoundtrackUrl(data.musicUrl || '')) {
       setMusicUrlError('Enter a valid YouTube, YouTube Music, or Spotify link.');
       return;
+    }
+
+    // Block generation on invalid gift/booking link. Field is optional;
+    // empty is fine. Only fires when the Grand Gesture is enabled AND
+    // the user typed something AND that something fails structural or
+    // denylist validation. One-shot block — the user fixes/clears and
+    // re-submits.
+    if (step === 3 && data.hasGift && (data.giftLink || '').trim()) {
+      const result = validateGiftLink(data.giftLink || '');
+      if (result) {
+        setGiftLinkError(giftLinkErrorMessage(result.reason));
+        return;
+      }
     }
 
     const isFinal = step === 3;
@@ -1608,7 +1704,27 @@ export const PreparationForm: React.FC<Props> = ({
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold uppercase tracking-widest text-luxury-ink/60 block">Booking or Surprise Link <span className="text-luxury-ink/40 normal-case italic">(optional)</span></label>
-                            <input type="text" className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 focus:border-luxury-ink outline-none text-base placeholder-luxury-ink/50" placeholder="e.g. https://booking-confirmation.com/..." value={data.giftLink} onChange={e => updateData({ giftLink: e.target.value })} />
+                            <input
+                              type="url"
+                              inputMode="url"
+                              className="w-full bg-luxury-ink/5 border-b-2 border-luxury-ink/30 py-3 px-3 focus:border-luxury-ink outline-none text-base placeholder-luxury-ink/50"
+                              placeholder="e.g. https://booking-confirmation.com/..."
+                              value={data.giftLink}
+                              onChange={e => {
+                                updateData({ giftLink: e.target.value });
+                                if (giftLinkError) setGiftLinkError(null);
+                              }}
+                              onBlur={e => {
+                                const result = validateGiftLink(e.target.value);
+                                setGiftLinkError(result ? giftLinkErrorMessage(result.reason) : null);
+                              }}
+                              aria-invalid={giftLinkError ? 'true' : undefined}
+                            />
+                            {giftLinkError && (
+                              <p role="alert" className="text-[11px] italic mt-1 font-medium" style={{ color: '#c4624b' }}>
+                                {giftLinkError}
+                              </p>
+                            )}
                         </div>
                     </div>
                 )}
