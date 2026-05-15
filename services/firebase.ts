@@ -29,6 +29,13 @@ export const auth = getAuth(app);
 
 export async function signInWithGoogle(): Promise<User> {
   const provider = new GoogleAuthProvider();
+  // Force the Google account chooser on every sign-in attempt. Without
+  // prompt=select_account, Google silently reuses the browser's active
+  // session, which prevents users from switching accounts after sign-out
+  // without clearing cookies. Provider-level config only — no change to
+  // Firebase session persistence or the downstream /api/auth/session
+  // exchange below.
+  provider.setCustomParameters({ prompt: 'select_account' });
   const { user } = await signInWithPopup(auth, provider);
   const idToken = await user.getIdToken();
 
