@@ -192,7 +192,10 @@ export const LandingPage: React.FC<Props> = ({ onEnter }) => {
 
   const handleResumeContinue = () => {
     setShowResumeOrDiscard(false);
-    proceedToCreate();
+    // PR-49 Phase 1 QA: resume flows skip OccasionSelector — the draft
+    // already has its occasion locked. Navigate directly to /letter/create.
+    // App.tsx hydration restores the saved state on mount.
+    window.location.href = '/letter/create';
   };
 
   const handleResumeConfirmDiscard = async () => {

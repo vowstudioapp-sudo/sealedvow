@@ -129,7 +129,10 @@ export const MyLettersModal: React.FC<Props> = ({ isOpen, onClose, onCreateNew }
 
   const handleResumeDraft = () => {
     onClose();
-    window.location.href = '/create';
+    // PR-49 Phase 1 QA: resume flows skip OccasionSelector — the draft
+    // already has its occasion locked. Navigate directly to /letter/create.
+    // App.tsx hydration restores the saved state on mount.
+    window.location.href = '/letter/create';
   };
 
   return (
