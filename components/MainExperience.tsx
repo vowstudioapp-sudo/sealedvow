@@ -185,9 +185,12 @@ export const MainExperience: React.FC<Props> = ({
     // Promises sequence: title section (+1) plus one section per populated
     // promise (+populatedCoupons.length). Each promise is its own
     // full-viewport snap-section, encountered by scroll one at a time.
-    if (!isPreview && hasPopulatedPromises) count += 1 + populatedCoupons.length;
-    if (!isPreview && data.hasGift) count++;
-    if (!isPreview) count++; // final closure (.snap-section wrapper)
+    // Preview restoration: promises, gift, and closure now render in
+    // creator preview alongside the receiver flow (same renderer, same
+    // gates as data presence). Demo conversion CTA stays preview-hidden.
+    if (hasPopulatedPromises) count += 1 + populatedCoupons.length;
+    if (data.hasGift) count++;
+    count++; // final closure (.snap-section wrapper)
     if (isDemoMode && !isPreview) count++;
     return count;
   }, [
@@ -600,7 +603,7 @@ export const MainExperience: React.FC<Props> = ({
       <>
 
       {/* SECTION: Promises Title — emotional framing for the vows that follow */}
-      {!isPreview && hasPopulatedPromises && (
+      {hasPopulatedPromises && (
         <PaperSurface
           theme={data.theme || 'obsidian'}
           as="section"
@@ -633,7 +636,7 @@ export const MainExperience: React.FC<Props> = ({
           IntersectionObserver, which writes the section's index into
           `revealedPromises`. The card reads `isRevealed` and animates with
           the existing closureReveal keyframe. */}
-      {!isPreview && populatedCoupons.map((coupon, idx) => (
+      {populatedCoupons.map((coupon, idx) => (
         <section
           key={coupon.id}
           data-section-type={`promise-${idx}`}
@@ -655,7 +658,7 @@ export const MainExperience: React.FC<Props> = ({
       ))}
 
       {/* SECTION: Gift */}
-      {!isPreview && data.hasGift && (
+      {data.hasGift && (
         <PaperSurface
           theme={data.theme || 'obsidian'}
           as="section"
@@ -674,11 +677,17 @@ export const MainExperience: React.FC<Props> = ({
       )}
 
       {/* SECTION: Final Closure — the one and only ending */}
-      {!isPreview && (
-        <section
-          data-section-type="closure"
-          className="snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-8"
-        >
+      {/* Preview restoration: closure renders in creator preview too. The
+          inner {sealedDate && ...} guard at the timestamp paragraph keeps
+          the date line hidden when sealedAt/createdAt aren't server-set
+          yet — preview shows only the "Sealed by {senderName}" line, no
+          fabricated timestamp. Extra bottom padding under isPreview
+          prevents the fixed Creator Preview Controls footer from clipping
+          the stamp; receiver render is unaffected. */}
+      <section
+        data-section-type="closure"
+        className={`snap-section h-screen w-full flex flex-col items-center justify-center snap-start px-8 ${isPreview ? 'pb-40' : ''}`}
+      >
         <PaperSurface
           theme={data.theme || 'obsidian'}
           as="div"
@@ -727,7 +736,6 @@ export const MainExperience: React.FC<Props> = ({
           </div>
         </PaperSurface>
         </section>
-      )}
 
       {/* DEMO: Final Conversion Screen — the only CTA in the entire demo */}
       {isDemoMode && !isPreview && (
