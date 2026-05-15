@@ -700,21 +700,6 @@ export const PreparationForm: React.FC<Props> = ({
           onBeginAgain={handleBeginAgain}
         />
       )}
-      {/* Back to Home — quiet exit point. Uses the same luxury-bronze
-          back-button language as the in-form back buttons. Persistence is
-          untouched: autosave + cloud draft survive, so returning via
-          "Create Your Letter" restores the draft normally. Fixed top-left
-          at z-20 — sits below DraftResumeModal (z-50) and the larger
-          reconciliation modals so it doesn't compete during mandatory
-          dismissals. */}
-      <button
-        type="button"
-        onClick={() => { window.location.href = '/'; }}
-        aria-label="Back to Home"
-        className="fixed top-4 left-4 md:top-6 md:left-6 z-20 px-6 py-3 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all duration-300 text-[10px] uppercase tracking-[0.2em] font-bold whitespace-nowrap shadow-lg animate-fade-in"
-      >
-        ← Back to Home
-      </button>
     <div className={`mx-auto ${(step as number) === 2 ? 'max-w-5xl p-4 mt-2 mb-4' : 'max-w-3xl p-4 md:p-12 mt-4 mb-32'}`}>
       <div className={`text-center animate-fade-in ${(step as number) === 2 ? 'mb-2' : 'mb-16'}`}>
         {step !== 2 && (
@@ -1468,11 +1453,27 @@ export const PreparationForm: React.FC<Props> = ({
         )}
 
         <div className={`pt-8 pb-20 flex justify-between items-center border-t border-white/10 ${(step as number) === 2 ? "hidden" : ""}`}>
-           {step > 1 ? (
-             <button type="button" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); back(); }} className="px-12 py-5 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs font-bold shadow-2xl">
-               ← Back
+           {/* Secondary navigation cluster — left side. Back to Home is
+               always present in this row; the step-Back button joins it
+               from Step 2 onward (Step 1 has no "previous step"). Both
+               reuse the same in-flow back-button styling for visual
+               continuity. Persistence is untouched on either: autosave
+               keeps the draft alive on the way out. */}
+           <div className="flex items-center gap-3 md:gap-4">
+             <button
+               type="button"
+               onClick={() => { window.location.href = '/'; }}
+               aria-label="Back to Home"
+               className="px-12 py-5 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs font-bold shadow-2xl"
+             >
+               ← Back to Home
              </button>
-           ) : <div></div>}
+             {step > 1 && (
+               <button type="button" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); back(); }} className="px-12 py-5 rounded-full bg-luxury-bronze text-white hover:bg-luxury-ink transition-all transform hover:-translate-y-1 active:scale-[0.99] uppercase tracking-[0.4em] text-[10px] md:text-xs font-bold shadow-2xl">
+                 ← Back
+               </button>
+             )}
+           </div>
            
            <button
              type="submit"
