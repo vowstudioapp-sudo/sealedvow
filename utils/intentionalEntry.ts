@@ -27,3 +27,18 @@ export function consumeIntentionalEntry(): boolean {
     return false;
   }
 }
+
+// Lifecycle-authoritative clear, distinct from the read-and-clear consume
+// above. Called from useAuth's auth-end listener so navigation-intent
+// state cannot cross an auth-lifecycle boundary — e.g., a CREATE click
+// that set the flag followed by sign-out must not leak into the next
+// sign-in session.
+export function clearIntentionalEntry(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(ENTRY_FLAG_KEY);
+  } catch {
+    // sessionStorage may be unavailable (private mode, quota errors).
+    // Clearing failure is non-fatal.
+  }
+}

@@ -39,6 +39,7 @@ import {
 } from '../services/firebase';
 import { clearActiveMode } from '../utils/activeMode';
 import { clearCloudDraftExpected } from '../utils/cloudDraftExpectation';
+import { clearIntentionalEntry } from '../utils/intentionalEntry';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -77,6 +78,12 @@ export function useAuth() {
         // signed-in session. Sign-out invalidates it the same way it
         // invalidates the active mode.
         clearCloudDraftExpected();
+        // Navigation-intent must not cross an auth-lifecycle boundary. A
+        // CREATE click before sign-out can leave sv_intentional_entry set;
+        // without this clear it would persist in sessionStorage until the
+        // tab closes and could be consumed by a later flow on the next
+        // sign-in. Same listener that owns the other two clears.
+        clearIntentionalEntry();
       }
 
       setUser(u);

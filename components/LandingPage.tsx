@@ -252,8 +252,16 @@ export const LandingPage: React.FC<Props> = ({
     proceedToCreate();
   };
 
-  const handleModeChosen = () => {
+  const handleModeChosen = (mode: 'guest' | 'authenticated') => {
     setShowModeSelection(false);
+    // Product invariant: a successful Google sign-in is an identity action,
+    // not an intent to create. After auth completes, return the user to
+    // LandingPage so they explicitly choose what to do next. They can then
+    // click CREATE YOUR LETTER again — this time signed-in, so handleEnter
+    // routes through the cloud-hydration path (and ResumeOrDiscardModal if
+    // a draft exists). Guest is treated differently because picking Guest
+    // *is* the create intent; there is no separate identity step.
+    if (mode === 'authenticated') return;
     proceedToCreate();
   };
 
