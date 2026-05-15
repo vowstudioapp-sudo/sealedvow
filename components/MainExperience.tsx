@@ -172,6 +172,29 @@ export const MainExperience: React.FC<Props> = ({
     return isNaN(d.getTime()) ? null : d;
   }, [data.sealedAt, data.createdAt]);
 
+  // Canonical seal-time rendering. The seal happens at the moment the
+  // sender pays; we render it in the sender's IANA timezone so the
+  // receiver — wherever they are in the world — sees the same wall clock
+  // the sender saw. Without timeZone, toLocaleDateString/TimeString use
+  // the viewer's local zone and the ceremonial timestamp drifts per
+  // receiver. Old letters that predate sealedTimezone fall back to UTC.
+  // Wrapped in try/catch because a malformed timezone string would throw
+  // RangeError; on failure we fall through to UTC so render never crashes.
+  const sealedStamp = useMemo(() => {
+    if (!sealedDate) return null;
+    const zone = data.sealedTimezone || 'UTC';
+    const safeFormat = (opts: Intl.DateTimeFormatOptions) => {
+      try {
+        return new Intl.DateTimeFormat('en-US', { ...opts, timeZone: zone }).format(sealedDate);
+      } catch {
+        return new Intl.DateTimeFormat('en-US', { ...opts, timeZone: 'UTC' }).format(sealedDate);
+      }
+    };
+    const datePart = safeFormat({ month: 'long', day: 'numeric', year: 'numeric' });
+    const timePart = safeFormat({ hour: 'numeric', minute: '2-digit', hour12: true });
+    return `${datePart} · ${timePart}`;
+  }, [sealedDate, data.sealedTimezone]);
+
   /* ------------------------------------------------------------------ */
   /* SECTION COUNT (Optimized Observer Deps)                            */
   /* ------------------------------------------------------------------ */
@@ -719,8 +742,8 @@ export const MainExperience: React.FC<Props> = ({
               Sealed by {data.senderName}
             </p>
 
-            {sealedDate && (
-              <p 
+            {sealedStamp && (
+              <p
                 className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold"
                 style={{
                   color: theme.gold,
@@ -728,9 +751,7 @@ export const MainExperience: React.FC<Props> = ({
                   animation: closureRevealed ? 'closureReveal 1s ease-out 1s both' : undefined,
                 }}
               >
-                {sealedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                  + ' · '
-                  + sealedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                {sealedStamp}
               </p>
             )}
           </div>

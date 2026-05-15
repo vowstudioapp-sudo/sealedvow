@@ -17,6 +17,7 @@ function sanitizeSession(data = {}) {
     occasion: data.occasion,
     theme: data.theme,
     sealedAt: data.sealedAt,
+    sealedTimezone: data.sealedTimezone,
     createdAt: data.createdAt,
     revealMethod: data.revealMethod,
     unlockDate: data.unlockDate,

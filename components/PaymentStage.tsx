@@ -70,6 +70,21 @@ export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentCompl
   // this is empty (server falls back to the verified session email).
   const effectiveEmailForServer = isGuestMode ? trimmedInlineEmail : '';
 
+  // Sender's IANA timezone, captured at component mount from the browser.
+  // Forwarded to /api/verify-payment in both the founder and Razorpay
+  // branches so the server can persist it alongside sealedAt. Receivers
+  // worldwide then render the seal time in this canonical sender zone
+  // instead of their own local zone. Wrapped because some restrictive
+  // environments throw on Intl access; falls through to '' which the
+  // server treats as "absent" and the renderer falls back to UTC.
+  const senderTimezone = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch {
+      return '';
+    }
+  })();
+
   // Founder access
   const [founderCode, setFounderCode] = useState('');
   const [founderError, setFounderError] = useState<string | null>(null);
@@ -119,6 +134,7 @@ export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentCompl
           ...(effectiveEmailForServer
             ? { recipientEmail: effectiveEmailForServer }
             : {}),
+          ...(senderTimezone ? { sealedTimezone: senderTimezone } : {}),
         }),
       });
 
@@ -232,6 +248,7 @@ export const PaymentStage: React.FC<Props> = ({ data, guestEmail, onPaymentCompl
                 ...(effectiveEmailForServer
                   ? { recipientEmail: effectiveEmailForServer }
                   : {}),
+                ...(senderTimezone ? { sealedTimezone: senderTimezone } : {}),
               }),
             });
 

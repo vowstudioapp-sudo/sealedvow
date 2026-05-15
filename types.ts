@@ -136,6 +136,12 @@ export interface CoupleData {
   createdAt?: string;        // ISO timestamp
   updatedAt?: string;        // ISO timestamp
   sealedAt?: string;         // ISO timestamp — set at payment verification
+  // IANA timezone identifier captured from the sender's browser at payment
+  // success (e.g. "Asia/Kolkata"). Canonical seal-time anchor — the receiver
+  // experience formats sealedAt in this timezone so every viewer worldwide
+  // sees the same ceremonial seal time. Optional for back-compat with
+  // pre-feature letters; MainExperience falls back to UTC when absent.
+  sealedTimezone?: string;
   previewExpiresAt?: string; // ISO timestamp
   replyEnabled?: boolean;    // Whether the receiver can send a one-time reply
 

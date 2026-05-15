@@ -47,6 +47,28 @@ function normalizeRecipientEmail(raw) {
   return t;
 }
 
+// Normalize and validate the sender's IANA timezone identifier. Used as
+// the canonical seal-time anchor so every receiver renders the same wall
+// clock. Returns the validated string or null. We never fail the payment
+// on a bad timezone — invalid input simply persists as null and the
+// renderer falls back to UTC.
+function normalizeSealedTimezone(raw) {
+  if (raw == null) return null;
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim();
+  if (!t || t.length > 64) return null;
+  // Quick character allowlist — IANA zones are ASCII letters/digits plus
+  // '/', '_', '-', '+', ':' (e.g. Asia/Kolkata, Etc/GMT+5, America/Indiana/Indianapolis).
+  if (!/^[A-Za-z0-9_/+\-:]+$/.test(t)) return null;
+  // Authoritative check: Intl throws RangeError on unknown zones.
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: t });
+  } catch {
+    return null;
+  }
+  return t;
+}
+
 // PR #18a: atomic-with-success draft completion. Called from BOTH the founder
 // branch and the Razorpay branch AFTER the existing payment-success multi-path
 // write resolves. Internal try/catch swallows errors — payment success must
@@ -325,9 +347,11 @@ export default async function handler(req, res) {
     paymentMode,
     founderToken,
     recipientEmail: recipientEmailRaw,
+    sealedTimezone: sealedTimezoneRaw,
   } = req.body || {};
 
   const transportRecipientEmail = normalizeRecipientEmail(recipientEmailRaw);
+  const sealedTimezone = normalizeSealedTimezone(sealedTimezoneRaw);
 
   // ════════════════════════════════════════════════════════════
   // PATH A: FOUNDER ACCESS
@@ -400,6 +424,10 @@ export default async function handler(req, res) {
         status: 'paid',
         sealedAt: now,
         createdAt: sanitized.createdAt || now,
+        // Canonical sender-zone anchor for receiver render. Omitted from
+        // the persisted record when client didn't send one or it failed
+        // normalization — the renderer treats absence as UTC fallback.
+        ...(sealedTimezone ? { sealedTimezone } : {}),
         paymentId: founderId,
         paymentMode: 'founder',
         paidAmount: 0,
@@ -692,6 +720,8 @@ export default async function handler(req, res) {
       status: 'paid',
       sealedAt: now,
       createdAt: sanitized.createdAt || now,
+      // Canonical sender-zone anchor — see normalizeSealedTimezone above.
+      ...(sealedTimezone ? { sealedTimezone } : {}),
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
       ...(senderUid ? { senderUid } : {}),
